@@ -41,8 +41,9 @@ export async function initiateCall(params: InitiateCallParams): Promise<CallResu
 
   console.log('DEBUG: assistantId:', assistantId);
   console.log('DEBUG: phoneNumberId:', phoneNumberId);
-  console.log('DEBUG: assistantId type:', typeof assistantId);
-  console.log('DEBUG: phoneNumberId type:', typeof phoneNumberId);
+  console.log('DEBUG: VAPI_ASSISTANT_ID env:', process.env.VAPI_ASSISTANT_ID);
+  console.log('DEBUG: VAPI_PHONE_NUMBER_ID env:', process.env.VAPI_PHONE_NUMBER_ID);
+  console.log('DEBUG: All VAPI env vars:', Object.keys(process.env).filter(k => k.startsWith('VAPI')));
 
   const response = await fetch("https://api.vapi.ai/call/phone", {
     method: "POST",
