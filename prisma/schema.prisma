@@ -1,0 +1,173 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Lead status enum
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  CALL_SCHEDULED
+  CALL_COMPLETED
+  CONVERTED
+  LOST
+}
+
+// Communication channel enum
+enum CommunicationChannel {
+  EMAIL
+  SMS
+  VOICE
+  SYSTEM
+}
+
+// Activity type enum
+enum ActivityType {
+  STATUS_CHANGE
+  EMAIL_SENT
+  EMAIL_OPENED
+  EMAIL_CLICKED
+  SMS_SENT
+  SMS_RECEIVED
+  CALL_INITIATED
+  CALL_COMPLETED
+  APPOINTMENT_BOOKED
+  APPOINTMENT_CANCELLED
+  NOTE_ADDED
+  WEBHOOK_RECEIVED
+}
+
+// Main lead table
+model Lead {
+  id                String              @id @default(cuid())
+  email             String              @unique
+  phone             String?
+  firstName         String
+  lastName          String
+  status            LeadStatus          @default(NEW)
+  source            String?             // webhook source identifier
+  rawData           Json?               // store original webhook payload
+  consentEmail      Boolean             @default(false)
+  consentSms        Boolean             @default(false)
+  consentCall       Boolean             @default(false)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  lastContactedAt   DateTime?
+  convertedAt       DateTime?
+
+  // Relations
+  activities        LeadActivity[]
+  appointments      Appointment[]
+
+  @@index([email])
+  @@index([phone])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// Activity log for all lead interactions
+model LeadActivity {
+  id                String              @id @default(cuid())
+  leadId            String
+  type              ActivityType
+  channel           CommunicationChannel?
+  subject           String?
+  content           String?
+  metadata          Json?               // additional data like email open time, call duration, etc
+  createdAt         DateTime            @default(now())
+
+  // Relations
+  lead              Lead                @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+// Cal.com appointments
+model Appointment {
+  id                String              @id @default(cuid())
+  leadId            String
+  calComEventId     String?             @unique
+  calComBookingUid  String?             @unique
+  scheduledAt       DateTime
+  duration          Int                 // minutes
+  status            String              // scheduled, completed, cancelled, no_show
+  meetingUrl        String?
+  notes             String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  // Relations
+  lead              Lead                @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([scheduledAt])
+}
+
+// Email templates
+model EmailTemplate {
+  id                String              @id @default(cuid())
+  name              String              @unique
+  subject           String
+  htmlBody          String
+  textBody          String?
+  variables         String[]            // e.g., ["firstName", "advisorName"]
+  isActive          Boolean             @default(true)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+}
+
+// SMS templates
+model SmsTemplate {
+  id                String              @id @default(cuid())
+  name              String              @unique
+  body              String
+  variables         String[]
+  isActive          Boolean             @default(true)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+}
+
+// Automation rules
+model AutomationRule {
+  id                String              @id @default(cuid())
+  name              String
+  description       String?
+  triggerType       String              // time_based, event_based, status_based
+  triggerCondition  Json                // condition logic
+  actions           Json                // actions to execute
+  isActive          Boolean             @default(true)
+  priority          Int                 @default(0)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([isActive])
+}
+
+// Webhook event log for debugging
+model WebhookEvent {
+  id                String              @id @default(cuid())
+  source            String              // e.g., "lead_provider", "cal_com"
+  eventType         String?
+  payload           Json
+  processed         Boolean             @default(false)
+  error             String?
+  createdAt         DateTime            @default(now())
+
+  @@index([source])
+  @@index([processed])
+  @@index([createdAt])
+}

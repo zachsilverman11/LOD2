@@ -1,0 +1,105 @@
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
+import { normalizePhoneNumber } from "@/lib/sms";
+import { ActivityType, CommunicationChannel } from "@/app/generated/prisma";
+
+/**
+ * Handle incoming SMS messages from Twilio
+ * Docs: https://www.twilio.com/docs/sms/twiml
+ */
+export async function POST(request: NextRequest) {
+  try {
+    const formData = await request.formData();
+    const from = formData.get("From") as string;
+    const body = formData.get("Body") as string;
+    const messageSid = formData.get("MessageSid") as string;
+
+    if (!from || !body) {
+      return NextResponse.json(
+        { error: "Missing required fields" },
+        { status: 400 }
+      );
+    }
+
+    // Normalize phone number
+    const normalizedPhone = normalizePhoneNumber(from);
+
+    // Find lead by phone number
+    const lead = await prisma.lead.findFirst({
+      where: {
+        phone: {
+          contains: normalizedPhone.replace("+", "").slice(-10), // Match last 10 digits
+        },
+      },
+    });
+
+    if (lead) {
+      // Handle opt-out (CASL compliance)
+      if (body.toLowerCase().includes("stop") || body.toLowerCase().includes("unsubscribe")) {
+        await prisma.lead.update({
+          where: { id: lead.id },
+          data: { consentSms: false },
+        });
+
+        await prisma.leadActivity.create({
+          data: {
+            leadId: lead.id,
+            type: ActivityType.SMS_RECEIVED,
+            channel: CommunicationChannel.SMS,
+            content: "Lead opted out of SMS communication",
+          },
+        });
+
+        // Respond with TwiML
+        return new Response(
+          '<?xml version="1.0" encoding="UTF-8"?><Response><Message>You have been unsubscribed from SMS messages.</Message></Response>',
+          {
+            headers: { "Content-Type": "text/xml" },
+          }
+        );
+      }
+
+      // Log incoming message
+      await prisma.leadActivity.create({
+        data: {
+          leadId: lead.id,
+          type: ActivityType.SMS_RECEIVED,
+          channel: CommunicationChannel.SMS,
+          content: body,
+          metadata: {
+            messageSid,
+            from: normalizedPhone,
+          },
+        },
+      });
+    }
+
+    // Log webhook event
+    await prisma.webhookEvent.create({
+      data: {
+        source: "twilio",
+        eventType: "sms.received",
+        payload: {
+          from,
+          body,
+          messageSid,
+        },
+        processed: true,
+      },
+    });
+
+    // Respond with empty TwiML (no auto-reply)
+    return new Response(
+      '<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
+      {
+        headers: { "Content-Type": "text/xml" },
+      }
+    );
+  } catch (error) {
+    console.error("Twilio webhook error:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
