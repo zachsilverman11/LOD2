@@ -39,6 +39,11 @@ export async function initiateCall(params: InitiateCallParams): Promise<CallResu
     throw new Error("VAPI_PHONE_NUMBER_ID is not set");
   }
 
+  console.log('DEBUG: assistantId:', assistantId);
+  console.log('DEBUG: phoneNumberId:', phoneNumberId);
+  console.log('DEBUG: assistantId type:', typeof assistantId);
+  console.log('DEBUG: phoneNumberId type:', typeof phoneNumberId);
+
   const response = await fetch("https://api.vapi.ai/call/phone", {
     method: "POST",
     headers: {

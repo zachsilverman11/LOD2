@@ -18,7 +18,7 @@ async function configureWebhook() {
     throw new Error("VAPI_ASSISTANT_ID is not set");
   }
 
-  const webhookUrl = "https://b25c840934c809.lhr.life/api/webhooks/vapi";
+  const webhookUrl = "https://lod2-a9incracj-zach-silvermans-projects.vercel.app/api/webhooks/vapi";
 
   console.log("Configuring webhook for assistant:", assistantId);
   console.log("Webhook URL:", webhookUrl);
