@@ -29,12 +29,12 @@ export async function initiateCall(params: InitiateCallParams): Promise<CallResu
     throw new Error("VAPI_API_KEY is not set");
   }
 
-  const assistantId = params.assistantId || process.env.VAPI_ASSISTANT_ID;
+  const assistantId = params.assistantId || process.env.VAPI_ASSISTANT_ID || "3826d44a-96ac-4761-bac2-aab7cd0a40df";
   if (!assistantId) {
     throw new Error("VAPI_ASSISTANT_ID is not set");
   }
 
-  const phoneNumberId = process.env.VAPI_PHONE_NUMBER_ID;
+  const phoneNumberId = process.env.VAPI_PHONE_NUMBER_ID || "4bf4ce34-c5a6-4943-b4e5-c84019c87c57";
   if (!phoneNumberId) {
     throw new Error("VAPI_PHONE_NUMBER_ID is not set");
   }
