@@ -39,11 +39,22 @@ export async function initiateCall(params: InitiateCallParams): Promise<CallResu
     throw new Error("VAPI_PHONE_NUMBER_ID is not set");
   }
 
-  console.log('DEBUG: assistantId:', assistantId);
-  console.log('DEBUG: phoneNumberId:', phoneNumberId);
-  console.log('DEBUG: VAPI_ASSISTANT_ID env:', process.env.VAPI_ASSISTANT_ID);
-  console.log('DEBUG: VAPI_PHONE_NUMBER_ID env:', process.env.VAPI_PHONE_NUMBER_ID);
+  console.log('DEBUG: assistantId:', assistantId, typeof assistantId);
+  console.log('DEBUG: phoneNumberId:', phoneNumberId, typeof phoneNumberId);
+  console.log('DEBUG: VAPI_ASSISTANT_ID env:', process.env.VAPI_ASSISTANT_ID, typeof process.env.VAPI_ASSISTANT_ID);
+  console.log('DEBUG: VAPI_PHONE_NUMBER_ID env:', process.env.VAPI_PHONE_NUMBER_ID, typeof process.env.VAPI_PHONE_NUMBER_ID);
   console.log('DEBUG: All VAPI env vars:', Object.keys(process.env).filter(k => k.startsWith('VAPI')));
+
+  const requestBody = {
+    assistantId,
+    phoneNumberId,
+    customer: {
+      number: params.phoneNumber,
+    },
+    metadata: params.metadata,
+  };
+
+  console.log('DEBUG: Request body:', JSON.stringify(requestBody, null, 2));
 
   const response = await fetch("https://api.vapi.ai/call/phone", {
     method: "POST",
@@ -51,14 +62,7 @@ export async function initiateCall(params: InitiateCallParams): Promise<CallResu
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
     },
-    body: JSON.stringify({
-      assistantId,
-      phoneNumberId,
-      customer: {
-        number: params.phoneNumber,
-      },
-      metadata: params.metadata,
-    }),
+    body: JSON.stringify(requestBody),
   });
 
   if (!response.ok) {
