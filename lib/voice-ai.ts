@@ -29,21 +29,9 @@ export async function initiateCall(params: InitiateCallParams): Promise<CallResu
     throw new Error("VAPI_API_KEY is not set");
   }
 
-  const assistantId = params.assistantId || process.env.VAPI_ASSISTANT_ID || "3826d44a-96ac-4761-bac2-aab7cd0a40df";
-  if (!assistantId) {
-    throw new Error("VAPI_ASSISTANT_ID is not set");
-  }
-
-  const phoneNumberId = process.env.VAPI_PHONE_NUMBER_ID || "4bf4ce34-c5a6-4943-b4e5-c84019c87c57";
-  if (!phoneNumberId) {
-    throw new Error("VAPI_PHONE_NUMBER_ID is not set");
-  }
-
-  console.log('DEBUG: assistantId:', assistantId, typeof assistantId);
-  console.log('DEBUG: phoneNumberId:', phoneNumberId, typeof phoneNumberId);
-  console.log('DEBUG: VAPI_ASSISTANT_ID env:', process.env.VAPI_ASSISTANT_ID, typeof process.env.VAPI_ASSISTANT_ID);
-  console.log('DEBUG: VAPI_PHONE_NUMBER_ID env:', process.env.VAPI_PHONE_NUMBER_ID, typeof process.env.VAPI_PHONE_NUMBER_ID);
-  console.log('DEBUG: All VAPI env vars:', Object.keys(process.env).filter(k => k.startsWith('VAPI')));
+  // Hardcoded for now - TODO: fix env vars
+  const assistantId = "3826d44a-96ac-4761-bac2-aab7cd0a40df";
+  const phoneNumberId = "4bf4ce34-c5a6-4943-b4e5-c84019c87c57";
 
   const requestBody = {
     assistantId,
@@ -53,8 +41,6 @@ export async function initiateCall(params: InitiateCallParams): Promise<CallResu
     },
     metadata: params.metadata,
   };
-
-  console.log('DEBUG: Request body:', JSON.stringify(requestBody, null, 2));
 
   const response = await fetch("https://api.vapi.ai/call/phone", {
     method: "POST",
