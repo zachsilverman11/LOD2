@@ -71,7 +71,7 @@ export async function PATCH(
     if (status && status !== lead.status) {
       await prisma.leadActivity.create({
         data: {
-          leadId: params.id,
+          leadId: id,
           type: ActivityType.STATUS_CHANGE,
           channel: CommunicationChannel.SYSTEM,
           content: `Status changed from ${lead.status} to ${status}`,

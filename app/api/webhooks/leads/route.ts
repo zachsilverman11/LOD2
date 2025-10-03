@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
           consentEmail: leadData.consentEmail || existingLead.consentEmail,
           consentSms: leadData.consentSms || existingLead.consentSms,
           consentCall: leadData.consentCall || existingLead.consentCall,
-          rawData: leadData.metadata || existingLead.rawData,
+          rawData: (leadData.metadata || existingLead.rawData) as any,
           updatedAt: new Date(),
         },
       });
@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
           type: ActivityType.WEBHOOK_RECEIVED,
           channel: CommunicationChannel.SYSTEM,
           content: "Duplicate lead received - updated existing record",
-          metadata: leadData.metadata,
+          metadata: leadData.metadata as any,
         },
       });
 
@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
             type: ActivityType.WEBHOOK_RECEIVED,
             channel: CommunicationChannel.SYSTEM,
             content: "New lead received from webhook",
-            metadata: leadData.metadata,
+            metadata: leadData.metadata as any,
           },
         },
       },
