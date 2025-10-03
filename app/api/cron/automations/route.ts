@@ -11,7 +11,7 @@ import { processTimeBasedAutomations } from "@/lib/automation-engine";
  * {
  *   "crons": [{
  *     "path": "/api/cron/automations",
- *     "schedule": "*/15 * * * *"
+ *     "schedule": "every 15 minutes"
  *   }]
  * }
  */
