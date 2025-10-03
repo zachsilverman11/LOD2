@@ -23,7 +23,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Lead has no phone number" }, { status: 400 });
     }
 
-    // Initiate the call
+    // Initiate the call with all lead context
     const result = await initiateCall({
       phoneNumber: lead.phone,
       metadata: {
@@ -31,6 +31,10 @@ export async function POST(req: Request) {
         firstName: lead.firstName,
         lastName: lead.lastName,
         email: lead.email,
+        phone: lead.phone,
+        source: lead.source,
+        // Include any custom form data
+        ...(lead.rawData as Record<string, unknown> || {}),
       },
     });
 
