@@ -43,24 +43,6 @@ export function LeadCard({ lead, onClick }: LeadCardProps) {
           Last activity: {format(new Date(lastActivity.createdAt), "MMM d, h:mm a")}
         </div>
       )}
-
-      <div className="mt-3 flex gap-2 flex-wrap">
-        {lead.consentEmail && (
-          <span className="text-xs bg-[#625FFF]/10 text-[#625FFF] px-2.5 py-1 rounded font-medium border border-[#625FFF]/30">
-            Email
-          </span>
-        )}
-        {lead.consentSms && (
-          <span className="text-xs bg-[#B1AFFF]/30 text-[#625FFF] px-2.5 py-1 rounded font-medium border border-[#B1AFFF]">
-            SMS
-          </span>
-        )}
-        {lead.consentCall && (
-          <span className="text-xs bg-[#D9F36E]/30 text-[#1C1B1A] px-2.5 py-1 rounded font-medium border border-[#D9F36E]">
-            Call
-          </span>
-        )}
-      </div>
     </div>
   );
 }
