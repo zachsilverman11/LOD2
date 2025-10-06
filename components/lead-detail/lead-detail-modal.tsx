@@ -177,12 +177,6 @@ export function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
             </div>
           </div>
 
-          {/* Cal.com Integration Placeholder */}
-          <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-            <p className="text-sm text-blue-700">
-              📅 Cal.com scheduling widget will be integrated here
-            </p>
-          </div>
         </div>
       </div>
     </div>
