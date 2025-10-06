@@ -58,11 +58,15 @@ export async function POST(request: NextRequest) {
 }
 
 async function handleBookingCreated(payload: any) {
-  const { uid, id, startTime, endTime, attendees, metadata } = payload;
+  const { uid, id, startTime, endTime, attendees, metadata, responses } = payload;
 
   // Find lead by email or phone
   const attendeeEmail = attendees[0]?.email;
-  const attendeePhone = attendees[0]?.phoneNumber;
+  // Cal.com stores phone in responses.location.value for phone meetings
+  const attendeePhone =
+    responses?.location?.value ||
+    responses?.attendeePhoneNumber?.value ||
+    attendees[0]?.phoneNumber;
 
   if (!attendeeEmail && !attendeePhone) {
     console.log("No email or phone in booking payload");
