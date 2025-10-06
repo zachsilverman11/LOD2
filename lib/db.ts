@@ -6,20 +6,21 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-// Use Neon serverless adapter for Vercel
+// Use Neon serverless adapter for production
 const createPrismaClient = () => {
-  if (process.env.DATABASE_URL && process.env.VERCEL) {
+  // Always use serverless adapter with Neon connection pooling
+  if (process.env.DATABASE_URL) {
     const pool = new NeonPool({ connectionString: process.env.DATABASE_URL });
     const adapter = new PrismaNeon(pool);
     return new PrismaClient({
       adapter,
-      log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
+      log: ["error"],
     });
   }
 
-  // Fallback for local development
+  // Fallback (should not happen)
   return new PrismaClient({
-    log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
+    log: ["error"],
   });
 };
 
