@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { signOut } from "next-auth/react";
 import { KanbanBoard } from "@/components/kanban/kanban-board";
 import { LeadDetailModal } from "@/components/lead-detail/lead-detail-modal";
 import { LeadWithRelations } from "@/types/lead";
@@ -20,12 +21,20 @@ export default function DashboardPage() {
               </h1>
               <p className="text-[#55514D] mt-2 text-lg">Lead Conversion Dashboard</p>
             </div>
-            <Link
-              href="/dashboard/analytics"
-              className="px-4 py-2 text-sm text-[#625FFF] border border-[#625FFF] rounded-md hover:bg-[#625FFF] hover:text-white transition-colors"
-            >
-              Analytics
-            </Link>
+            <div className="flex items-center gap-3">
+              <Link
+                href="/dashboard/analytics"
+                className="px-4 py-2 text-sm text-[#625FFF] border border-[#625FFF] rounded-md hover:bg-[#625FFF] hover:text-white transition-colors"
+              >
+                Analytics
+              </Link>
+              <button
+                onClick={() => signOut({ callbackUrl: "/login" })}
+                className="px-4 py-2 text-sm text-[#55514D] border border-[#E4DDD3] rounded-md hover:bg-[#F5F5F5] transition-colors"
+              >
+                Sign Out
+              </button>
+            </div>
           </div>
         </div>
       </header>

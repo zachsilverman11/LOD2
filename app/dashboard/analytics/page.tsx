@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { signOut } from "next-auth/react";
 
 interface OverviewData {
   totalLeads: number;
@@ -114,12 +115,20 @@ export default function AnalyticsPage() {
               </h1>
               <p className="text-[#55514D] mt-2 text-lg">Analytics Dashboard</p>
             </div>
-            <Link
-              href="/dashboard"
-              className="px-6 py-3 bg-[#625FFF] text-white font-semibold rounded-lg hover:bg-[#4F4DCC] transition-colors"
-            >
-              ← Back to Pipeline
-            </Link>
+            <div className="flex items-center gap-3">
+              <Link
+                href="/dashboard"
+                className="px-4 py-2 text-sm text-[#625FFF] border border-[#625FFF] rounded-md hover:bg-[#625FFF] hover:text-white transition-colors"
+              >
+                ← Pipeline
+              </Link>
+              <button
+                onClick={() => signOut({ callbackUrl: "/login" })}
+                className="px-4 py-2 text-sm text-[#55514D] border border-[#E4DDD3] rounded-md hover:bg-[#F5F5F5] transition-colors"
+              >
+                Sign Out
+              </button>
+            </div>
           </div>
         </div>
       </header>
