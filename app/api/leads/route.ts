@@ -6,7 +6,6 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const status = searchParams.get("status");
 
-    // Temporarily fetch without notes/tasks to diagnose
     const leads = await prisma.lead.findMany({
       where: status ? { status: status as any } : undefined,
       include: {
@@ -19,18 +18,17 @@ export async function GET(request: NextRequest) {
         communications: {
           orderBy: { createdAt: "desc" },
         },
+        notes: {
+          orderBy: { createdAt: "desc" },
+        },
+        tasks: {
+          orderBy: { createdAt: "desc" },
+        },
       },
       orderBy: { createdAt: "desc" },
     });
 
-    // Add empty arrays for notes and tasks for now
-    const leadsWithExtras = leads.map(lead => ({
-      ...lead,
-      notes: [],
-      tasks: [],
-    }));
-
-    return NextResponse.json(leadsWithExtras);
+    return NextResponse.json(leads);
   } catch (error) {
     console.error("Error fetching leads:", error);
     return NextResponse.json(
