@@ -60,16 +60,36 @@ export async function POST(request: NextRequest) {
 async function handleBookingCreated(payload: any) {
   const { uid, id, startTime, endTime, attendees, metadata } = payload;
 
-  // Find lead by email
+  // Find lead by email or phone
   const attendeeEmail = attendees[0]?.email;
-  if (!attendeeEmail) return;
+  const attendeePhone = attendees[0]?.phoneNumber;
 
-  const lead = await prisma.lead.findUnique({
-    where: { email: attendeeEmail.toLowerCase() },
-  });
+  if (!attendeeEmail && !attendeePhone) {
+    console.log("No email or phone in booking payload");
+    return;
+  }
+
+  // Try to find lead by email first
+  let lead = attendeeEmail
+    ? await prisma.lead.findUnique({
+        where: { email: attendeeEmail.toLowerCase() },
+      })
+    : null;
+
+  // If not found by email, try phone number (match last 10 digits)
+  if (!lead && attendeePhone) {
+    const phoneDigits = attendeePhone.replace(/\D/g, "").slice(-10);
+    lead = await prisma.lead.findFirst({
+      where: {
+        phone: {
+          contains: phoneDigits,
+        },
+      },
+    });
+  }
 
   if (!lead) {
-    console.log("Lead not found for booking:", attendeeEmail);
+    console.log("Lead not found for booking. Email:", attendeeEmail, "Phone:", attendeePhone);
     return;
   }
 
