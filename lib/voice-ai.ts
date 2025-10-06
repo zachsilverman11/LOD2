@@ -29,8 +29,8 @@ export async function initiateCall(params: InitiateCallParams): Promise<CallResu
     throw new Error("VAPI_API_KEY is not set");
   }
 
-  // Hardcoded - working assistant with proper configuration
-  const assistantId = "b1cf5f60-78ef-413e-8ef0-ab464dd4978e";
+  // Simple assistant without variable interpolation
+  const assistantId = "f10ba039-f2b2-47b9-bc8d-d55f5e4526af";
   const phoneNumberId = "4bf4ce34-c5a6-4943-b4e5-c84019c87c57";
 
   const requestBody = {
