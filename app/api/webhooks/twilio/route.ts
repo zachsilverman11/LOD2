@@ -88,39 +88,37 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // 🤖 TRIGGER AI RESPONSE (async, don't block webhook)
-      // Run this in background after responding to Twilio
-      setImmediate(async () => {
-        try {
-          console.log(`[AI] Processing incoming SMS from lead: ${lead.id}`);
+      // 🤖 TRIGGER AI RESPONSE
+      // Must await in serverless environment (can't use setImmediate)
+      try {
+        console.log(`[AI] Processing incoming SMS from lead: ${lead.id}`);
 
-          // Generate AI response
-          const decision = await handleConversation(lead.id, body);
+        // Generate AI response
+        const decision = await handleConversation(lead.id, body);
 
-          // Execute the decision
-          await executeDecision(lead.id, decision);
+        // Execute the decision
+        await executeDecision(lead.id, decision);
 
-          // Update lead stage if they replied (NEW -> ENGAGED)
-          if (lead.status === "NEW" || lead.status === "CONTACTED") {
-            await prisma.lead.update({
-              where: { id: lead.id },
-              data: { status: "ENGAGED" },
-            });
-          }
-
-          console.log(`[AI] ✅ Response handled: ${decision.action}`);
-        } catch (error) {
-          console.error("[AI] Failed to handle conversation:", error);
-          // Log error but don't crash
-          await prisma.leadActivity.create({
-            data: {
-              leadId: lead.id,
-              type: ActivityType.NOTE_ADDED,
-              content: `AI response failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-            },
+        // Update lead stage if they replied (NEW -> ENGAGED)
+        if (lead.status === "NEW" || lead.status === "CONTACTED") {
+          await prisma.lead.update({
+            where: { id: lead.id },
+            data: { status: "ENGAGED" },
           });
         }
-      });
+
+        console.log(`[AI] ✅ Response handled: ${decision.action}`);
+      } catch (error) {
+        console.error("[AI] Failed to handle conversation:", error);
+        // Log error but don't crash
+        await prisma.leadActivity.create({
+          data: {
+            leadId: lead.id,
+            type: ActivityType.NOTE_ADDED,
+            content: `AI response failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+          },
+        });
+      }
     }
 
     // Log webhook event
