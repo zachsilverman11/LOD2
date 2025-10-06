@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { handleConversation, executeDecision } from "@/lib/ai-conversation-enhanced";
+import { sendSlackNotification } from "@/lib/slack";
 
 /**
  * Webhook endpoint for Leads on Demand
@@ -109,6 +110,20 @@ export async function POST(req: NextRequest) {
       });
 
       console.log(`[Leads on Demand] Created new lead: ${lead.id}`);
+
+      // Send Slack notification for new lead
+      const loanInfo = payload.loanType === "purchase"
+        ? `$${payload.loanAmount || "Unknown"} ${payload.loanType} - ${payload.propertyType || "property"} in ${payload.city || "Unknown"}`
+        : payload.loanType === "refinance"
+        ? `$${payload.loanAmount || "Unknown"} refinance in ${payload.city || "Unknown"}`
+        : `${payload.loanType || "mortgage"} inquiry`;
+
+      await sendSlackNotification({
+        type: "new_lead",
+        leadName: `${firstName} ${lastName}`,
+        leadId: lead.id,
+        details: loanInfo,
+      });
     }
 
     // Mark webhook as processed

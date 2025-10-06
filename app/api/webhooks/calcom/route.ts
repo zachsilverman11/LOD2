@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { ActivityType, CommunicationChannel, LeadStatus } from "@/app/generated/prisma";
+import { sendSlackNotification } from "@/lib/slack";
 
 /**
  * Handle Cal.com webhook events
@@ -136,6 +137,20 @@ async function handleBookingCreated(payload: any) {
       content: `Call scheduled for ${new Date(startTime).toLocaleString()}`,
       metadata: payload,
     },
+  });
+
+  // Send Slack notification
+  await sendSlackNotification({
+    type: "call_booked",
+    leadName: `${lead.firstName} ${lead.lastName}`,
+    leadId: lead.id,
+    details: `Scheduled for ${new Date(startTime).toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    })}`,
   });
 }
 
