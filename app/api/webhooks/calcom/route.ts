@@ -63,10 +63,15 @@ async function handleBookingCreated(payload: any) {
   // Find lead by email or phone
   const attendeeEmail = attendees[0]?.email;
   // Cal.com stores phone in responses.location.value for phone meetings
-  const attendeePhone =
+  let attendeePhone =
     responses?.location?.value ||
     responses?.attendeePhoneNumber?.value ||
     attendees[0]?.phoneNumber;
+
+  // Handle case where phone is an object like { value: "+1234567890", optionValue: "" }
+  if (typeof attendeePhone === "object" && attendeePhone?.value) {
+    attendeePhone = attendeePhone.value;
+  }
 
   if (!attendeeEmail && !attendeePhone) {
     console.log("No email or phone in booking payload");
