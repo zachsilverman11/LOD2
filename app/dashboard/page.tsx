@@ -9,13 +9,13 @@ export default function DashboardPage() {
   const [selectedLead, setSelectedLead] = useState<LeadWithRelations | null>(null);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100">
-      <header className="bg-white shadow-md border-b border-gray-200">
-        <div className="max-w-full mx-auto px-8 py-5">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            Lead Conversion Dashboard
+    <div className="min-h-screen bg-gradient-to-br from-[#FBF3E7] via-[#B1AFFF]/20 to-[#F6D7FF]/30">
+      <header className="bg-white/80 backdrop-blur-sm shadow-sm border-b border-[#E4DDD3]">
+        <div className="max-w-full mx-auto px-8 py-6">
+          <h1 className="text-4xl font-extrabold text-[#1C1B1A]">
+            <span className="italic text-[#625FFF]">inspired</span> <span className="font-bold">mortgage.</span>
           </h1>
-          <p className="text-gray-600 mt-1">Manage your mortgage leads through the conversion pipeline</p>
+          <p className="text-[#55514D] mt-2 text-lg">Lead Conversion Dashboard</p>
         </div>
       </header>
 

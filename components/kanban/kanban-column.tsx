@@ -29,7 +29,7 @@ export function KanbanColumn({ status, label, color, leads, onLeadClick }: Kanba
       </div>
       <div
         ref={setNodeRef}
-        className="bg-gray-100 p-4 rounded-b-lg min-h-[600px] space-y-3 border-x border-b border-gray-200"
+        className="bg-white/60 backdrop-blur-sm p-4 rounded-b-lg min-h-[600px] space-y-3 border-x border-b border-[#E4DDD3]"
       >
         <SortableContext items={leads.map(l => l.id)} strategy={verticalListSortingStrategy}>
           {leads.map((lead) => (

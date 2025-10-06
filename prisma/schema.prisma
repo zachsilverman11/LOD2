@@ -74,6 +74,8 @@ model Lead {
   appointments      Appointment[]
   communications    Communication[]
   scheduledMessages ScheduledMessage[]
+  notes             Note[]
+  tasks             Task[]
 
   @@index([email])
   @@index([phone])
@@ -217,4 +219,42 @@ model ScheduledMessage {
   @@index([leadId])
   @@index([scheduledFor])
   @@index([sent])
+}
+
+// Notes on leads
+model Note {
+  id                String              @id @default(cuid())
+  leadId            String
+  content           String
+  createdBy         String              // user/team member name or ID
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  // Relations
+  lead              Lead                @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([createdAt])
+}
+
+// Tasks for team members
+model Task {
+  id                String              @id @default(cuid())
+  leadId            String
+  title             String
+  description       String?
+  dueDate           DateTime?
+  completed         Boolean             @default(false)
+  completedAt       DateTime?
+  assignedTo        String              // user/team member name or ID
+  createdBy         String              // user/team member name or ID
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  // Relations
+  lead              Lead                @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([completed])
+  @@index([dueDate])
 }

@@ -18,6 +18,12 @@ export async function GET(request: NextRequest) {
         communications: {
           orderBy: { createdAt: "desc" },
         },
+        notes: {
+          orderBy: { createdAt: "desc" },
+        },
+        tasks: {
+          orderBy: { createdAt: "desc" },
+        },
       },
       orderBy: { createdAt: "desc" },
     });
