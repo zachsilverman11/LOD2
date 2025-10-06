@@ -40,9 +40,17 @@ export function KanbanBoard({ onLeadClick }: KanbanBoardProps) {
     try {
       const response = await fetch("/api/leads");
       const data = await response.json();
-      setLeads(data);
+
+      if (!response.ok || data.error) {
+        console.error("API error:", data.error || data.details);
+        setLeads([]);
+        return;
+      }
+
+      setLeads(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error fetching leads:", error);
+      setLeads([]);
     } finally {
       setIsLoading(false);
     }
