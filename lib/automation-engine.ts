@@ -403,9 +403,11 @@ async function processSmartFollowUps() {
   console.log("[Automation] Processing smart follow-ups...");
 
   const now = new Date();
+  const oneHourAgo = new Date(now.getTime() - 1 * 3600000);
+  const fourHoursAgo = new Date(now.getTime() - 4 * 3600000);
+  const twelveHoursAgo = new Date(now.getTime() - 12 * 3600000);
+  const oneDayAgo = new Date(now.getTime() - 24 * 3600000);
   const twoDaysAgo = new Date(now.getTime() - 48 * 3600000);
-  const fourDaysAgo = new Date(now.getTime() - 96 * 3600000);
-  const sevenDaysAgo = new Date(now.getTime() - 168 * 3600000);
 
   // Find leads in CONTACTED or ENGAGED that haven't been contacted recently
   const leads = await prisma.lead.findMany({
@@ -415,31 +417,36 @@ async function processSmartFollowUps() {
       },
       consentSms: true,
       lastContactedAt: {
-        lte: twoDaysAgo,
+        lte: oneHourAgo, // Check if need follow-up (starts at 1 hour)
       },
     },
     include: {
       communications: {
         orderBy: { createdAt: "desc" },
-        take: 5,
+        take: 10,
       },
     },
   });
 
   for (const lead of leads) {
     try {
-      const daysSinceContact = Math.floor(
-        (now.getTime() - (lead.lastContactedAt?.getTime() || lead.createdAt.getTime())) / 86400000
+      const hoursSinceContact = Math.floor(
+        (now.getTime() - (lead.lastContactedAt?.getTime() || lead.createdAt.getTime())) / 3600000
       );
-
-      // Skip if recently messaged (within last 48 hours)
-      if (daysSinceContact < 2) continue;
+      const daysSinceContact = Math.floor(hoursSinceContact / 24);
 
       // Check if they ever replied
       const hasReplied = lead.communications.some((c) => c.direction === "INBOUND");
 
-      if (!hasReplied && daysSinceContact >= 7) {
-        // 7+ days, no response ever -> move to LOST and alert
+      // Count total outbound messages to this lead
+      const outboundCount = lead.communications.filter((c) => c.direction === "OUTBOUND").length;
+
+      // Multi-phase follow-up strategy
+      let shouldFollowUp = false;
+      let followUpReason = "";
+
+      if (!hasReplied && daysSinceContact >= 60) {
+        // 60+ days, no response ever -> archive to LOST
         await prisma.lead.update({
           where: { id: lead.id },
           data: { status: "LOST" },
@@ -449,44 +456,101 @@ async function processSmartFollowUps() {
           type: "lead_rotting",
           leadName: `${lead.firstName} ${lead.lastName}`,
           leadId: lead.id,
-          details: `${daysSinceContact} days, no response. Moved to LOST.`,
+          details: `60 days, ${outboundCount} messages, no response. Archived to LOST.`,
         });
 
-        console.log(`[Automation] Lead ${lead.id} moved to LOST after ${daysSinceContact} days no response`);
+        console.log(`[Automation] Lead ${lead.id} moved to LOST after 60 days`);
         continue;
       }
 
-      if (daysSinceContact >= 5) {
-        // 5+ days, send Slack alert
+      // 🔥 FIRST 48 HOURS: STRIKE WHILE HOT (Critical window!)
+      if (daysSinceContact === 0) {
+        if (outboundCount === 1 && hoursSinceContact >= 1) {
+          // Message 2: 1 hour after initial contact
+          shouldFollowUp = true;
+          followUpReason = "1-hour hot follow-up";
+        } else if (outboundCount === 2 && hoursSinceContact >= 4) {
+          // Message 3: 4 hours after initial
+          shouldFollowUp = true;
+          followUpReason = "4-hour follow-up";
+        } else if (outboundCount === 3 && hoursSinceContact >= 12) {
+          // Message 4: 12 hours after initial
+          shouldFollowUp = true;
+          followUpReason = "12-hour follow-up";
+        }
+      } else if (daysSinceContact === 1 && outboundCount <= 5) {
+        // Day 2: Morning follow-up
+        shouldFollowUp = true;
+        followUpReason = "Day 2 morning touch";
+      } else if (daysSinceContact === 2 && outboundCount <= 6) {
+        // Day 3: Afternoon check-in
+        shouldFollowUp = true;
+        followUpReason = "Day 3 check-in";
+      } else if (daysSinceContact === 4 && outboundCount <= 7) {
+        // Day 5: Mid-week touch
+        shouldFollowUp = true;
+        followUpReason = "Day 5 mid-week";
+      } else if (daysSinceContact === 6 && outboundCount <= 8) {
+        // Day 7: End of week
+        shouldFollowUp = true;
+        followUpReason = "Day 7 week-end";
+      }
+      // 📅 WEEK 2 (Days 8-14): Every 2-3 days
+      else if (daysSinceContact >= 8 && daysSinceContact <= 14) {
+        const daysSinceLastMessage = Math.floor(
+          (now.getTime() - (lead.lastContactedAt?.getTime() || 0)) / 86400000
+        );
+        if (daysSinceLastMessage >= 2) {
+          shouldFollowUp = true;
+          followUpReason = "Week 2 follow-up";
+        }
+      }
+      // 📅 WEEK 3-4 (Days 15-30): Every 4 days
+      else if (daysSinceContact >= 15 && daysSinceContact <= 30) {
+        const daysSinceLastMessage = Math.floor(
+          (now.getTime() - (lead.lastContactedAt?.getTime() || 0)) / 86400000
+        );
+        if (daysSinceLastMessage >= 4) {
+          shouldFollowUp = true;
+          followUpReason = "Week 3-4 nurture";
+        }
+      }
+      // 📅 MONTH 2 (Days 31-60): Weekly
+      else if (daysSinceContact >= 31 && daysSinceContact <= 60) {
+        const daysSinceLastMessage = Math.floor(
+          (now.getTime() - (lead.lastContactedAt?.getTime() || 0)) / 86400000
+        );
+        if (daysSinceLastMessage >= 7) {
+          shouldFollowUp = true;
+          followUpReason = "Month 2 weekly";
+        }
+      }
+
+      // Send Slack alerts at key milestones
+      if ([3, 7, 10, 15, 21, 28, 35, 45, 55].includes(daysSinceContact)) {
+        const phase = daysSinceContact <= 14 ? "Active Pursuit" : daysSinceContact <= 30 ? "Nurturing" : "Long-term";
         await sendSlackNotification({
-          type: "lead_rotting",
+          type: daysSinceContact >= 30 ? "lead_rotting" : "no_response",
           leadName: `${lead.firstName} ${lead.lastName}`,
           leadId: lead.id,
-          details: `${daysSinceContact} days since last contact. ${hasReplied ? "Has replied before" : "Never replied"}.`,
+          details: `Day ${daysSinceContact} | ${outboundCount} messages sent | ${phase} phase | ${hasReplied ? "Has replied before" : "Never replied"}`,
         });
       }
 
-      if (daysSinceContact >= 2 && daysSinceContact < 7) {
-        // 2-6 days: Send AI follow-up
-        console.log(`[Automation] Sending AI follow-up to lead ${lead.id} (${daysSinceContact} days)`);
+      // Send AI follow-up if it's time
+      if (shouldFollowUp) {
+        console.log(`[Automation] ${followUpReason} - Sending to lead ${lead.id} (Day ${daysSinceContact}, Hour ${hoursSinceContact}, Message #${outboundCount + 1})`);
 
         const decision = await handleConversation(lead.id);
         await executeDecision(lead.id, decision);
 
         await prisma.lead.update({
           where: { id: lead.id },
-          data: { lastContactedAt: now, status: "NURTURING" },
+          data: {
+            lastContactedAt: now,
+            status: outboundCount >= 5 ? "NURTURING" : lead.status,
+          },
         });
-
-        // Alert Slack about no response
-        if (daysSinceContact >= 3) {
-          await sendSlackNotification({
-            type: "no_response",
-            leadName: `${lead.firstName} ${lead.lastName}`,
-            leadId: lead.id,
-            details: `${daysSinceContact} days since last contact. AI follow-up sent.`,
-          });
-        }
       }
     } catch (error) {
       console.error(`[Automation] Error processing follow-up for lead ${lead.id}:`, error);

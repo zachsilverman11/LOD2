@@ -18,6 +18,8 @@ interface LeadContext {
     stage: string;
     daysInStage: number;
     totalMessages: number;
+    outboundCount: number;
+    inboundCount: number;
     lastActivity: Date | null;
   };
   appointments: any[];
@@ -93,6 +95,8 @@ export async function buildLeadContext(leadId: string): Promise<LeadContext> {
       stage: lead.status,
       daysInStage,
       totalMessages: communications.length,
+      outboundCount: communications.filter((c) => c.direction === "OUTBOUND").length,
+      inboundCount: communications.filter((c) => c.direction === "INBOUND").length,
       lastActivity: lead.lastContactedAt,
     },
     appointments: lead.appointments,
@@ -208,8 +212,54 @@ Captured: ${data.capture_time || new Date().toISOString()}
 # 📈 PIPELINE STATUS
 Current Stage: ${context.pipelineStatus.stage}
 Days Since First Contact: ${daysInStage}
-Total Messages Exchanged: ${context.pipelineStatus.totalMessages}
+Messages Sent (You): ${context.pipelineStatus.outboundCount}
+Messages Received (Them): ${context.pipelineStatus.inboundCount}
+Total Conversation: ${context.pipelineStatus.totalMessages} messages
 Has Appointment: ${context.appointments.length > 0 ? "Yes" : "No"}
+
+# 📊 FOLLOW-UP INTELLIGENCE
+**This is message #${context.pipelineStatus.outboundCount + 1}** from you to this lead.
+${context.pipelineStatus.inboundCount === 0 ? "⚠️ THEY HAVE NEVER REPLIED - Adjust your approach!" : `✅ They've replied ${context.pipelineStatus.inboundCount} time(s) - they're engaged!`}
+
+**Messaging Strategy Based on Touch Count:**
+${context.pipelineStatus.outboundCount <= 2 ? `
+📍 Touches 1-3: PROGRAMS & URGENCY
+- Lead with your primary offer (${primaryOffer})
+- Create exclusivity and scarcity
+- Focus on what they'll GET from the call
+- Keep it curious, not salesy
+` : context.pipelineStatus.outboundCount <= 5 ? `
+📍 Touches 4-6: QUESTIONS & QUALIFICATION
+- Ask about their situation: timeline, current status, concerns
+- "What's prompting your ${data.loanType || "mortgage"} search?"
+- "Are you working with anyone else?"
+- Make it conversational, not interrogative
+` : context.pipelineStatus.outboundCount <= 9 ? `
+📍 Touches 7-9: VALUE-ADD & EDUCATION
+- Share market insights or rate trends
+- "Did you know..." facts about mortgages
+- Position yourself as the helpful expert
+- No ask - just provide value
+` : context.pipelineStatus.outboundCount <= 12 ? `
+📍 Touches 10-12: SOFT CHECK-INS
+- "Just checking in..."
+- "Wanted to make sure you're all set"
+- Caring tone, low pressure
+- Maybe they forgot about you - remind them gently
+` : `
+📍 Touches 13+: MARKET UPDATES & LONG-TERM
+- Rate changes, market shifts, new programs
+- "Saw this and thought of you"
+- Stay top-of-mind for when they're ready
+- Very soft, value-focused
+`}
+
+**IMPORTANT VARIETY RULES:**
+- NEVER repeat the same angle twice
+- If previous message mentioned rates, try programs this time
+- If you asked a question last time, provide value this time
+- Review conversation history to avoid repetition
+- Vary your opening: "Hey", "Hi", "Quick question", "Wanted to share", etc.
 
 # 🎁 YOUR THREE CORE PROGRAMS (Use Strategically)
 
