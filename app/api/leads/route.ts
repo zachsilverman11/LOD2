@@ -11,11 +11,12 @@ export async function GET(request: NextRequest) {
       include: {
         activities: {
           orderBy: { createdAt: "desc" },
-          take: 5,
         },
         appointments: {
           orderBy: { scheduledAt: "desc" },
-          take: 1,
+        },
+        communications: {
+          orderBy: { createdAt: "desc" },
         },
       },
       orderBy: { createdAt: "desc" },

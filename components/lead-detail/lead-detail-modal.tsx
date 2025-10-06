@@ -87,29 +87,93 @@ export function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
             </div>
           )}
 
-          {/* Activity Timeline */}
-          <div>
-            <h3 className="text-lg font-semibold mb-3">Activity Timeline</h3>
-            <div className="space-y-3">
-              {lead.activities.map((activity) => (
-                <div key={activity.id} className="border-l-4 border-gray-300 pl-4 py-2">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-medium">{activity.type.replace(/_/g, ' ')}</p>
-                      {activity.subject && <p className="text-sm text-gray-700">{activity.subject}</p>}
-                      {activity.content && <p className="text-sm text-gray-600 mt-1">{activity.content}</p>}
-                      {activity.channel && (
-                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded mt-1 inline-block">
-                          {activity.channel}
-                        </span>
-                      )}
+          {/* SMS Conversation */}
+          {lead.communications && lead.communications.length > 0 && (
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold mb-3">💬 SMS Conversation</h3>
+              <div className="bg-gray-50 rounded-lg p-4 space-y-3 max-h-96 overflow-y-auto">
+                {lead.communications
+                  .filter((comm) => comm.channel === "SMS")
+                  .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+                  .map((comm) => (
+                    <div
+                      key={comm.id}
+                      className={`flex ${comm.direction === "OUTBOUND" ? "justify-end" : "justify-start"}`}
+                    >
+                      <div
+                        className={`max-w-[75%] rounded-lg px-4 py-2 ${
+                          comm.direction === "OUTBOUND"
+                            ? "bg-blue-500 text-white"
+                            : "bg-white border border-gray-300"
+                        }`}
+                      >
+                        <p className="text-sm">{comm.content}</p>
+                        <p
+                          className={`text-xs mt-1 ${
+                            comm.direction === "OUTBOUND" ? "text-blue-100" : "text-gray-500"
+                          }`}
+                        >
+                          {format(new Date(comm.createdAt), "MMM d, h:mm a")}
+                        </p>
+                      </div>
                     </div>
-                    <span className="text-sm text-gray-500">
-                      {format(new Date(activity.createdAt), "MMM d, h:mm a")}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {/* System Activity Timeline */}
+          <div>
+            <h3 className="text-lg font-semibold mb-3">📋 System Activity</h3>
+            <div className="space-y-3">
+              {lead.activities
+                .filter((activity) => !["SMS_SENT", "SMS_RECEIVED"].includes(activity.type))
+                .map((activity) => {
+                  // Determine icon and color based on activity type
+                  let icon = "📌";
+                  let borderColor = "border-gray-300";
+
+                  if (activity.type === "APPOINTMENT_BOOKED") {
+                    icon = "📅";
+                    borderColor = "border-green-500";
+                  } else if (activity.type === "APPOINTMENT_CANCELLED") {
+                    icon = "❌";
+                    borderColor = "border-red-500";
+                  } else if (activity.type === "STATUS_CHANGE") {
+                    icon = "🔄";
+                    borderColor = "border-blue-500";
+                  } else if (activity.type === "WEBHOOK_RECEIVED") {
+                    icon = "📥";
+                    borderColor = "border-purple-500";
+                  } else if (activity.type.includes("EMAIL")) {
+                    icon = "📧";
+                    borderColor = "border-yellow-500";
+                  } else if (activity.type.includes("CALL")) {
+                    icon = "📞";
+                    borderColor = "border-indigo-500";
+                  }
+
+                  return (
+                    <div key={activity.id} className={`border-l-4 ${borderColor} pl-4 py-2`}>
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <p className="font-medium">
+                            {icon} {activity.type.replace(/_/g, " ")}
+                          </p>
+                          {activity.subject && (
+                            <p className="text-sm text-gray-700 mt-1">{activity.subject}</p>
+                          )}
+                          {activity.content && (
+                            <p className="text-sm text-gray-600 mt-1">{activity.content}</p>
+                          )}
+                        </div>
+                        <span className="text-sm text-gray-500 whitespace-nowrap ml-4">
+                          {format(new Date(activity.createdAt), "MMM d, h:mm a")}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
           </div>
 

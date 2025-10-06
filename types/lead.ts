@@ -1,8 +1,9 @@
-import { Lead, LeadActivity, Appointment, LeadStatus } from "@/app/generated/prisma";
+import { Lead, LeadActivity, Appointment, Communication, LeadStatus } from "@/app/generated/prisma";
 
 export type LeadWithRelations = Lead & {
   activities: LeadActivity[];
   appointments: Appointment[];
+  communications: Communication[];
 };
 
 export const PIPELINE_STAGES: { id: LeadStatus; label: string; color: string }[] = [
