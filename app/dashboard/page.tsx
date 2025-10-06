@@ -22,9 +22,9 @@ export default function DashboardPage() {
             </div>
             <Link
               href="/dashboard/analytics"
-              className="px-6 py-3 bg-[#625FFF] text-white font-semibold rounded-lg hover:bg-[#4F4DCC] transition-colors"
+              className="px-4 py-2 text-sm text-[#625FFF] border border-[#625FFF] rounded-md hover:bg-[#625FFF] hover:text-white transition-colors"
             >
-              📊 Analytics
+              Analytics
             </Link>
           </div>
         </div>
