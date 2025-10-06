@@ -11,18 +11,23 @@ export async function GET(request: NextRequest) {
       include: {
         activities: {
           orderBy: { createdAt: "desc" },
+          take: 5,
         },
         appointments: {
           orderBy: { scheduledAt: "desc" },
+          take: 3,
         },
         communications: {
           orderBy: { createdAt: "desc" },
+          take: 5,
         },
         notes: {
           orderBy: { createdAt: "desc" },
+          take: 3,
         },
         tasks: {
           orderBy: { createdAt: "desc" },
+          take: 5,
         },
       },
       orderBy: { createdAt: "desc" },
