@@ -4,9 +4,9 @@ import { ActivityType, CommunicationChannel } from "@/app/generated/prisma";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ leadId: string }> }
 ) {
-  const { id } = await params;
+  const { leadId: id } = await params;
   try {
     const lead = await prisma.lead.findUnique({
       where: { id },
@@ -39,9 +39,9 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ leadId: string }> }
 ) {
-  const { id } = await params;
+  const { leadId: id } = await params;
   try {
     const body = await request.json();
     const { status, ...otherUpdates } = body;
