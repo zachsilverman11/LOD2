@@ -1,15 +1,15 @@
 import { PrismaClient } from "@/app/generated/prisma";
-import { Pool } from "@vercel/postgres";
+import { Pool as NeonPool } from "@neondatabase/serverless";
 import { PrismaNeon } from "@prisma/adapter-neon";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-// Use Vercel Postgres adapter for serverless environments
+// Use Neon serverless adapter for Vercel
 const createPrismaClient = () => {
-  if (process.env.POSTGRES_URL) {
-    const pool = new Pool({ connectionString: process.env.POSTGRES_URL });
+  if (process.env.DATABASE_URL && process.env.VERCEL) {
+    const pool = new NeonPool({ connectionString: process.env.DATABASE_URL });
     const adapter = new PrismaNeon(pool);
     return new PrismaClient({
       adapter,
