@@ -103,6 +103,10 @@ async function handleBookingCreated(payload: any) {
   }
 
   // Create appointment record
+  // For phone meetings, Cal.com provides location as phone number
+  // For video meetings, there's a meetingUrl field
+  const meetingUrl = payload.meetingUrl || `https://cal.com/booking/${uid}`;
+
   await prisma.appointment.create({
     data: {
       leadId: lead.id,
@@ -111,7 +115,8 @@ async function handleBookingCreated(payload: any) {
       scheduledAt: new Date(startTime),
       duration: Math.round((new Date(endTime).getTime() - new Date(startTime).getTime()) / 60000),
       status: "scheduled",
-      meetingUrl: payload.meetingUrl,
+      meetingUrl: meetingUrl,
+      notes: payload.location ? `Meeting location: ${typeof payload.location === 'string' ? payload.location : JSON.stringify(payload.location)}` : undefined,
     },
   });
 
