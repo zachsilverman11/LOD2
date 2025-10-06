@@ -18,6 +18,8 @@ datasource db {
 enum LeadStatus {
   NEW
   CONTACTED
+  ENGAGED
+  NURTURING
   QUALIFIED
   CALL_SCHEDULED
   CALL_COMPLETED
@@ -70,6 +72,8 @@ model Lead {
   // Relations
   activities        LeadActivity[]
   appointments      Appointment[]
+  communications    Communication[]
+  scheduledMessages ScheduledMessage[]
 
   @@index([email])
   @@index([phone])
@@ -170,4 +174,47 @@ model WebhookEvent {
   @@index([source])
   @@index([processed])
   @@index([createdAt])
+}
+
+// SMS/Email conversation tracking
+model Communication {
+  id                String              @id @default(cuid())
+  leadId            String
+  channel           CommunicationChannel
+  direction         String              // INBOUND or OUTBOUND
+  content           String
+  twilioSid         String?             @unique
+  sendgridId        String?             @unique
+  sentiment         String?             // AI-analyzed sentiment
+  intent            String?             // AI-detected intent
+  metadata          Json?
+  createdAt         DateTime            @default(now())
+
+  // Relations
+  lead              Lead                @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([channel])
+  @@index([createdAt])
+}
+
+// Scheduled follow-up messages
+model ScheduledMessage {
+  id                String              @id @default(cuid())
+  leadId            String
+  channel           CommunicationChannel
+  content           String
+  scheduledFor      DateTime
+  sent              Boolean             @default(false)
+  sentAt            DateTime?
+  cancelledAt       DateTime?
+  metadata          Json?
+  createdAt         DateTime            @default(now())
+
+  // Relations
+  lead              Lead                @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([scheduledFor])
+  @@index([sent])
 }
