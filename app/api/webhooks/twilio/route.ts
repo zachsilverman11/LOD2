@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { normalizePhoneNumber } from "@/lib/sms";
 import { ActivityType, CommunicationChannel } from "@/app/generated/prisma";
 import { handleConversation, executeDecision } from "@/lib/ai-conversation-enhanced";
+import { sendErrorAlert } from "@/lib/slack";
 
 /**
  * Handle incoming SMS messages from Twilio
@@ -110,6 +111,17 @@ export async function POST(request: NextRequest) {
         console.log(`[AI] ✅ Response handled: ${decision.action}`);
       } catch (error) {
         console.error("[AI] Failed to handle conversation:", error);
+
+        // Send error alert to Slack
+        await sendErrorAlert({
+          error: error instanceof Error ? error : new Error(String(error)),
+          context: {
+            location: "webhooks/twilio - AI conversation handler",
+            leadId: lead.id,
+            details: { incomingMessage: body, phone: normalizedPhone },
+          },
+        });
+
         // Log error but don't crash
         await prisma.leadActivity.create({
           data: {
@@ -144,6 +156,16 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     console.error("Twilio webhook error:", error);
+
+    // Send critical error alert to Slack
+    await sendErrorAlert({
+      error: error instanceof Error ? error : new Error(String(error)),
+      context: {
+        location: "webhooks/twilio - Webhook processing",
+        details: { message: "Failed to process incoming Twilio webhook" },
+      },
+    });
+
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

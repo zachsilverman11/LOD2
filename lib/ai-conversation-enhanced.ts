@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { prisma } from "./db";
 import { sendSms } from "./sms";
+import { sendErrorAlert } from "./slack";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -574,25 +575,37 @@ export async function executeDecision(
   switch (decision.action) {
     case "send_sms":
       if (decision.message) {
-        await sendSms({
-          to: lead.phone,
-          body: decision.message,
-        });
+        try {
+          await sendSms({
+            to: lead.phone,
+            body: decision.message,
+          });
 
-        await prisma.communication.create({
-          data: {
-            leadId,
-            channel: "SMS",
-            direction: "OUTBOUND",
-            content: decision.message,
-            metadata: { aiReasoning: decision.reasoning },
-          },
-        });
+          await prisma.communication.create({
+            data: {
+              leadId,
+              channel: "SMS",
+              direction: "OUTBOUND",
+              content: decision.message,
+              metadata: { aiReasoning: decision.reasoning },
+            },
+          });
 
-        await prisma.lead.update({
-          where: { id: leadId },
-          data: { lastContactedAt: new Date() },
-        });
+          await prisma.lead.update({
+            where: { id: leadId },
+            data: { lastContactedAt: new Date() },
+          });
+        } catch (error) {
+          await sendErrorAlert({
+            error: error instanceof Error ? error : new Error(String(error)),
+            context: {
+              location: "ai-conversation-enhanced - send_sms",
+              leadId,
+              details: { message: decision.message, phone: lead.phone },
+            },
+          });
+          throw error;
+        }
       }
       break;
 
@@ -615,24 +628,36 @@ export async function executeDecision(
 
     case "send_booking_link":
       if (decision.message) {
-        const bookingUrl = process.env.CAL_COM_BOOKING_URL || "https://cal.com/your-link";
-        const messageWithLink = `${decision.message}\n\n${bookingUrl}`;
+        try {
+          const bookingUrl = process.env.CAL_COM_BOOKING_URL || "https://cal.com/your-link";
+          const messageWithLink = `${decision.message}\n\n${bookingUrl}`;
 
-        await sendSms({
-          to: lead.phone,
-          body: messageWithLink,
-        });
+          await sendSms({
+            to: lead.phone,
+            body: messageWithLink,
+          });
 
-        await prisma.communication.create({
-          data: {
-            leadId,
-            channel: "SMS",
-            direction: "OUTBOUND",
-            content: messageWithLink,
-            intent: "booking_link_sent",
-            metadata: { aiReasoning: decision.reasoning },
-          },
-        });
+          await prisma.communication.create({
+            data: {
+              leadId,
+              channel: "SMS",
+              direction: "OUTBOUND",
+              content: messageWithLink,
+              intent: "booking_link_sent",
+              metadata: { aiReasoning: decision.reasoning },
+            },
+          });
+        } catch (error) {
+          await sendErrorAlert({
+            error: error instanceof Error ? error : new Error(String(error)),
+            context: {
+              location: "ai-conversation-enhanced - send_booking_link",
+              leadId,
+              details: { message: decision.message, phone: lead.phone },
+            },
+          });
+          throw error;
+        }
       }
       break;
 

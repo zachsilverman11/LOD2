@@ -8,6 +8,15 @@ interface SlackNotification {
   metadata?: Record<string, any>;
 }
 
+interface ErrorAlert {
+  error: Error;
+  context: {
+    location: string;
+    leadId?: string;
+    details?: any;
+  };
+}
+
 export async function sendSlackNotification(notification: SlackNotification) {
   const { type, leadName, leadId, details, metadata } = notification;
 
@@ -106,5 +115,89 @@ export async function sendSlackNotification(notification: SlackNotification) {
     }
   } catch (error) {
     console.error("Failed to send Slack notification:", error);
+  }
+}
+
+export async function sendErrorAlert({ error, context }: ErrorAlert) {
+  const { location, leadId, details } = context;
+
+  const errorMessage = error.message || "Unknown error";
+  const errorStack = error.stack?.split("\n").slice(0, 5).join("\n") || "No stack trace available";
+
+  const payload = {
+    attachments: [
+      {
+        color: "#FF0000",
+        blocks: [
+          {
+            type: "header",
+            text: {
+              type: "plain_text",
+              text: "🚨 Critical Error Alert",
+              emoji: true,
+            },
+          },
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: `*Location:* \`${location}\`\n*Error:* ${errorMessage}`,
+            },
+          },
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: `\`\`\`${errorStack}\`\`\``,
+            },
+          },
+          ...(leadId
+            ? [
+                {
+                  type: "section",
+                  text: {
+                    type: "mrkdwn",
+                    text: `*Lead ID:* \`${leadId}\``,
+                  },
+                },
+              ]
+            : []),
+          ...(details
+            ? [
+                {
+                  type: "section",
+                  text: {
+                    type: "mrkdwn",
+                    text: `*Details:*\n\`\`\`${JSON.stringify(details, null, 2)}\`\`\``,
+                  },
+                },
+              ]
+            : []),
+          {
+            type: "context",
+            elements: [
+              {
+                type: "mrkdwn",
+                text: `<https://lod2-5e814kgl0-zach-silvermans-projects.vercel.app/dashboard|View Dashboard> • ${new Date().toISOString()}`,
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+
+  try {
+    const response = await fetch(SLACK_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      console.error("Slack error alert failed:", await response.text());
+    }
+  } catch (sendError) {
+    console.error("Failed to send Slack error alert:", sendError);
   }
 }

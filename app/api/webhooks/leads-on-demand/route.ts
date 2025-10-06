@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { handleConversation, executeDecision } from "@/lib/ai-conversation-enhanced";
-import { sendSlackNotification } from "@/lib/slack";
+import { sendSlackNotification, sendErrorAlert } from "@/lib/slack";
 
 /**
  * Webhook endpoint for Leads on Demand
@@ -164,6 +164,17 @@ export async function POST(req: NextRequest) {
         console.log(`[AI] ✅ Initial contact sent successfully`);
       } catch (error) {
         console.error("[AI] Failed to send initial contact:", error);
+
+        // Send error alert to Slack
+        await sendErrorAlert({
+          error: error instanceof Error ? error : new Error(String(error)),
+          context: {
+            location: "webhooks/leads-on-demand - Initial AI contact",
+            leadId: lead.id,
+            details: { firstName, lastName, phone: lead.phone },
+          },
+        });
+
         // Don't fail the webhook - just log the error
         await prisma.leadActivity.create({
           data: {
@@ -183,6 +194,16 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error("[Leads on Demand] Webhook error:", error);
+
+    // Send critical error alert to Slack
+    await sendErrorAlert({
+      error: error instanceof Error ? error : new Error(String(error)),
+      context: {
+        location: "webhooks/leads-on-demand - Webhook processing",
+        details: { message: "Failed to process incoming webhook" },
+      },
+    });
+
     return NextResponse.json(
       {
         error: "Failed to process webhook",

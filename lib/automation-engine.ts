@@ -5,7 +5,7 @@ import { initiateCall } from "@/lib/voice-ai";
 import { normalizePhoneNumber } from "@/lib/sms";
 import { LeadStatus, ActivityType, CommunicationChannel } from "@/app/generated/prisma";
 import { handleConversation, executeDecision } from "@/lib/ai-conversation-enhanced";
-import { sendSlackNotification } from "@/lib/slack";
+import { sendSlackNotification, sendErrorAlert } from "@/lib/slack";
 
 /**
  * Automation rule trigger types
@@ -236,40 +236,60 @@ async function executeAddNote(lead: any, config: any) {
 export async function processTimeBasedAutomations() {
   console.log("[Automation] Starting time-based automations...");
 
-  // Run the built-in smart automations
-  await processSmartFollowUps();
-  await processPostCallConfirmations();
-  await processStaleLeadAlerts();
+  try {
+    // Run the built-in smart automations
+    await processSmartFollowUps();
+    await processPostCallConfirmations();
+    await processStaleLeadAlerts();
 
-  // Then process custom automation rules from database
-  const rules = await prisma.automationRule.findMany({
-    where: {
-      isActive: true,
-      triggerType: "time_based",
-    },
-    orderBy: { priority: "desc" },
-  });
+    // Then process custom automation rules from database
+    const rules = await prisma.automationRule.findMany({
+      where: {
+        isActive: true,
+        triggerType: "time_based",
+      },
+      orderBy: { priority: "desc" },
+    });
 
-  for (const rule of rules) {
-    try {
-      const condition = rule.triggerCondition as any;
-      const actions = rule.actions as AutomationAction[];
+    for (const rule of rules) {
+      try {
+        const condition = rule.triggerCondition as any;
+        const actions = rule.actions as AutomationAction[];
 
-      // Example: Find leads that match the time condition
-      // e.g., "24 hours since creation with no contact"
-      const leads = await findLeadsMatchingTimeCondition(condition);
+        // Example: Find leads that match the time condition
+        // e.g., "24 hours since creation with no contact"
+        const leads = await findLeadsMatchingTimeCondition(condition);
 
-      for (const lead of leads) {
-        if (evaluateConditions(lead, condition.conditions || [])) {
-          await executeActions(lead.id, actions);
+        for (const lead of leads) {
+          if (evaluateConditions(lead, condition.conditions || [])) {
+            await executeActions(lead.id, actions);
+          }
         }
-      }
-    } catch (error) {
-      console.error(`Error processing automation rule ${rule.id}:`, error);
-    }
-  }
+      } catch (error) {
+        console.error(`Error processing automation rule ${rule.id}:`, error);
 
-  console.log("[Automation] Completed time-based automations");
+        await sendErrorAlert({
+          error: error instanceof Error ? error : new Error(String(error)),
+          context: {
+            location: "automation-engine - Custom automation rule",
+            details: { ruleId: rule.id, ruleName: rule.name },
+          },
+        });
+      }
+    }
+
+    console.log("[Automation] Completed time-based automations");
+  } catch (error) {
+    console.error("[Automation] Critical error in processTimeBasedAutomations:", error);
+
+    await sendErrorAlert({
+      error: error instanceof Error ? error : new Error(String(error)),
+      context: {
+        location: "automation-engine - processTimeBasedAutomations",
+        details: { message: "Critical failure in automation engine" },
+      },
+    });
+  }
 }
 
 async function findLeadsMatchingTimeCondition(condition: any) {
@@ -541,19 +561,41 @@ async function processSmartFollowUps() {
       if (shouldFollowUp) {
         console.log(`[Automation] ${followUpReason} - Sending to lead ${lead.id} (Day ${daysSinceContact}, Hour ${hoursSinceContact}, Message #${outboundCount + 1})`);
 
-        const decision = await handleConversation(lead.id);
-        await executeDecision(lead.id, decision);
+        try {
+          const decision = await handleConversation(lead.id);
+          await executeDecision(lead.id, decision);
 
-        await prisma.lead.update({
-          where: { id: lead.id },
-          data: {
-            lastContactedAt: now,
-            status: outboundCount >= 5 ? "NURTURING" : lead.status,
-          },
-        });
+          await prisma.lead.update({
+            where: { id: lead.id },
+            data: {
+              lastContactedAt: now,
+              status: outboundCount >= 5 ? "NURTURING" : lead.status,
+            },
+          });
+        } catch (followUpError) {
+          await sendErrorAlert({
+            error: followUpError instanceof Error ? followUpError : new Error(String(followUpError)),
+            context: {
+              location: "automation-engine - Smart follow-up",
+              leadId: lead.id,
+              details: { followUpReason, daysSinceContact, outboundCount },
+            },
+          });
+          throw followUpError;
+        }
       }
     } catch (error) {
       console.error(`[Automation] Error processing follow-up for lead ${lead.id}:`, error);
+
+      // Send error alert for automation failure
+      await sendErrorAlert({
+        error: error instanceof Error ? error : new Error(String(error)),
+        context: {
+          location: "automation-engine - processSmartFollowUps loop",
+          leadId: lead.id,
+          details: { message: "Failed to process smart follow-up" },
+        },
+      });
     }
   }
 }

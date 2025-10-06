@@ -23,7 +23,7 @@ export async function sendSms(params: SendSmsParams) {
   const formData = new URLSearchParams();
   formData.append("To", params.to);
   formData.append("From", fromNumber);
-  formData.append("Body", params.body);
+  formData.append("Body", params.body + "\n\nReply STOP to opt out");
 
   const response = await fetch(url, {
     method: "POST",

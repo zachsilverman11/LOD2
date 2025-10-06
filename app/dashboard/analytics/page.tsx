@@ -1,0 +1,315 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import Link from "next/link";
+
+interface OverviewData {
+  totalLeads: number;
+  totalPipelineValue: number;
+  conversionRate: number;
+  callsBooked: number;
+  responseRate: number;
+  avgTimeToResponse: number;
+  convertedCount: number;
+  activeLeadsCount: number;
+  statusBreakdown: Array<{ status: string; count: number }>;
+}
+
+interface FunnelStage {
+  stage: string;
+  label: string;
+  count: number;
+  color: string;
+  conversionRate: number;
+  dropOff: number;
+}
+
+interface FunnelData {
+  funnel: FunnelStage[];
+  metrics: {
+    contactRate: string;
+    engagementRate: string;
+    bookingRate: string;
+    conversionRate: string;
+  };
+  totalLeads: number;
+  lostLeads: number;
+}
+
+interface TopLead {
+  id: string;
+  name: string;
+  status: string;
+  loanAmount: number;
+  loanType: string;
+  city: string;
+  lastContactedAt: Date | null;
+}
+
+interface TopLeadsData {
+  topLeads: TopLead[];
+  totalValue: number;
+  count: number;
+}
+
+export default function AnalyticsPage() {
+  const [overview, setOverview] = useState<OverviewData | null>(null);
+  const [funnel, setFunnel] = useState<FunnelData | null>(null);
+  const [topLeads, setTopLeads] = useState<TopLeadsData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchAnalytics();
+  }, []);
+
+  const fetchAnalytics = async () => {
+    setLoading(true);
+    try {
+      const [overviewRes, funnelRes, topLeadsRes] = await Promise.all([
+        fetch("/api/analytics/overview"),
+        fetch("/api/analytics/funnel"),
+        fetch("/api/analytics/top-leads"),
+      ]);
+
+      const overviewData = await overviewRes.json();
+      const funnelData = await funnelRes.json();
+      const topLeadsData = await topLeadsRes.json();
+
+      if (overviewData.success) setOverview(overviewData.data);
+      if (funnelData.success) setFunnel(funnelData.data);
+      if (topLeadsData.success) setTopLeads(topLeadsData.data);
+    } catch (error) {
+      console.error("Failed to fetch analytics:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat("en-CA", {
+      style: "currency",
+      currency: "CAD",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(value);
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#FBF3E7] via-[#B1AFFF]/20 to-[#F6D7FF]/30 flex items-center justify-center">
+        <div className="text-2xl text-[#1C1B1A]">Loading analytics...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-[#FBF3E7] via-[#B1AFFF]/20 to-[#F6D7FF]/30">
+      <header className="bg-white/80 backdrop-blur-sm shadow-sm border-b border-[#E4DDD3]">
+        <div className="max-w-full mx-auto px-8 py-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-4xl font-extrabold text-[#1C1B1A]">
+                <span className="italic text-[#625FFF]">inspired</span>{" "}
+                <span className="font-bold">mortgage.</span>
+              </h1>
+              <p className="text-[#55514D] mt-2 text-lg">Analytics Dashboard</p>
+            </div>
+            <Link
+              href="/dashboard"
+              className="px-6 py-3 bg-[#625FFF] text-white font-semibold rounded-lg hover:bg-[#4F4DCC] transition-colors"
+            >
+              ← Back to Pipeline
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-full mx-auto px-8 py-8">
+        {/* Key Metrics Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-6">
+            <div className="text-sm text-[#55514D] font-medium mb-2">Total Pipeline Value</div>
+            <div className="text-3xl font-bold text-[#625FFF]">
+              {formatCurrency(overview?.totalPipelineValue || 0)}
+            </div>
+            <div className="text-xs text-[#55514D] mt-2">
+              {overview?.activeLeadsCount || 0} active leads
+            </div>
+          </div>
+
+          <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-6">
+            <div className="text-sm text-[#55514D] font-medium mb-2">Total Leads</div>
+            <div className="text-3xl font-bold text-[#1C1B1A]">{overview?.totalLeads || 0}</div>
+            <div className="text-xs text-[#55514D] mt-2">
+              {overview?.convertedCount || 0} converted
+            </div>
+          </div>
+
+          <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-6">
+            <div className="text-sm text-[#55514D] font-medium mb-2">Conversion Rate</div>
+            <div className="text-3xl font-bold text-[#D9F36E]">
+              {overview?.conversionRate || 0}%
+            </div>
+            <div className="text-xs text-[#55514D] mt-2">End-to-end conversion</div>
+          </div>
+
+          <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-6">
+            <div className="text-sm text-[#55514D] font-medium mb-2">Calls Booked</div>
+            <div className="text-3xl font-bold text-[#625FFF]">{overview?.callsBooked || 0}</div>
+            <div className="text-xs text-[#55514D] mt-2">
+              {overview?.responseRate || 0}% response rate
+            </div>
+          </div>
+        </div>
+
+        {/* Performance Metrics */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-6">
+            <div className="text-sm text-[#55514D] font-medium mb-2">Response Rate</div>
+            <div className="text-2xl font-bold text-[#1C1B1A]">
+              {overview?.responseRate || 0}%
+            </div>
+            <div className="text-xs text-[#55514D] mt-2">Leads who replied</div>
+          </div>
+
+          <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-6">
+            <div className="text-sm text-[#55514D] font-medium mb-2">Avg. Time to Response</div>
+            <div className="text-2xl font-bold text-[#1C1B1A]">
+              {overview?.avgTimeToResponse ? `${overview.avgTimeToResponse.toFixed(1)}h` : "N/A"}
+            </div>
+            <div className="text-xs text-[#55514D] mt-2">First reply time</div>
+          </div>
+
+          <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-6">
+            <div className="text-sm text-[#55514D] font-medium mb-2">Booking Rate</div>
+            <div className="text-2xl font-bold text-[#1C1B1A]">
+              {funnel?.metrics.bookingRate || 0}%
+            </div>
+            <div className="text-xs text-[#55514D] mt-2">Engaged → Call scheduled</div>
+          </div>
+        </div>
+
+        {/* Conversion Funnel */}
+        <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-8 mb-8">
+          <h2 className="text-2xl font-bold text-[#1C1B1A] mb-6">Conversion Funnel</h2>
+          <div className="space-y-4">
+            {funnel?.funnel.map((stage, index) => {
+              const maxCount = funnel.funnel[0]?.count || 1;
+              const widthPercent = (stage.count / maxCount) * 100;
+
+              return (
+                <div key={stage.stage} className="relative">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="font-semibold text-[#1C1B1A]">{stage.label}</div>
+                    <div className="text-sm text-[#55514D]">
+                      {stage.count} leads ({stage.conversionRate}%)
+                    </div>
+                  </div>
+                  <div className="w-full bg-[#E4DDD3] rounded-full h-8 relative overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-500 flex items-center justify-end px-4"
+                      style={{
+                        width: `${widthPercent}%`,
+                        backgroundColor: stage.color,
+                      }}
+                    >
+                      {stage.count > 0 && (
+                        <span className="text-sm font-bold text-[#1C1B1A]">{stage.count}</span>
+                      )}
+                    </div>
+                  </div>
+                  {index > 0 && stage.dropOff > 0 && (
+                    <div className="text-xs text-red-600 mt-1">↓ {stage.dropOff.toFixed(1)}% drop-off</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4 pt-6 border-t border-[#E4DDD3]">
+            <div>
+              <div className="text-xs text-[#55514D]">Contact Rate</div>
+              <div className="text-xl font-bold text-[#625FFF]">
+                {funnel?.metrics.contactRate || 0}%
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-[#55514D]">Engagement Rate</div>
+              <div className="text-xl font-bold text-[#625FFF]">
+                {funnel?.metrics.engagementRate || 0}%
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-[#55514D]">Booking Rate</div>
+              <div className="text-xl font-bold text-[#625FFF]">
+                {funnel?.metrics.bookingRate || 0}%
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-[#55514D]">Conversion Rate</div>
+              <div className="text-xl font-bold text-[#D9F36E]">
+                {funnel?.metrics.conversionRate || 0}%
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Top Leads by Value */}
+        <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-8">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-[#1C1B1A]">Top Leads by Value</h2>
+            <div className="text-sm text-[#55514D]">
+              Total: {formatCurrency(topLeads?.totalValue || 0)}
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-[#E4DDD3]">
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-[#55514D]">Name</th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-[#55514D]">
+                    Loan Amount
+                  </th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-[#55514D]">Type</th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-[#55514D]">
+                    Location
+                  </th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-[#55514D]">
+                    Status
+                  </th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-[#55514D]">
+                    Last Contact
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {topLeads?.topLeads.slice(0, 10).map((lead) => (
+                  <tr key={lead.id} className="border-b border-[#E4DDD3]/50 hover:bg-[#FBF3E7]/30">
+                    <td className="py-3 px-4 text-sm text-[#1C1B1A] font-medium">{lead.name}</td>
+                    <td className="py-3 px-4 text-sm text-[#625FFF] font-bold">
+                      {formatCurrency(lead.loanAmount)}
+                    </td>
+                    <td className="py-3 px-4 text-sm text-[#55514D] capitalize">
+                      {lead.loanType}
+                    </td>
+                    <td className="py-3 px-4 text-sm text-[#55514D]">{lead.city}</td>
+                    <td className="py-3 px-4">
+                      <span className="inline-block px-2 py-1 text-xs font-semibold rounded-full bg-[#B1AFFF]/20 text-[#625FFF]">
+                        {lead.status}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-sm text-[#55514D]">
+                      {lead.lastContactedAt
+                        ? new Date(lead.lastContactedAt).toLocaleDateString()
+                        : "Never"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
