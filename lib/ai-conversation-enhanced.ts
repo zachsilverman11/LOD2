@@ -390,7 +390,7 @@ export async function handleConversation(
             properties: {
               message: {
                 type: "string",
-                description: "Message to accompany the booking link",
+                description: "Message to accompany the booking link. DO NOT include placeholder text like '[link]' or 'here's the link' - the actual URL will be appended automatically. Just write the message naturally.",
               },
               reasoning: {
                 type: "string",
