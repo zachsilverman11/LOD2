@@ -133,10 +133,14 @@ function generateSystemPrompt(context: LeadContext): string {
   let primaryOffer: string;
   let secondaryOffer: string;
 
-  if (data.lead_type === "Home Purchase") {
+  const loanType = data.loanType || data.lead_type || "";
+  const isPurchase = loanType === "purchase" || loanType === "Home Purchase";
+  const isRefinance = loanType === "refinance" || loanType === "Refinance";
+
+  if (isPurchase) {
     primaryOffer = "Guaranteed Approvals Certificate";
     secondaryOffer = "Reserved Ultra-Low Rates";
-  } else if (data.lead_type === "Refinance") {
+  } else if (isRefinance) {
     primaryOffer = "No Bank Penalties Program";
     secondaryOffer = "Reserved Ultra-Low Rates";
   } else {
@@ -170,31 +174,36 @@ Email: ${data.email || "Unknown"}
 Location: ${data.city ? `${data.city}, ${data.province}` : data.province || "Unknown"}
 
 # 💼 MORTGAGE INQUIRY DETAILS
-Type: ${data.lead_type || "Unknown"} ${data.lead_type === "Home Purchase" ? "(PURCHASE)" : data.lead_type === "Refinance" ? "(REFI)" : data.lead_type === "Renewal" ? "(RENEWAL)" : ""}
-Property Type: ${data.prop_type || "Unknown"}
-${data.lead_type === "Home Purchase" ? `
+Type: ${data.loanType || data.lead_type || "Unknown"} ${(data.loanType === "purchase" || data.lead_type === "Home Purchase") ? "(PURCHASE)" : (data.loanType === "refinance" || data.lead_type === "Refinance") ? "(REFI)" : (data.loanType === "renewal" || data.lead_type === "Renewal") ? "(RENEWAL)" : ""}
+Property Type: ${data.propertyType || data.prop_type || "Unknown"}
+${(data.loanType === "purchase" || data.lead_type === "Home Purchase") ? `
 Purchase Details:
-- Home Value: $${data.home_value || "Unknown"}
-- Down Payment: $${data.down_payment || "Unknown"}
+- Purchase Price: $${data.purchasePrice || data.home_value || "Unknown"}
+- Loan Amount: $${data.loanAmount || "Unknown"}
+- Down Payment: $${data.downPayment || data.down_payment || "Unknown"}
+- Credit Score: ${data.creditScore || "Unknown"}
 - Urgency: ${data.motivation_level || "Unknown"}
 ` : ""}
-${data.lead_type === "Refinance" ? `
+${(data.loanType === "refinance" || data.lead_type === "Refinance") ? `
 Refinance Details:
-- Home Value: $${data.home_value || "Unknown"}
+- Property Value: $${data.purchasePrice || data.home_value || "Unknown"}
+- Loan Amount: $${data.loanAmount || "Unknown"}
 - Current Balance: $${data.balance || "Unknown"}
 - Withdrawal Amount: $${data.withdraw_amount || "Unknown"}
 - Current Lender: ${data.lender || "Unknown"}
+- Credit Score: ${data.creditScore || "Unknown"}
 ` : ""}
-${data.lead_type === "Renewal" ? `
+${(data.loanType === "renewal" || data.lead_type === "Renewal") ? `
 Renewal Details:
 - Current Balance: $${data.balance || "Unknown"}
 - Timeframe: $${data.timeframe || "Unknown"}
 - Extend Amortization: ${data.extend_amortization || "No"}
 - Current Lender: ${data.lender || "Unknown"}
 ` : ""}
-Will Live in Property: ${data.rent_check || "Unknown"}
-Lead Source: ${data.ad_source || "Unknown"}
-Captured: ${data.capture_time || "Unknown"}
+Employment Status: ${data.employmentStatus || "Unknown"}
+Additional Notes: ${data.notes || "None"}
+Lead Source: ${data.source || data.ad_source || "leads_on_demand"}
+Captured: ${data.capture_time || new Date().toISOString()}
 
 # 📈 PIPELINE STATUS
 Current Stage: ${context.pipelineStatus.stage}
@@ -237,7 +246,7 @@ Has Appointment: ${context.appointments.length > 0 ? "Yes" : "No"}
 # 🎯 RECOMMENDED APPROACH FOR THIS LEAD
 **Lead With:** ${primaryOffer}
 **Secondary Offer:** ${secondaryOffer}
-**Why:** ${data.lead_type === "Home Purchase" ? "Purchase leads need competitive advantage" : data.lead_type === "Refinance" ? "Refinance leads value flexibility" : "Create urgency with exclusive rates"}
+**Why:** ${isPurchase ? "Purchase leads need competitive advantage in offers" : isRefinance ? "Refinance leads value flexibility and penalty protection" : "Create urgency with exclusive rates"}
 
 # ⏰ URGENCY LEVEL: ${urgencyLevel}
 **Guidance:** ${urgencyGuidance}
