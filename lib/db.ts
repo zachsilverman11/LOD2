@@ -17,7 +17,10 @@ const createPrismaClient = () => {
   // Always use serverless adapter with Neon connection pooling
   if (process.env.DATABASE_URL) {
     try {
-      const pool = new NeonPool({ connectionString: process.env.DATABASE_URL });
+      const pool = new NeonPool({
+        connectionString: process.env.DATABASE_URL,
+        connectionTimeoutMillis: 10000, // 10 second timeout
+      });
       const adapter = new PrismaNeon(pool);
       return new PrismaClient({
         adapter,

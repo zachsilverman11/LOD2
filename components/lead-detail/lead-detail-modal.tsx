@@ -125,6 +125,29 @@ export function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
             </div>
           </div>
 
+          {/* Lead Details from Leads on Demand */}
+          {lead.rawData && typeof lead.rawData === 'object' && Object.keys(lead.rawData as object).length > 0 && (
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold mb-3 text-[#1C1B1A]">Lead Details</h3>
+              <div className="bg-[#FBF3E7]/50 border border-[#E4DDD3] rounded-lg p-4">
+                <div className="grid grid-cols-2 gap-4">
+                  {Object.entries(lead.rawData as Record<string, any>)
+                    .filter(([key]) => !['name', 'email', 'phone', 'consent'].includes(key))
+                    .map(([key, value]) => (
+                      <div key={key} className="text-sm">
+                        <span className="font-medium text-[#1C1B1A] capitalize">
+                          {key.replace(/([A-Z])/g, ' $1').trim()}:
+                        </span>
+                        <span className="text-[#55514D] ml-2">
+                          {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Notes Section */}
           <div className="mb-6">
             <div className="flex justify-between items-center mb-3">
