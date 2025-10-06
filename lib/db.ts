@@ -14,12 +14,18 @@ const createPrismaClient = () => {
     neonConfig.webSocketConstructor = ws;
   }
 
+  // Use HTTP fetch mode for better serverless compatibility
+  neonConfig.fetchConnectionCache = true;
+  neonConfig.useSecureWebSocket = true;
+
   // Always use serverless adapter with Neon connection pooling
   if (process.env.DATABASE_URL) {
     try {
       const pool = new NeonPool({
         connectionString: process.env.DATABASE_URL,
-        connectionTimeoutMillis: 10000, // 10 second timeout
+        connectionTimeoutMillis: 15000, // 15 second timeout
+        idleTimeoutMillis: 30000, // 30 second idle timeout
+        maxUses: 100, // Reuse connections
       });
       const adapter = new PrismaNeon(pool);
       return new PrismaClient({
