@@ -12,12 +12,12 @@ export const TEAM_MEMBERS = ["Greg", "Jakub", "Admin Team"] as const;
 export type TeamMember = typeof TEAM_MEMBERS[number];
 
 export const PIPELINE_STAGES: { id: LeadStatus; label: string; color: string }[] = [
-  { id: "NEW", label: "New Lead", color: "bg-[#625FFF]" }, // FUTURE - primary brand color
-  { id: "CONTACTED", label: "Contacted", color: "bg-[#B1AFFF]" }, // LOFT - light purple accent
-  { id: "ENGAGED", label: "Engaged", color: "bg-[#F6D7FF]" }, // BLOSSOM - pink accent
-  { id: "NURTURING", label: "Nurturing", color: "bg-[#F6D7FF]" }, // BLOSSOM - pink accent (nurturing stage)
-  { id: "CALL_SCHEDULED", label: "Call Scheduled", color: "bg-[#D9F36E]" }, // UPLIFT - lime green accent
-  { id: "CALL_COMPLETED", label: "Call Completed", color: "bg-[#625FFF]" }, // FUTURE - reuse primary
-  { id: "CONVERTED", label: "Converted", color: "bg-[#D9F36E]" }, // UPLIFT - success green
-  { id: "LOST", label: "Lost", color: "bg-[#55514D]" }, // HORIZON - neutral gray
+  { id: "NEW", label: "New Lead", color: "bg-[#625FFF]" }, // Bold purple - new opportunities
+  { id: "CONTACTED", label: "Contacted", color: "bg-[#8B88FF]" }, // Lighter purple - initial engagement
+  { id: "ENGAGED", label: "Engaged", color: "bg-[#FFB6E1]" }, // Bright pink - active conversation
+  { id: "NURTURING", label: "Nurturing", color: "bg-[#E0BBE4]" }, // Soft lavender - long-term nurture
+  { id: "CALL_SCHEDULED", label: "Call Scheduled", color: "bg-[#D9F36E]" }, // Lime - action pending
+  { id: "CALL_COMPLETED", label: "Call Completed", color: "bg-[#B8E986]" }, // Olive green - action complete
+  { id: "CONVERTED", label: "Converted", color: "bg-[#A8D96E]" }, // Success green - won
+  { id: "LOST", label: "Lost", color: "bg-[#55514D]" }, // Gray - closed lost
 ];
