@@ -5,6 +5,7 @@ import Link from "next/link";
 import { KanbanBoard } from "@/components/kanban/kanban-board";
 import { LeadDetailModal } from "@/components/lead-detail/lead-detail-modal";
 import { LeadWithRelations } from "@/types/lead";
+import { LogoutButton } from "./logout-button";
 
 export default function DashboardPage() {
   const [selectedLead, setSelectedLead] = useState<LeadWithRelations | null>(null);
@@ -20,12 +21,15 @@ export default function DashboardPage() {
               </h1>
               <p className="text-[#55514D] mt-2 text-lg">Lead Conversion Dashboard</p>
             </div>
-            <Link
-              href="/dashboard/analytics"
-              className="px-4 py-2 text-sm text-[#625FFF] border border-[#625FFF] rounded-md hover:bg-[#625FFF] hover:text-white transition-colors"
-            >
-              Analytics
-            </Link>
+            <div className="flex items-center gap-3">
+              <Link
+                href="/dashboard/analytics"
+                className="px-4 py-2 text-sm text-[#625FFF] border border-[#625FFF] rounded-md hover:bg-[#625FFF] hover:text-white transition-colors"
+              >
+                Analytics
+              </Link>
+              <LogoutButton />
+            </div>
           </div>
         </div>
       </header>

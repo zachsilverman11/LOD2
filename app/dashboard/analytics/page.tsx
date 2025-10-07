@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { LogoutButton } from "../logout-button";
 
 
 interface OverviewData {
@@ -122,6 +123,7 @@ export default function AnalyticsPage() {
               >
                 ← Pipeline
               </Link>
+              <LogoutButton />
             </div>
           </div>
         </div>
