@@ -253,7 +253,7 @@ export default function AnalyticsPage() {
               {overview?.avgTimeToResponse ? `${overview.avgTimeToResponse.toFixed(1)}h` : "N/A"}
             </div>
             <div className="text-xs text-[#55514D] mt-2">
-              Target: <24h • Lead response speed
+              Target: &lt;24h • Lead response speed
             </div>
           </div>
         </div>
