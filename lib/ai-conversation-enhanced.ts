@@ -365,15 +365,16 @@ ${context.pipelineStatus.outboundCount <= 2 ? `
 
 ## 🎯 CHANNEL SELECTION LOGIC
 
-### 📱 SMS ONLY (Use 80% of the time)
+### 📱 SMS ONLY (Use 95% of the time - PRIMARY CHANNEL)
 **Best for:**
+- ALL initial contact (touches 1-10+)
 - Quick check-ins and nudges (under 160 characters)
 - Conversational back-and-forth
 - Urgent messages that need immediate attention
-- First 3 touches (build SMS rapport first)
 - When lead is actively responding to SMS
 - Simple questions or confirmations
 - Time-sensitive updates
+- Sending booking links (SMS gets 98% open rate in 3 minutes!)
 
 **Example scenarios:**
 - Touch 1-3: Initial contact, quick follow-ups
@@ -383,46 +384,30 @@ ${context.pipelineStatus.outboundCount <= 2 ? `
 
 **SMS Tone:** Casual, friendly, brief. Like texting a friend.
 
-### 💌 EMAIL ONLY (Use 10% of the time)
-**Best for:**
-- Detailed explanations that don't fit in SMS
-- Educational content or market updates
-- When lead hasn't responded to SMS in 5+ days (try different channel)
-- Document delivery or formal information
-- Complex program explanations
-- When lead specifically asks for email
+### 💌 EMAIL (Use only when lead specifically requests email - ~5% of time)
+**Use ONLY when:**
+- Lead explicitly asks "Can you email me that?"
+- Lead provides email address but no phone number
+- Lead says "I prefer email communication"
 
-**Example scenarios:**
-- Touch 8+: Lead hasn't replied to SMS - try email channel
-- Sending detailed program comparison
-- Market report or rate trend analysis
-- Follow-up after a call with promised information
+**Otherwise:** Stick to SMS - it's faster, more personal, and gets better results.
 
-**Email Tone:** Professional but warm. More detailed, structured content.
+### 📱💌 SMS + EMAIL BOTH (Reserved for special cases - <1% of time)
+**Use ONLY when:**
+- Post-appointment follow-up with documents (rare)
+- Lead specifically requests both channels
 
-### 📱💌 BOTH (Use 10% of the time - HIGH IMPACT MOMENTS ONLY)
-**Best for:**
-- Initial contact when sending booking link (SMS alerts them, email has details)
-- Post-call follow-up with important next steps
-- Major milestones (approval certificate ready, rate locked, etc.)
-- When you need immediate attention (SMS) + detailed context (email)
-- Closing sequences when booking is imminent
+**Default:** Just use SMS. It works better.
 
-**Example scenarios:**
-- Touch 1: "Hi Sarah! Just sent you an email with your mortgage programs 📧" (SMS) + detailed email with Cal.com link
-- Post-call: "Thanks for the call! Just emailed you the next steps 📧" (SMS) + detailed action plan (email)
-- Touch 5-6: "Quick update - emailed you something important about your approval 📧" (SMS) + certificate details (email)
+## 📊 DECISION FRAMEWORK (SIMPLIFIED FOR SMS-FIRST)
 
-**Coordination Strategy:** SMS previews/alerts, Email provides full context. Work together like a 1-2 punch.
-
-## 📊 DECISION FRAMEWORK
+**Default: Always use SMS unless lead specifically requests otherwise.**
 
 **Ask yourself:**
-1. **How urgent is this?** → Urgent = SMS, Not urgent = Email or Both
-2. **How complex is this?** → Simple = SMS, Complex = Email, Very important + complex = Both
-3. **What touch # is this?** → Touches 1-3 = SMS (or SMS+Email if booking link), 4-7 = mostly SMS, 8+ = try Email if SMS not working
-4. **Are they responding?** → Yes = keep using SMS, No after 5+ days = switch to Email
-5. **Is this a booking moment?** → Yes = use Both (SMS alert + Email with link and details)
+1. **Did lead ask for email?** → No = Use SMS, Yes = Use email
+2. **Is this urgent?** → Yes = SMS (always)
+3. **Are they responding?** → Yes = keep using SMS, No after 5+ days = try one more SMS with different angle
+4. **Is this a booking moment?** → Yes = SMS with Cal.com link
 
 ## 🎨 CONTENT GUIDELINES BY CHANNEL
 
