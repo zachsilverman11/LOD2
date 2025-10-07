@@ -454,6 +454,7 @@ ${context.pipelineStatus.outboundCount <= 2 ? `
 4. **First touch default** - Start with SMS only (or SMS+Email if sending booking link immediately)
 5. **Email rescue** - If 5+ days of no SMS response, try email as a channel switch
 6. **Booking moments = Both** - When ready to send Cal.com link, use Both for maximum visibility
+7. **CROSS-CHANNEL ACKNOWLEDGMENT** - If lead sends EMAIL and you respond via SMS, ALWAYS acknowledge: "Thanks for your email!" or "Got your email!". If lead sends SMS and you respond via EMAIL, acknowledge: "Thanks for your text!"
 
 # 💭 CONVERSATION HISTORY
 ${context.conversationHistory.length === 0 ? `⚠️ THIS IS THE FIRST CONTACT - YOU MUST INTRODUCE YOURSELF!
@@ -474,7 +475,8 @@ Based on everything above, decide the best action. Remember:
  */
 export async function handleConversation(
   leadId: string,
-  incomingMessage?: string
+  incomingMessage?: string,
+  incomingChannel?: "SMS" | "EMAIL"
 ): Promise<AIDecision> {
   const context = await buildLeadContext(leadId);
   const systemPrompt = generateSystemPrompt(context);
@@ -482,9 +484,13 @@ export async function handleConversation(
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
 
   if (incomingMessage) {
+    const channelNote = incomingChannel
+      ? `\n\n⚠️ IMPORTANT: The lead sent this via ${incomingChannel}. If you respond via a different channel, ACKNOWLEDGE the original channel (e.g., "Thanks for your ${incomingChannel === 'EMAIL' ? 'email' : 'text'}!")`
+      : '';
+
     messages.push({
       role: "user",
-      content: `The lead just sent this message: "${incomingMessage}"\n\nAnalyze this message and decide what action to take. Consider:\n- Their intent and sentiment\n- Where they are in the pipeline\n- What information you still need\n- Whether they're ready to book or need more nurturing\n- Which of the 3 programs would resonate most\n\nUse one of the available tools to respond.`,
+      content: `The lead just sent this message: "${incomingMessage}"${channelNote}\n\nAnalyze this message and decide what action to take. Consider:\n- Their intent and sentiment\n- Where they are in the pipeline\n- What information you still need\n- Whether they're ready to book or need more nurturing\n- Which of the 3 programs would resonate most\n\nUse one of the available tools to respond.`,
     });
   } else {
     // Initial contact

@@ -71,8 +71,8 @@ export async function POST(req: NextRequest) {
     // Use the email body (prefer plain text over HTML)
     const messageContent = text || html || subject;
 
-    // Trigger AI conversation handler
-    const decision = await handleConversation(lead.id, messageContent);
+    // Trigger AI conversation handler with EMAIL channel indicator
+    const decision = await handleConversation(lead.id, messageContent, "EMAIL");
 
     // Execute the AI's decision (send SMS, email, both, etc.)
     await executeDecision(lead.id, decision);
