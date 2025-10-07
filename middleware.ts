@@ -2,28 +2,29 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 export function middleware(request: NextRequest) {
-  // Check if accessing dashboard or analytics
-  if (
-    request.nextUrl.pathname.startsWith("/dashboard") ||
-    request.nextUrl.pathname.startsWith("/dashboard/analytics")
-  ) {
-    // Check for session cookie
-    const sessionCookie = request.cookies.get("lod2_session");
+  // Only protect dashboard routes
+  if (request.nextUrl.pathname.startsWith("/dashboard")) {
+    const basicAuth = request.headers.get("authorization");
+    const url = request.nextUrl;
 
-    if (!sessionCookie) {
-      // Redirect to login if not authenticated
-      return NextResponse.redirect(new URL("/login", request.url));
-    }
+    if (basicAuth) {
+      const authValue = basicAuth.split(" ")[1];
+      const [user, pwd] = atob(authValue).split(":");
 
-    // Validate session data exists
-    try {
-      const sessionData = JSON.parse(sessionCookie.value);
-      if (!sessionData.username) {
-        return NextResponse.redirect(new URL("/login", request.url));
+      const validUser = process.env.BASIC_AUTH_USER || "admin";
+      const validPass = process.env.BASIC_AUTH_PASSWORD || "InspiredMortgage2025!";
+
+      if (user === validUser && pwd === validPass) {
+        return NextResponse.next();
       }
-    } catch {
-      return NextResponse.redirect(new URL("/login", request.url));
     }
+
+    return new NextResponse("Authentication required", {
+      status: 401,
+      headers: {
+        "WWW-Authenticate": 'Basic realm="Secure Area"',
+      },
+    });
   }
 
   return NextResponse.next();
