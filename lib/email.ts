@@ -3,24 +3,34 @@
  * Supports both providers - automatically detects which one to use based on API key
  */
 
+import { wrapEmailTemplate } from "./email-template";
+
 export interface SendEmailParams {
   to: string;
   subject: string;
-  html: string;
+  html?: string;
+  htmlContent?: string; // AI-generated content that will be wrapped in branded template
   text?: string;
   from?: string;
   replyTo?: string;
 }
 
 export async function sendEmail(params: SendEmailParams) {
+  // If htmlContent is provided (from AI), wrap it in branded template
+  const html = params.htmlContent
+    ? wrapEmailTemplate(params.htmlContent)
+    : params.html || "";
+
+  const emailParams = { ...params, html };
+
   // Check which email provider to use
   const sendgridApiKey = process.env.SENDGRID_API_KEY;
   const resendApiKey = process.env.RESEND_API_KEY;
 
   if (sendgridApiKey) {
-    return sendEmailViaSendGrid(params, sendgridApiKey);
+    return sendEmailViaSendGrid(emailParams, sendgridApiKey);
   } else if (resendApiKey) {
-    return sendEmailViaResend(params, resendApiKey);
+    return sendEmailViaResend(emailParams, resendApiKey);
   } else {
     throw new Error("No email API key found. Set either SENDGRID_API_KEY or RESEND_API_KEY");
   }

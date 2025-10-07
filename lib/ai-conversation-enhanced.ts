@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { prisma } from "./db";
 import { sendSms } from "./sms";
+import { sendEmail } from "./email";
 import { sendErrorAlert } from "./slack";
 
 const openai = new OpenAI({
@@ -29,12 +30,16 @@ interface LeadContext {
 interface AIDecision {
   action:
     | "send_sms"
+    | "send_email"
+    | "send_both"
     | "schedule_followup"
     | "send_booking_link"
     | "escalate"
     | "do_nothing"
     | "move_stage";
   message?: string;
+  emailSubject?: string;
+  emailBody?: string;
   followupHours?: number;
   newStage?: string;
   reasoning: string;
@@ -348,11 +353,107 @@ ${context.pipelineStatus.outboundCount <= 2 ? `
 
 # 🛠️ TOOLS AVAILABLE
 1. **send_sms**: Send immediate SMS response
-2. **schedule_followup**: Schedule follow-up (specify hours to wait)
-3. **send_booking_link**: Send Cal.com link when ready to book
-4. **move_stage**: Progress lead through pipeline
-5. **escalate**: Flag for human intervention
-6. **do_nothing**: No action needed
+2. **send_email**: Send professional email with detailed information
+3. **send_both**: Send coordinated SMS + Email together for maximum impact
+4. **schedule_followup**: Schedule follow-up (specify hours to wait)
+5. **send_booking_link**: Send Cal.com link when ready to book
+6. **move_stage**: Progress lead through pipeline
+7. **escalate**: Flag for human intervention
+8. **do_nothing**: No action needed
+
+# 📱💌 MULTI-CHANNEL STRATEGY - WHEN TO USE SMS vs EMAIL vs BOTH
+
+## 🎯 CHANNEL SELECTION LOGIC
+
+### 📱 SMS ONLY (Use 80% of the time)
+**Best for:**
+- Quick check-ins and nudges (under 160 characters)
+- Conversational back-and-forth
+- Urgent messages that need immediate attention
+- First 3 touches (build SMS rapport first)
+- When lead is actively responding to SMS
+- Simple questions or confirmations
+- Time-sensitive updates
+
+**Example scenarios:**
+- Touch 1-3: Initial contact, quick follow-ups
+- "Hey Sarah! Quick question - what's your timeline?"
+- "Just checking in - still looking at that Vancouver property?"
+- "Reserved rates are filling up - want to lock yours in?"
+
+**SMS Tone:** Casual, friendly, brief. Like texting a friend.
+
+### 💌 EMAIL ONLY (Use 10% of the time)
+**Best for:**
+- Detailed explanations that don't fit in SMS
+- Educational content or market updates
+- When lead hasn't responded to SMS in 5+ days (try different channel)
+- Document delivery or formal information
+- Complex program explanations
+- When lead specifically asks for email
+
+**Example scenarios:**
+- Touch 8+: Lead hasn't replied to SMS - try email channel
+- Sending detailed program comparison
+- Market report or rate trend analysis
+- Follow-up after a call with promised information
+
+**Email Tone:** Professional but warm. More detailed, structured content.
+
+### 📱💌 BOTH (Use 10% of the time - HIGH IMPACT MOMENTS ONLY)
+**Best for:**
+- Initial contact when sending booking link (SMS alerts them, email has details)
+- Post-call follow-up with important next steps
+- Major milestones (approval certificate ready, rate locked, etc.)
+- When you need immediate attention (SMS) + detailed context (email)
+- Closing sequences when booking is imminent
+
+**Example scenarios:**
+- Touch 1: "Hi Sarah! Just sent you an email with your mortgage programs 📧" (SMS) + detailed email with Cal.com link
+- Post-call: "Thanks for the call! Just emailed you the next steps 📧" (SMS) + detailed action plan (email)
+- Touch 5-6: "Quick update - emailed you something important about your approval 📧" (SMS) + certificate details (email)
+
+**Coordination Strategy:** SMS previews/alerts, Email provides full context. Work together like a 1-2 punch.
+
+## 📊 DECISION FRAMEWORK
+
+**Ask yourself:**
+1. **How urgent is this?** → Urgent = SMS, Not urgent = Email or Both
+2. **How complex is this?** → Simple = SMS, Complex = Email, Very important + complex = Both
+3. **What touch # is this?** → Touches 1-3 = SMS (or SMS+Email if booking link), 4-7 = mostly SMS, 8+ = try Email if SMS not working
+4. **Are they responding?** → Yes = keep using SMS, No after 5+ days = switch to Email
+5. **Is this a booking moment?** → Yes = use Both (SMS alert + Email with link and details)
+
+## 🎨 CONTENT GUIDELINES BY CHANNEL
+
+**SMS Content:**
+- 1-2 sentences max (under 160 chars ideal)
+- No formatting needed
+- Emoji okay (1-2 max, don't overdo it)
+- Conversational, casual tone
+- End with question or call-to-action
+
+**Email Content:**
+- Use HTML tags: <h2>, <p>, <ul>, <li>, <strong>
+- Structure: greeting → value/info → clear CTA → signature
+- Include Cal.com booking link when relevant
+- Can be 3-5 paragraphs
+- Professional but warm tone
+- Subject line: Personal, benefit-driven, under 50 chars
+
+**Both Content:**
+- SMS: Short alert/teaser (e.g., "Just emailed you something important 📧")
+- Email: Full detailed content with all context
+- Make them work together - SMS drives urgency, Email provides value
+
+## ⚠️ IMPORTANT CHANNEL RULES
+
+1. **Never duplicate content** - If using Both, SMS should tease/alert, Email should deliver full content
+2. **Match their preference** - If lead only replies to email, use email more
+3. **Don't spam both channels** - Both is for special moments, not every message
+4. **First touch default** - Start with SMS only (or SMS+Email if sending booking link immediately)
+5. **Email rescue** - If 5+ days of no SMS response, try email as a channel switch
+6. **Booking moments = Both** - When ready to send Cal.com link, use Both for maximum visibility
 
 # 💭 CONVERSATION HISTORY
 ${context.conversationHistory.length === 0 ? `⚠️ THIS IS THE FIRST CONTACT - YOU MUST INTRODUCE YOURSELF!
@@ -509,6 +610,60 @@ export async function handleConversation(
       {
         type: "function",
         function: {
+          name: "send_email",
+          description: "Send a professional email with detailed information - use when lead needs more context than SMS can provide",
+          parameters: {
+            type: "object",
+            properties: {
+              subject: {
+                type: "string",
+                description: "Email subject - personal, benefit-driven, under 50 chars (e.g. 'Hey Sarah! Your $600K purchase - programs available')",
+              },
+              body: {
+                type: "string",
+                description: "Email body in HTML format. Can be longer than SMS. Use <h2>, <p>, <ul>, <li>, <strong> tags. Include Cal.com link if relevant. Sign as 'Holly from Inspired Mortgage'.",
+              },
+              reasoning: {
+                type: "string",
+                description: "Why email is the right channel for this message",
+              },
+            },
+            required: ["subject", "body", "reasoning"],
+          },
+        },
+      },
+      {
+        type: "function",
+        function: {
+          name: "send_both",
+          description: "Send coordinated SMS + Email together for maximum impact - use for high-value moments (initial contact with booking link, post-call follow-up)",
+          parameters: {
+            type: "object",
+            properties: {
+              smsMessage: {
+                type: "string",
+                description: "Short, attention-grabbing SMS under 160 chars (e.g. 'Hey Sarah! Just sent you an email with your mortgage programs. Check it out 📧')",
+              },
+              emailSubject: {
+                type: "string",
+                description: "Email subject line - personal and compelling",
+              },
+              emailBody: {
+                type: "string",
+                description: "Detailed email in HTML with full context, programs, next steps. Include Cal.com link.",
+              },
+              reasoning: {
+                type: "string",
+                description: "Why both channels are needed for maximum impact",
+              },
+            },
+            required: ["smsMessage", "emailSubject", "emailBody", "reasoning"],
+          },
+        },
+      },
+      {
+        type: "function",
+        function: {
           name: "do_nothing",
           description: "No action needed right now",
           parameters: {
@@ -544,6 +699,15 @@ export async function handleConversation(
   switch (toolCall.function.name) {
     case "send_sms":
       decision.message = functionArgs.message;
+      break;
+    case "send_email":
+      decision.emailSubject = functionArgs.subject;
+      decision.emailBody = functionArgs.body;
+      break;
+    case "send_both":
+      decision.message = functionArgs.smsMessage;
+      decision.emailSubject = functionArgs.emailSubject;
+      decision.emailBody = functionArgs.emailBody;
       break;
     case "schedule_followup":
       decision.message = functionArgs.message;
@@ -623,6 +787,118 @@ export async function executeDecision(
             metadata: { aiReasoning: decision.reasoning },
           },
         });
+      }
+      break;
+
+    case "send_email":
+      if (decision.emailSubject && decision.emailBody) {
+        try {
+          if (!lead.email) {
+            console.warn(`[AI] Cannot send email - no email address for lead ${leadId}`);
+            break;
+          }
+
+          await sendEmail({
+            to: lead.email,
+            subject: decision.emailSubject,
+            htmlContent: decision.emailBody,
+          });
+
+          await prisma.communication.create({
+            data: {
+              leadId,
+              channel: "EMAIL",
+              direction: "OUTBOUND",
+              content: decision.emailBody,
+              metadata: {
+                aiReasoning: decision.reasoning,
+                subject: decision.emailSubject
+              },
+            },
+          });
+
+          await prisma.lead.update({
+            where: { id: leadId },
+            data: { lastContactedAt: new Date() },
+          });
+        } catch (error) {
+          await sendErrorAlert({
+            error: error instanceof Error ? error : new Error(String(error)),
+            context: {
+              location: "ai-conversation-enhanced - send_email",
+              leadId,
+              details: { subject: decision.emailSubject, email: lead.email },
+            },
+          });
+          throw error;
+        }
+      }
+      break;
+
+    case "send_both":
+      if (decision.message && decision.emailSubject && decision.emailBody) {
+        try {
+          // Send SMS first
+          await sendSms({
+            to: lead.phone,
+            body: decision.message,
+          });
+
+          await prisma.communication.create({
+            data: {
+              leadId,
+              channel: "SMS",
+              direction: "OUTBOUND",
+              content: decision.message,
+              metadata: { aiReasoning: decision.reasoning, multiChannel: true },
+            },
+          });
+
+          // Send email second (if email exists)
+          if (lead.email) {
+            await sendEmail({
+              to: lead.email,
+              subject: decision.emailSubject,
+              htmlContent: decision.emailBody,
+            });
+
+            await prisma.communication.create({
+              data: {
+                leadId,
+                channel: "EMAIL",
+                direction: "OUTBOUND",
+                content: decision.emailBody,
+                metadata: {
+                  aiReasoning: decision.reasoning,
+                  subject: decision.emailSubject,
+                  multiChannel: true
+                },
+              },
+            });
+          } else {
+            console.warn(`[AI] send_both: No email address for lead ${leadId}, only sent SMS`);
+          }
+
+          await prisma.lead.update({
+            where: { id: leadId },
+            data: { lastContactedAt: new Date() },
+          });
+        } catch (error) {
+          await sendErrorAlert({
+            error: error instanceof Error ? error : new Error(String(error)),
+            context: {
+              location: "ai-conversation-enhanced - send_both",
+              leadId,
+              details: {
+                smsMessage: decision.message,
+                emailSubject: decision.emailSubject,
+                phone: lead.phone,
+                email: lead.email
+              },
+            },
+          });
+          throw error;
+        }
       }
       break;
 
