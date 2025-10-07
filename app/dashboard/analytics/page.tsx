@@ -9,12 +9,18 @@ interface OverviewData {
   totalLeads: number;
   totalPipelineValue: number;
   conversionRate: number;
-  callsBooked: number;
+  callsScheduled: number;
+  callsCompleted: number;
+  showUpRate: number;
   responseRate: number;
   avgTimeToResponse: number;
   convertedCount: number;
   activeLeadsCount: number;
   statusBreakdown: Array<{ status: string; count: number }>;
+  // New KPIs
+  leadToCallRate: number;
+  leadToAppRate: number;
+  callToAppRate: number;
 }
 
 interface FunnelStage {
@@ -96,6 +102,31 @@ export default function AnalyticsPage() {
     }).format(value);
   };
 
+  // Helper to get color based on metric vs target
+  const getMetricColor = (value: number, target: number, higherIsBetter: boolean = true) => {
+    if (higherIsBetter) {
+      if (value >= target) return "text-green-600";
+      if (value >= target * 0.8) return "text-yellow-600";
+      return "text-red-600";
+    } else {
+      if (value <= target) return "text-green-600";
+      if (value <= target * 1.2) return "text-yellow-600";
+      return "text-red-600";
+    }
+  };
+
+  const getMetricBg = (value: number, target: number, higherIsBetter: boolean = true) => {
+    if (higherIsBetter) {
+      if (value >= target) return "bg-green-50 border-green-200";
+      if (value >= target * 0.8) return "bg-yellow-50 border-yellow-200";
+      return "bg-red-50 border-red-200";
+    } else {
+      if (value <= target) return "bg-green-50 border-green-200";
+      if (value <= target * 1.2) return "bg-yellow-50 border-yellow-200";
+      return "bg-red-50 border-red-200";
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#FBF3E7] via-[#B1AFFF]/20 to-[#F6D7FF]/30 flex items-center justify-center">
@@ -130,8 +161,72 @@ export default function AnalyticsPage() {
       </header>
 
       <main className="max-w-full mx-auto px-8 py-8">
-        {/* Key Metrics Grid */}
+        {/* 4 Core KPIs */}
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-[#1C1B1A] mb-2">Core Performance Metrics</h2>
+          <p className="text-sm text-[#55514D]">Key indicators of system health and conversion effectiveness</p>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {/* KPI 1: Lead-to-Call Rate */}
+          <div className={`backdrop-blur-sm rounded-xl shadow-sm border-2 p-6 ${getMetricBg(overview?.leadToCallRate || 0, 18)}`}>
+            <div className="text-sm text-[#55514D] font-medium mb-2">Lead-to-Call Rate</div>
+            <div className={`text-4xl font-bold ${getMetricColor(overview?.leadToCallRate || 0, 18)}`}>
+              {overview?.leadToCallRate || 0}%
+            </div>
+            <div className="text-xs text-[#55514D] mt-2">
+              Target: 18% • {overview?.callsScheduled || 0} of {overview?.totalLeads || 0} leads
+            </div>
+          </div>
+
+          {/* KPI 2: Response Rate */}
+          <div className={`backdrop-blur-sm rounded-xl shadow-sm border-2 p-6 ${getMetricBg(overview?.responseRate || 0, 35)}`}>
+            <div className="text-sm text-[#55514D] font-medium mb-2">Response Rate</div>
+            <div className={`text-4xl font-bold ${getMetricColor(overview?.responseRate || 0, 35)}`}>
+              {overview?.responseRate || 0}%
+            </div>
+            <div className="text-xs text-[#55514D] mt-2">
+              Target: 35% • Leads who replied to Holly
+            </div>
+          </div>
+
+          {/* KPI 3: Show-Up Rate */}
+          <div className={`backdrop-blur-sm rounded-xl shadow-sm border-2 p-6 ${getMetricBg(overview?.showUpRate || 0, 75)}`}>
+            <div className="text-sm text-[#55514D] font-medium mb-2">Show-Up Rate</div>
+            <div className={`text-4xl font-bold ${getMetricColor(overview?.showUpRate || 0, 75)}`}>
+              {overview?.showUpRate || 0}%
+            </div>
+            <div className="text-xs text-[#55514D] mt-2">
+              Target: 75% • {overview?.callsCompleted || 0} of {overview?.callsScheduled || 0} calls
+            </div>
+          </div>
+
+          {/* KPI 4: Lead-to-App Rate */}
+          <div className={`backdrop-blur-sm rounded-xl shadow-sm border-2 p-6 ${getMetricBg(overview?.leadToAppRate || 0, 6)}`}>
+            <div className="text-sm text-[#55514D] font-medium mb-2">Lead-to-App Rate</div>
+            <div className={`text-4xl font-bold ${getMetricColor(overview?.leadToAppRate || 0, 6)}`}>
+              {overview?.leadToAppRate || 0}%
+            </div>
+            <div className="text-xs text-[#55514D] mt-2">
+              Target: 6% • {overview?.convertedCount || 0} applications
+            </div>
+          </div>
+        </div>
+
+        {/* Supporting Metrics */}
+        <div className="mb-6">
+          <h2 className="text-xl font-bold text-[#1C1B1A] mb-2">Supporting Metrics</h2>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-6">
+            <div className="text-sm text-[#55514D] font-medium mb-2">Total Leads</div>
+            <div className="text-3xl font-bold text-[#1C1B1A]">{overview?.totalLeads || 0}</div>
+            <div className="text-xs text-[#55514D] mt-2">
+              {overview?.activeLeadsCount || 0} active, {overview?.convertedCount || 0} converted
+            </div>
+          </div>
+
           <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-6">
             <div className="text-sm text-[#55514D] font-medium mb-2">Total Pipeline Value</div>
             <div className="text-3xl font-bold text-[#625FFF]">
@@ -143,56 +238,26 @@ export default function AnalyticsPage() {
           </div>
 
           <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-6">
-            <div className="text-sm text-[#55514D] font-medium mb-2">Total Leads</div>
-            <div className="text-3xl font-bold text-[#1C1B1A]">{overview?.totalLeads || 0}</div>
+            <div className="text-sm text-[#55514D] font-medium mb-2">Call-to-App Rate</div>
+            <div className="text-3xl font-bold text-[#625FFF]">
+              {overview?.callToAppRate || 0}%
+            </div>
             <div className="text-xs text-[#55514D] mt-2">
-              {overview?.convertedCount || 0} converted
+              Target: 45% • Close rate from calls
             </div>
           </div>
 
           <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-6">
-            <div className="text-sm text-[#55514D] font-medium mb-2">Conversion Rate</div>
-            <div className="text-3xl font-bold text-[#D9F36E]">
-              {overview?.conversionRate || 0}%
-            </div>
-            <div className="text-xs text-[#55514D] mt-2">End-to-end conversion</div>
-          </div>
-
-          <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-6">
-            <div className="text-sm text-[#55514D] font-medium mb-2">Calls Booked</div>
-            <div className="text-3xl font-bold text-[#625FFF]">{overview?.callsBooked || 0}</div>
-            <div className="text-xs text-[#55514D] mt-2">
-              {overview?.responseRate || 0}% response rate
-            </div>
-          </div>
-        </div>
-
-        {/* Performance Metrics */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-6">
-            <div className="text-sm text-[#55514D] font-medium mb-2">Response Rate</div>
-            <div className="text-2xl font-bold text-[#1C1B1A]">
-              {overview?.responseRate || 0}%
-            </div>
-            <div className="text-xs text-[#55514D] mt-2">Leads who replied</div>
-          </div>
-
-          <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-6">
-            <div className="text-sm text-[#55514D] font-medium mb-2">Avg. Time to Response</div>
-            <div className="text-2xl font-bold text-[#1C1B1A]">
+            <div className="text-sm text-[#55514D] font-medium mb-2">Avg. Time to Reply</div>
+            <div className="text-3xl font-bold text-[#1C1B1A]">
               {overview?.avgTimeToResponse ? `${overview.avgTimeToResponse.toFixed(1)}h` : "N/A"}
             </div>
-            <div className="text-xs text-[#55514D] mt-2">First reply time</div>
-          </div>
-
-          <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-6">
-            <div className="text-sm text-[#55514D] font-medium mb-2">Booking Rate</div>
-            <div className="text-2xl font-bold text-[#1C1B1A]">
-              {funnel?.metrics.bookingRate || 0}%
+            <div className="text-xs text-[#55514D] mt-2">
+              Target: <24h • Lead response speed
             </div>
-            <div className="text-xs text-[#55514D] mt-2">Engaged → Call scheduled</div>
           </div>
         </div>
+
 
         {/* Conversion Funnel */}
         <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-8 mb-8">

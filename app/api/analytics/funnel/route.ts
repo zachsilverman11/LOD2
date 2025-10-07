@@ -29,19 +29,19 @@ export async function GET() {
         stage: "CONTACTED",
         label: "Contacted",
         count: statusMap.get("CONTACTED") || 0,
-        color: "#B1AFFF",
+        color: "#8B88FF",
       },
       {
         stage: "ENGAGED",
         label: "Engaged",
         count: statusMap.get("ENGAGED") || 0,
-        color: "#F6D7FF",
+        color: "#FFB6E1",
       },
       {
         stage: "NURTURING",
         label: "Nurturing",
         count: statusMap.get("NURTURING") || 0,
-        color: "#F6D7FF",
+        color: "#E0BBE4",
       },
       {
         stage: "CALL_SCHEDULED",
@@ -53,13 +53,13 @@ export async function GET() {
         stage: "CALL_COMPLETED",
         label: "Call Completed",
         count: statusMap.get("CALL_COMPLETED") || 0,
-        color: "#625FFF",
+        color: "#B8E986",
       },
       {
         stage: "CONVERTED",
         label: "Converted",
         count: statusMap.get("CONVERTED") || 0,
-        color: "#D9F36E",
+        color: "#A8D96E",
       },
     ];
 

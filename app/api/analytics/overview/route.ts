@@ -45,11 +45,19 @@ export async function GET() {
     // Calculate conversion rate
     const conversionRate = totalLeads > 0 ? (convertedCount / totalLeads) * 100 : 0;
 
-    // Get calls booked (CALL_SCHEDULED + CALL_COMPLETED + CONVERTED)
-    const callsBooked =
+    // Get calls scheduled (CALL_SCHEDULED + CALL_COMPLETED + CONVERTED)
+    const callsScheduled =
       (leadsByStatus.find((s) => s.status === "CALL_SCHEDULED")?._count.id || 0) +
       (leadsByStatus.find((s) => s.status === "CALL_COMPLETED")?._count.id || 0) +
       convertedCount;
+
+    // Get calls completed (CALL_COMPLETED + CONVERTED)
+    const callsCompleted =
+      (leadsByStatus.find((s) => s.status === "CALL_COMPLETED")?._count.id || 0) +
+      convertedCount;
+
+    // Calculate show-up rate
+    const showUpRate = callsScheduled > 0 ? (callsCompleted / callsScheduled) * 100 : 0;
 
     // Get total appointments
     const totalAppointments = await prisma.appointment.count();
@@ -108,19 +116,30 @@ export async function GET() {
       count: s._count.id,
     }));
 
+    // Calculate key KPIs
+    const leadToCallRate = totalLeads > 0 ? (callsScheduled / totalLeads) * 100 : 0;
+    const leadToAppRate = totalLeads > 0 ? (convertedCount / totalLeads) * 100 : 0;
+    const callToAppRate = callsCompleted > 0 ? (convertedCount / callsCompleted) * 100 : 0;
+
     return NextResponse.json({
       success: true,
       data: {
         totalLeads,
         totalPipelineValue,
         conversionRate: parseFloat(conversionRate.toFixed(2)),
-        callsBooked,
+        callsScheduled,
+        callsCompleted,
+        showUpRate: parseFloat(showUpRate.toFixed(2)),
         totalAppointments,
         responseRate: parseFloat(responseRate.toFixed(2)),
         avgTimeToResponse: parseFloat(avgTimeToResponse.toFixed(2)),
         statusBreakdown,
         convertedCount,
         activeLeadsCount: activeLeads.length,
+        // New KPIs
+        leadToCallRate: parseFloat(leadToCallRate.toFixed(2)),
+        leadToAppRate: parseFloat(leadToAppRate.toFixed(2)),
+        callToAppRate: parseFloat(callToAppRate.toFixed(2)),
       },
     });
   } catch (error) {
