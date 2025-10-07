@@ -627,7 +627,7 @@ export async function handleConversation(
               },
               body: {
                 type: "string",
-                description: "Email body in HTML format. Can be longer than SMS. Use <h2>, <p>, <ul>, <li>, <strong> tags. Include Cal.com link if relevant. Sign as 'Holly from Inspired Mortgage'.",
+                description: "Email body in HTML format. Can be longer than SMS. Use <h2>, <p>, <ul>, <li>, <strong> tags. IMPORTANT: When including booking link, use actual HTML anchor tag with Cal.com URL: <a href=\"https://cal.com/team/inpired-mortgage/mortgage-discovery-call\" class=\"cta-button\">Book Your Discovery Call</a>. Sign as 'Holly from Inspired Mortgage'.",
               },
               reasoning: {
                 type: "string",
@@ -656,7 +656,7 @@ export async function handleConversation(
               },
               emailBody: {
                 type: "string",
-                description: "Detailed email in HTML with full context, programs, next steps. Include Cal.com link.",
+                description: "Detailed email in HTML with full context, programs, next steps. IMPORTANT: Include actual clickable Cal.com link with HTML anchor tag: <a href=\"https://cal.com/team/inpired-mortgage/mortgage-discovery-call\" class=\"cta-button\">Book Your Discovery Call</a>.",
               },
               reasoning: {
                 type: "string",
