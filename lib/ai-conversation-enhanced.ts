@@ -731,6 +731,24 @@ export async function handleConversation(
 }
 
 /**
+ * Helper: Update lead after sending outbound communication
+ * Moves NEW leads to CONTACTED status
+ */
+async function updateLeadAfterContact(leadId: string, currentStatus: string) {
+  const updateData: any = { lastContactedAt: new Date() };
+
+  // Move NEW leads to CONTACTED on first outbound message
+  if (currentStatus === "NEW") {
+    updateData.status = "CONTACTED";
+  }
+
+  await prisma.lead.update({
+    where: { id: leadId },
+    data: updateData,
+  });
+}
+
+/**
  * Execute the AI's decision
  */
 export async function executeDecision(
@@ -761,10 +779,7 @@ export async function executeDecision(
             },
           });
 
-          await prisma.lead.update({
-            where: { id: leadId },
-            data: { lastContactedAt: new Date() },
-          });
+          await updateLeadAfterContact(leadId, lead.status);
         } catch (error) {
           await sendErrorAlert({
             error: error instanceof Error ? error : new Error(String(error)),
@@ -823,10 +838,7 @@ export async function executeDecision(
             },
           });
 
-          await prisma.lead.update({
-            where: { id: leadId },
-            data: { lastContactedAt: new Date() },
-          });
+          await updateLeadAfterContact(leadId, lead.status);
         } catch (error) {
           await sendErrorAlert({
             error: error instanceof Error ? error : new Error(String(error)),
@@ -885,10 +897,7 @@ export async function executeDecision(
             console.warn(`[AI] send_both: No email address for lead ${leadId}, only sent SMS`);
           }
 
-          await prisma.lead.update({
-            where: { id: leadId },
-            data: { lastContactedAt: new Date() },
-          });
+          await updateLeadAfterContact(leadId, lead.status);
         } catch (error) {
           await sendErrorAlert({
             error: error instanceof Error ? error : new Error(String(error)),
