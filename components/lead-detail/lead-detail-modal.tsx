@@ -18,8 +18,21 @@ export function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
   const [taskDueDate, setTaskDueDate] = useState("");
   const [isAddingNote, setIsAddingNote] = useState(false);
   const [isAddingTask, setIsAddingTask] = useState(false);
+  const [expandedEmails, setExpandedEmails] = useState<Set<string>>(new Set());
 
   if (!lead) return null;
+
+  const toggleEmail = (emailId: string) => {
+    setExpandedEmails(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(emailId)) {
+        newSet.delete(emailId);
+      } else {
+        newSet.add(emailId);
+      }
+      return newSet;
+    });
+  };
 
   const handleAddNote = async () => {
     if (!newNote.trim()) return;
@@ -389,41 +402,54 @@ export function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
                 {lead.communications
                   .filter((comm) => comm.channel === "EMAIL")
                   .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-                  .map((comm, index) => (
-                    <div
-                      key={comm.id}
-                      className={`p-4 ${index > 0 ? 'border-t border-[#E4DDD3]' : ''} ${
-                        comm.direction === "OUTBOUND" ? "bg-[#FBF3E7]/30" : "bg-white"
-                      }`}
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <span className={`text-xs font-semibold px-2 py-1 rounded ${
-                            comm.direction === "OUTBOUND"
-                              ? "bg-[#625FFF] text-white"
-                              : "bg-[#E4DDD3] text-[#1C1B1A]"
-                          }`}>
-                            {comm.direction === "OUTBOUND" ? "Sent by Holly" : "Received from Lead"}
-                          </span>
-                          {comm.metadata && typeof comm.metadata === 'object' && 'subject' in comm.metadata && (
-                            <span className="text-sm font-medium text-[#1C1B1A]">
-                              {(comm.metadata as any).subject}
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-xs text-[#55514D]">
-                          {format(new Date(comm.createdAt), "MMM d, yyyy 'at' h:mm a")}
-                        </span>
-                      </div>
-                      <div className="text-sm text-[#1C1B1A] prose prose-sm max-w-none">
-                        {comm.direction === "OUTBOUND" ? (
-                          <div dangerouslySetInnerHTML={{ __html: comm.content }} />
-                        ) : (
-                          <p className="whitespace-pre-wrap">{comm.content}</p>
+                  .map((comm, index) => {
+                    const isExpanded = expandedEmails.has(comm.id);
+                    return (
+                      <div
+                        key={comm.id}
+                        className={`${index > 0 ? 'border-t border-[#E4DDD3]' : ''} ${
+                          comm.direction === "OUTBOUND" ? "bg-[#FBF3E7]/30" : "bg-white"
+                        }`}
+                      >
+                        <button
+                          onClick={() => toggleEmail(comm.id)}
+                          className="w-full p-4 text-left hover:bg-black/5 transition-colors"
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-2 flex-1">
+                              <span className={`text-xs font-semibold px-2 py-1 rounded ${
+                                comm.direction === "OUTBOUND"
+                                  ? "bg-[#625FFF] text-white"
+                                  : "bg-[#E4DDD3] text-[#1C1B1A]"
+                              }`}>
+                                {comm.direction === "OUTBOUND" ? "Sent by Holly" : "Received from Lead"}
+                              </span>
+                              {comm.metadata && typeof comm.metadata === 'object' && 'subject' in comm.metadata && (
+                                <span className="text-sm font-medium text-[#1C1B1A]">
+                                  {(comm.metadata as any).subject}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-[#55514D]">
+                                {format(new Date(comm.createdAt), "MMM d, yyyy 'at' h:mm a")}
+                              </span>
+                              <span className="text-[#625FFF]">{isExpanded ? '▼' : '▶'}</span>
+                            </div>
+                          </div>
+                        </button>
+                        {isExpanded && (
+                          <div className="px-4 pb-4 text-sm text-[#1C1B1A] prose prose-sm max-w-none">
+                            {comm.direction === "OUTBOUND" ? (
+                              <div dangerouslySetInnerHTML={{ __html: comm.content }} />
+                            ) : (
+                              <p className="whitespace-pre-wrap">{comm.content}</p>
+                            )}
+                          </div>
                         )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
               </div>
             </div>
           )}
