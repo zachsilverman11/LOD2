@@ -823,6 +823,7 @@ export async function executeDecision(
             to: lead.email,
             subject: decision.emailSubject,
             htmlContent: decision.emailBody,
+            replyTo: "info@reply.inspired.mortgage",
           });
 
           await prisma.communication.create({
@@ -878,6 +879,7 @@ export async function executeDecision(
               to: lead.email,
               subject: decision.emailSubject,
               htmlContent: decision.emailBody,
+              replyTo: "info@reply.inspired.mortgage",
             });
 
             await prisma.communication.create({
