@@ -806,6 +806,7 @@ export async function executeDecision(
 
           await sendEmail({
             to: lead.email,
+            from: "info@inspired.mortgage",
             subject: decision.emailSubject,
             htmlContent: decision.emailBody,
             replyTo: "info@reply.inspired.mortgage",
@@ -862,6 +863,7 @@ export async function executeDecision(
           if (lead.email) {
             await sendEmail({
               to: lead.email,
+              from: "info@inspired.mortgage",
               subject: decision.emailSubject,
               htmlContent: decision.emailBody,
               replyTo: "info@reply.inspired.mortgage",
