@@ -347,9 +347,9 @@ export function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
           )}
 
           {/* SMS Conversation */}
-          {lead.communications && lead.communications.length > 0 && (
+          {lead.communications && lead.communications.filter((c) => c.channel === "SMS").length > 0 && (
             <div className="mb-6">
-              <h3 className="text-lg font-semibold mb-3 text-[#1C1B1A]">SMS Conversation</h3>
+              <h3 className="text-lg font-semibold mb-3 text-[#1C1B1A]">📱 SMS Conversation</h3>
               <div className="bg-[#FBF3E7]/50 rounded-lg p-4 space-y-3 max-h-96 overflow-y-auto border border-[#E4DDD3]">
                 {lead.communications
                   .filter((comm) => comm.channel === "SMS")
@@ -374,6 +374,53 @@ export function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
                         >
                           {format(new Date(comm.createdAt), "MMM d, h:mm a")}
                         </p>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {/* Email Conversation */}
+          {lead.communications && lead.communications.filter((c) => c.channel === "EMAIL").length > 0 && (
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold mb-3 text-[#1C1B1A]">📧 Email Conversation</h3>
+              <div className="bg-white rounded-lg border border-[#E4DDD3] overflow-hidden">
+                {lead.communications
+                  .filter((comm) => comm.channel === "EMAIL")
+                  .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+                  .map((comm, index) => (
+                    <div
+                      key={comm.id}
+                      className={`p-4 ${index > 0 ? 'border-t border-[#E4DDD3]' : ''} ${
+                        comm.direction === "OUTBOUND" ? "bg-[#FBF3E7]/30" : "bg-white"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs font-semibold px-2 py-1 rounded ${
+                            comm.direction === "OUTBOUND"
+                              ? "bg-[#625FFF] text-white"
+                              : "bg-[#E4DDD3] text-[#1C1B1A]"
+                          }`}>
+                            {comm.direction === "OUTBOUND" ? "Sent by Holly" : "Received from Lead"}
+                          </span>
+                          {comm.metadata && typeof comm.metadata === 'object' && 'subject' in comm.metadata && (
+                            <span className="text-sm font-medium text-[#1C1B1A]">
+                              {(comm.metadata as any).subject}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-xs text-[#55514D]">
+                          {format(new Date(comm.createdAt), "MMM d, yyyy 'at' h:mm a")}
+                        </span>
+                      </div>
+                      <div className="text-sm text-[#1C1B1A] prose prose-sm max-w-none">
+                        {comm.direction === "OUTBOUND" ? (
+                          <div dangerouslySetInnerHTML={{ __html: comm.content }} />
+                        ) : (
+                          <p className="whitespace-pre-wrap">{comm.content}</p>
+                        )}
                       </div>
                     </div>
                   ))}
