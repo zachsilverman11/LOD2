@@ -548,7 +548,7 @@ export async function handleConversation(
             properties: {
               message: {
                 type: "string",
-                description: "Message to accompany the booking link. DO NOT include placeholder text like '[link]' or 'here's the link' - the actual URL will be appended automatically. Just write the message naturally.",
+                description: "Message to accompany the booking link. DO NOT include placeholder text like '[link]' or 'here's the link' - the actual URL will be appended automatically. IMPORTANT: Always include this reminder at the end of your message: '(When booking, make sure to include +1 before your phone number)'. Just write the message naturally with this reminder.",
               },
               reasoning: {
                 type: "string",
