@@ -146,8 +146,11 @@ export function wrapEmailTemplate(content: string): string {
       <div class="footer-signature">
         Holly from Inspired Mortgage
       </div>
+      <div style="color: #55514D; font-size: 14px; margin-bottom: 16px;">
+        Scheduling & Lead Nurturing Specialist
+      </div>
       <div class="footer-contact">
-        <a href="mailto:holly@inspiredmortgage.ca">holly@inspiredmortgage.ca</a>
+        <a href="mailto:info@inspired.mortgage">info@inspired.mortgage</a>
       </div>
       <div class="footer-contact">
         <a href="${calComLink}" style="color: #625FFF; font-weight: 600;">📅 Book a 15-Min Discovery Call</a>
