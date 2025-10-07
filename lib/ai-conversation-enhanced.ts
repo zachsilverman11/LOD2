@@ -548,7 +548,7 @@ export async function handleConversation(
             properties: {
               message: {
                 type: "string",
-                description: "Message to accompany the booking link. DO NOT include placeholder text like '[link]' or 'here's the link' - the actual URL will be appended automatically. IMPORTANT: Always include this reminder at the end of your message: '(When booking, make sure to include +1 before your phone number)'. Just write the message naturally with this reminder.",
+                description: "Message to accompany the booking link. DO NOT include placeholder text like '[link]' or 'here's the link' - the actual URL will be appended automatically. Just write the message naturally.",
               },
               reasoning: {
                 type: "string",
@@ -910,7 +910,23 @@ export async function executeDecision(
       if (decision.message) {
         try {
           const bookingUrl = process.env.CAL_COM_BOOKING_URL || "https://cal.com/your-link";
-          const messageWithLink = `${decision.message}\n\n${bookingUrl}`;
+
+          // Pre-fill phone number and email if available
+          const urlParams = new URLSearchParams();
+          if (lead.phone) {
+            // Format phone as E.164 with +1 country code if not already present
+            const formattedPhone = lead.phone.startsWith('+') ? lead.phone : `+1${lead.phone.replace(/\D/g, '')}`;
+            urlParams.set('phone', formattedPhone);
+          }
+          if (lead.email) {
+            urlParams.set('email', lead.email);
+          }
+          if (lead.name) {
+            urlParams.set('name', lead.name);
+          }
+
+          const bookingUrlWithParams = `${bookingUrl}${urlParams.toString() ? '?' + urlParams.toString() : ''}`;
+          const messageWithLink = `${decision.message}\n\n${bookingUrlWithParams}`;
 
           await sendSms({
             to: lead.phone,
