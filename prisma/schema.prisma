@@ -55,21 +55,25 @@ model LeadActivity {
 }
 
 model Appointment {
-  id               String   @id @default(cuid())
+  id               String    @id @default(cuid())
   leadId           String
-  calComEventId    String?  @unique
-  calComBookingUid String?  @unique
+  calComEventId    String?   @unique
+  calComBookingUid String?   @unique
   scheduledAt      DateTime
+  scheduledFor     DateTime? // Actual appointment time (defaults to scheduledAt for backwards compatibility)
   duration         Int
   status           String
   meetingUrl       String?
   notes            String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  lead             Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  reminder24hSent  Boolean   @default(false)
+  reminder1hSent   Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  lead             Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
   @@index([leadId])
   @@index([scheduledAt])
+  @@index([scheduledFor])
 }
 
 model EmailTemplate {

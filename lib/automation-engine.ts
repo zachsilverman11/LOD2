@@ -238,6 +238,7 @@ export async function processTimeBasedAutomations() {
 
   try {
     // Run the built-in smart automations
+    await processAppointmentReminders();
     await processSmartFollowUps();
     await processPostCallConfirmations();
     await processStaleLeadAlerts();
@@ -415,6 +416,147 @@ export const DEFAULT_AUTOMATION_RULES = [
     priority: 9,
   },
 ];
+
+/**
+ * Appointment Reminders: Send automated reminders 24h and 1h before appointments
+ */
+async function processAppointmentReminders() {
+  console.log("[Automation] Processing appointment reminders...");
+
+  const now = new Date();
+  const twentyFourHoursFromNow = new Date(now.getTime() + 24 * 3600000);
+  const twentyFiveHoursFromNow = new Date(now.getTime() + 25 * 3600000);
+  const oneHourFromNow = new Date(now.getTime() + 1 * 3600000);
+  const twoHoursFromNow = new Date(now.getTime() + 2 * 3600000);
+
+  // Find appointments scheduled in 24-25 hours (1-hour window for cron tolerance)
+  // Use scheduledFor if available, otherwise fall back to scheduledAt
+  const allAppointments = await prisma.appointment.findMany({
+    where: {
+      status: { in: ["SCHEDULED", "CONFIRMED"] },
+    },
+    include: {
+      lead: true,
+    },
+  });
+
+  const appointments24h = allAppointments.filter((apt) => {
+    const appointmentTime = apt.scheduledFor || apt.scheduledAt;
+    return (
+      appointmentTime >= twentyFourHoursFromNow &&
+      appointmentTime <= twentyFiveHoursFromNow &&
+      !apt.reminder24hSent
+    );
+  });
+
+  const appointments1h = allAppointments.filter((apt) => {
+    const appointmentTime = apt.scheduledFor || apt.scheduledAt;
+    return (
+      appointmentTime >= oneHourFromNow &&
+      appointmentTime <= twoHoursFromNow &&
+      !apt.reminder1hSent
+    );
+  });
+
+  // Send 24-hour reminders
+  for (const appointment of appointments24h) {
+    try {
+      const lead = appointment.lead;
+      const appointmentTime = (appointment.scheduledFor || appointment.scheduledAt).toLocaleString('en-US', {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: 'America/Vancouver'
+      });
+
+      const reminderMessage = `Hey ${lead.name?.split(' ')[0] || 'there'}! Just a friendly reminder - your mortgage discovery call is tomorrow at ${appointmentTime} PT. Looking forward to it! 📅`;
+
+      await sendSms({
+        to: lead.phone || '',
+        body: reminderMessage,
+      });
+
+      await prisma.communication.create({
+        data: {
+          leadId: lead.id,
+          channel: "SMS",
+          direction: "OUTBOUND",
+          content: reminderMessage,
+          intent: "appointment_reminder_24h",
+          metadata: { automated: true, appointmentId: appointment.id },
+        },
+      });
+
+      await prisma.appointment.update({
+        where: { id: appointment.id },
+        data: { reminder24hSent: true },
+      });
+
+      console.log(`[Automation] 24h reminder sent for appointment ${appointment.id}, lead ${lead.id}`);
+    } catch (error) {
+      console.error(`[Automation] Error sending 24h reminder for appointment ${appointment.id}:`, error);
+      await sendErrorAlert({
+        error: error instanceof Error ? error : new Error(String(error)),
+        context: {
+          location: "automation-engine - 24h appointment reminder",
+          details: { appointmentId: appointment.id, leadId: appointment.lead.id },
+        },
+      });
+    }
+  }
+
+  // Send 1-hour reminders
+  for (const appointment of appointments1h) {
+    try {
+      const lead = appointment.lead;
+      const appointmentTime = (appointment.scheduledFor || appointment.scheduledAt).toLocaleString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: 'America/Vancouver'
+      });
+
+      const reminderMessage = `Quick reminder - your mortgage discovery call is in 1 hour at ${appointmentTime} PT. See you soon! 🎯`;
+
+      await sendSms({
+        to: lead.phone || '',
+        body: reminderMessage,
+      });
+
+      await prisma.communication.create({
+        data: {
+          leadId: lead.id,
+          channel: "SMS",
+          direction: "OUTBOUND",
+          content: reminderMessage,
+          intent: "appointment_reminder_1h",
+          metadata: { automated: true, appointmentId: appointment.id },
+        },
+      });
+
+      await prisma.appointment.update({
+        where: { id: appointment.id },
+        data: { reminder1hSent: true },
+      });
+
+      console.log(`[Automation] 1h reminder sent for appointment ${appointment.id}, lead ${lead.id}`);
+    } catch (error) {
+      console.error(`[Automation] Error sending 1h reminder for appointment ${appointment.id}:`, error);
+      await sendErrorAlert({
+        error: error instanceof Error ? error : new Error(String(error)),
+        context: {
+          location: "automation-engine - 1h appointment reminder",
+          details: { appointmentId: appointment.id, leadId: appointment.lead.id },
+        },
+      });
+    }
+  }
+
+  console.log(`[Automation] Sent ${appointments24h.length} x 24h reminders, ${appointments1h.length} x 1h reminders`);
+}
 
 /**
  * Smart Follow-Ups: Send AI-driven follow-ups to non-responsive leads

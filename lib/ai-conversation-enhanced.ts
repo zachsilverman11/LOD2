@@ -112,7 +112,7 @@ export async function buildLeadContext(leadId: string): Promise<LeadContext> {
 /**
  * Generate enhanced system prompt with Inspired Mortgage training
  */
-function generateSystemPrompt(context: LeadContext): string {
+function generateSystemPrompt(context: LeadContext, existingAppointment?: any): string {
   const data = context.leadData;
   const daysInStage = context.pipelineStatus.daysInStage;
 
@@ -167,8 +167,50 @@ Your ONLY job is to:
 2. Build curiosity and trust
 3. Book discovery calls with our mortgage advisors (Greg Williamson or Jakub Huncik)
 
-# 🎯 PRIMARY OBJECTIVE
+# 🗓️ APPOINTMENT STATUS
+${existingAppointment ? `
+⚠️ **CONFIRMATION MODE ACTIVE** ⚠️
+
+This lead ALREADY HAS A CALL SCHEDULED:
+- Date/Time: ${(existingAppointment.scheduledFor || existingAppointment.scheduledAt).toLocaleString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Vancouver' })} Pacific Time
+- Status: ${existingAppointment.status}
+- Meeting ID: ${existingAppointment.externalId || 'N/A'}
+
+🎯 YOUR OBJECTIVE HAS CHANGED:
+- DO NOT try to book them for a call - they're already booked!
+- CONFIRM they know when their call is
+- PREPARE them for what to expect
+- BUILD EXCITEMENT about the call
+- ENSURE THEY SHOW UP (80%+ show-up rate target)
+- Answer any pre-call questions
+
+📋 CONFIRMATION MODE STRATEGY:
+1. **Initial Contact**: Welcome them, confirm their call time, explain what to expect
+2. **Pre-Call Preparation**: Share what to have ready (property details, questions, concerns)
+3. **Value Reminder**: Build excitement about the programs they'll learn about
+4. **Logistics**: Ensure they have calendar invite, phone number, etc.
+5. **Day-Of Reminder**: "Looking forward to our call today at [time]!"
+
+💬 CONFIRMATION MODE LANGUAGE:
+- "Your call with [advisor] is confirmed for [date/time]"
+- "Looking forward to discussing your [mortgage type]"
+- "Quick tip: Have your property details handy for the call"
+- "Can't wait to share these programs with you on [day]"
+- "See you on the call [date/time]!"
+
+⚠️ NEVER use phrases like:
+- "Want to schedule a call?"
+- "Let's book a time"
+- "Here's my calendar link"
+- "When works for you?"
+` : `
+✅ **BOOKING MODE ACTIVE** ✅
+
+This lead DOES NOT have a call scheduled yet.
+
+🎯 YOUR PRIMARY OBJECTIVE:
 Book a 15-20 minute discovery call with one of our mortgage advisors (Greg Williamson or Jakub Huncik).
+
 This call is where they'll:
 - Review the lead's specific situation
 - Discuss what they qualify for
@@ -176,6 +218,7 @@ This call is where they'll:
 - Provide expert mortgage advice
 
 Your job: Get them curious enough to book the call. Don't try to answer everything via SMS.
+`}
 
 # 📊 LEAD PROFILE
 Name: ${data.name || "Unknown"}
@@ -464,7 +507,26 @@ export async function handleConversation(
   incomingChannel?: "SMS" | "EMAIL"
 ): Promise<AIDecision> {
   const context = await buildLeadContext(leadId);
-  const systemPrompt = generateSystemPrompt(context);
+
+  // Check for existing appointments
+  const existingAppointment = await prisma.appointment.findFirst({
+    where: {
+      leadId,
+      status: { in: ["SCHEDULED", "CONFIRMED"] },
+      OR: [
+        { scheduledFor: { gte: new Date() } },
+        {
+          AND: [
+            { scheduledFor: null },
+            { scheduledAt: { gte: new Date() } }
+          ]
+        }
+      ]
+    },
+    orderBy: { scheduledAt: "asc" },
+  });
+
+  const systemPrompt = generateSystemPrompt(context, existingAppointment);
 
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
 
@@ -475,13 +537,13 @@ export async function handleConversation(
 
     messages.push({
       role: "user",
-      content: `The lead just sent this message: "${incomingMessage}"${channelNote}\n\nAnalyze this message and decide what action to take. Consider:\n- Their intent and sentiment\n- Where they are in the pipeline\n- What information you still need\n- Whether they're ready to book or need more nurturing\n- Which of the 3 programs would resonate most\n\nUse one of the available tools to respond.`,
+      content: `The lead just sent this message: "${incomingMessage}"${channelNote}\n\nAnalyze this message and decide what action to take. Consider:\n- Their intent and sentiment\n- Where they are in the pipeline\n- What information you still need\n- Whether they're ready to book or need more nurturing\n- Which of the 3 programs would resonate most\n${existingAppointment ? `\n⚠️ CRITICAL: This lead ALREADY HAS A CALL SCHEDULED for ${(existingAppointment.scheduledFor || existingAppointment.scheduledAt).toLocaleString()}. DO NOT try to book them again. Focus on confirming, preparing, and ensuring they show up.` : ''}\n\nUse one of the available tools to respond.`,
     });
   } else {
     // Initial contact
     messages.push({
       role: "user",
-      content: `This is a brand new lead who just submitted a form. Craft a warm, personalized initial SMS that:\n- References their specific inquiry (${context.leadData.lead_type})\n- Leads with the PRIMARY OFFER recommended for this lead type\n- Creates curiosity without over-explaining\n- Mentions a quick call with one of our mortgage advisors (Greg Williamson or Jakub Huncik) to discuss their situation\n- Makes it clear what they'll get from the call (find out what they qualify for, get answers, etc.)\n- Keeps it conversational and builds trust\n\nIMPORTANT: Don't just say "free 15-min call" - explain WHO it's with and WHY it's valuable.\n\nUse the send_sms tool.`,
+      content: `This is a brand new lead who just submitted a form. ${existingAppointment ? `\n\n⚠️ CRITICAL: This lead ALREADY BOOKED A CALL when they submitted the form! Scheduled for ${(existingAppointment.scheduledFor || existingAppointment.scheduledAt).toLocaleString()}.\n\nYour message should:\n- Confirm their call is booked\n- Welcome them and introduce yourself\n- Let them know what to expect on the call\n- Build excitement and prepare them\n- Ensure they show up\n\nDO NOT try to book them - they're already booked!` : `\n\nCraft a warm, personalized initial SMS that:\n- References their specific inquiry (${context.leadData.lead_type})\n- Leads with the PRIMARY OFFER recommended for this lead type\n- Creates curiosity without over-explaining\n- Mentions a quick call with one of our mortgage advisors (Greg Williamson or Jakub Huncik) to discuss their situation\n- Makes it clear what they'll get from the call (find out what they qualify for, get answers, etc.)\n- Keeps it conversational and builds trust\n\nIMPORTANT: Don't just say "free 15-min call" - explain WHO it's with and WHY it's valuable.`}\n\nUse the send_sms tool.`,
     });
   }
 

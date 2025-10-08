@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { ActivityType, CommunicationChannel, LeadStatus } from "@/app/generated/prisma";
 import { sendSlackNotification } from "@/lib/slack";
+import { handleConversation, executeDecision } from "@/lib/ai-conversation-enhanced";
 
 /**
  * Handle Cal.com webhook events
@@ -114,6 +115,7 @@ async function handleBookingCreated(payload: any) {
       calComEventId: id?.toString(),
       calComBookingUid: uid,
       scheduledAt: new Date(startTime),
+      scheduledFor: new Date(startTime),
       duration: Math.round((new Date(endTime).getTime() - new Date(startTime).getTime()) / 60000),
       status: "scheduled",
       meetingUrl: meetingUrl,
@@ -152,6 +154,16 @@ async function handleBookingCreated(payload: any) {
       hour12: true
     })}`,
   });
+
+  // Send confirmation message via Holly (initial contact with appointment awareness)
+  // Holly will see the appointment exists and send appropriate confirmation
+  try {
+    const decision = await handleConversation(lead.id);
+    await executeDecision(lead.id, decision);
+  } catch (error) {
+    console.error("Failed to send appointment confirmation via Holly:", error);
+    // Don't throw - appointment is already created, this is just a nice-to-have
+  }
 }
 
 async function handleBookingRescheduled(payload: any) {
@@ -172,7 +184,10 @@ async function handleBookingRescheduled(payload: any) {
     where: { id: appointment.id },
     data: {
       scheduledAt: new Date(startTime),
+      scheduledFor: new Date(startTime),
       duration: Math.round((new Date(endTime).getTime() - new Date(startTime).getTime()) / 60000),
+      reminder24hSent: false, // Reset reminders when rescheduled
+      reminder1hSent: false,
     },
   });
 
