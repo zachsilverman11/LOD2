@@ -106,6 +106,10 @@ export async function buildLeadContext(leadId: string): Promise<LeadContext> {
       lastActivity: lead.lastContactedAt,
     },
     appointments: lead.appointments,
+    applicationStatus: {
+      started: lead.applicationStartedAt,
+      completed: lead.applicationCompletedAt,
+    },
   };
 }
 
@@ -265,6 +269,175 @@ Messages Sent (You): ${context.pipelineStatus.outboundCount}
 Messages Received (Them): ${context.pipelineStatus.inboundCount}
 Total Conversation: ${context.pipelineStatus.totalMessages} messages
 Has Appointment: ${context.appointments.length > 0 ? "Yes" : "No"}
+
+${data.callOutcome ? `
+# 📞 POST-CALL CONTEXT (CRITICAL - READ CAREFULLY)
+
+⚠️ **DISCOVERY CALL COMPLETED** ⚠️
+
+This lead just completed a discovery call with one of our advisors. Here's what happened:
+
+**Call Outcome:** ${data.callOutcome.outcome.toUpperCase().replace("_", " ")}
+**Timeline:** ${data.callOutcome.timeline || "Not specified"}
+**Next Step:** ${data.callOutcome.nextStep?.replace("_", " ") || "Not specified"}
+${data.callOutcome.programsDiscussed ? `**Programs Discussed:** ${data.callOutcome.programsDiscussed.join(", ")}` : ""}
+${data.callOutcome.preferredProgram ? `**Lead's Preferred Program:** ${data.callOutcome.preferredProgram}` : ""}
+${data.callOutcome.notes ? `**Advisor Notes:** ${data.callOutcome.notes}` : ""}
+
+🎯 **YOUR POST-CALL OBJECTIVE BASED ON OUTCOME:**
+
+${data.callOutcome.outcome === "hot_lead" ? `
+✅ **HOT LEAD - SEND APPLICATION**
+
+This lead is ready to move forward! Your job:
+1. Express excitement about their call with the advisor
+2. Reference what was discussed (use programs/notes above for context)
+3. Send them the application link: ${process.env.APPLICATION_URL}
+4. Make it easy and quick - "Should take about 10 minutes"
+5. Offer to help with any questions
+6. Follow up if they don't start the application within 24-48h
+
+**Example message:**
+"Hey [Name]! 🎉 So glad you and [Advisor] had a great call! Based on what you discussed about [reference specific program/situation], here's your application link to get started: ${process.env.APPLICATION_URL}
+
+Should take about 10 minutes. I'll check in tomorrow to see if you have any questions!"
+
+**Follow-up strategy:**
+- 24h: "Did you get a chance to start the application? Any questions?"
+- 48h: "Quick check-in - want to make sure you have everything you need"
+- 72h: Alert team if still no progress
+` : ""}
+
+${data.callOutcome.outcome === "needs_followup" ? `
+📋 **NEEDS FOLLOW-UP**
+
+The lead needs more information or time to decide. Your job:
+1. Ask how the call went (show you care)
+2. Offer to help with whatever they need
+3. Keep the conversation going based on their reply
+4. Don't push - be helpful and consultative
+5. Reference specific things discussed on the call for personalization
+
+**Example message:**
+"Hi [Name]! How did your call with [Advisor] go?${data.callOutcome.notes ? ` ${data.callOutcome.notes.includes("document") || data.callOutcome.notes.includes("info") ? "Did you get all the info you needed?" : ""}` : ""}
+
+Let me know if you have any questions - happy to help!"
+
+**Adaptive strategy based on their reply:**
+- "I need to think about it" → Soft nurture, check in weekly
+- "I need documents" → "What documents? I can help coordinate"
+- "I need better rates" → Explain value of programs discussed
+- "I want to compare" → "Totally fair - what questions can I answer?"
+` : ""}
+
+${data.callOutcome.outcome === "not_qualified" ? `
+🚫 **NOT QUALIFIED**
+
+This lead doesn't fit our programs right now. Your job:
+1. Send a polite, professional close message
+2. Thank them for their time
+3. Leave the door open for the future
+4. Move to LOST status
+5. Keep it warm - situations change
+
+**Example message:**
+"Hi [Name] - thanks for taking the time to chat with [Advisor] today!
+
+I understand you're exploring all your options right now. If your situation changes or you have questions down the road, we're here!
+
+Best of luck with everything 😊"
+
+**DO NOT:**
+- Try to resurrect the conversation
+- Send follow-ups or nurture messages
+- Push for a different outcome
+` : ""}
+
+${data.callOutcome.outcome === "long_timeline" ? `
+⏸️ **LONG TIMELINE**
+
+This lead is interested but not ready yet. Your job:
+1. Acknowledge their timeline respectfully
+2. Let them know you'll check in closer to their date
+3. Stay top-of-mind without being pushy
+4. Reference their specific timeline for personalization
+
+**Example message:**
+"Hey [Name]! Thanks for chatting with [Advisor] today.
+
+I know you're looking at a ${data.callOutcome.timeline || "few months"} timeline - I'll check in with you ${data.callOutcome.timeline === "3-6_months" ? "in about 2-3 months" : data.callOutcome.timeline === "6+_months" ? "in 4-5 months" : "in a few weeks"} to see where you're at!
+
+In the meantime, if anything changes or you have questions, just text me 📱"
+
+**Follow-up cadence:**
+- 1-3 months: Check in 2 weeks before their timeline
+- 3-6 months: Check in monthly
+- 6+ months: Check in quarterly
+- Market changes: Send relevant updates if rates drop or programs change
+` : ""}
+
+🎯 **PERSONALIZATION IS KEY**
+${data.callOutcome.programsDiscussed || data.callOutcome.preferredProgram || data.callOutcome.notes ?
+"Use the specific context from the call (programs discussed, preferences, advisor notes) to make your message feel personal and relevant. Don't send generic follow-up - reference what was actually discussed!" :
+"Ask the lead how the call went to get more context for future messages."}
+
+` : ""}
+
+${context.applicationStatus?.started || context.applicationStatus?.completed ? `
+# 🚀 APPLICATION STATUS (CRITICAL - CELEBRATE THIS!)
+
+${context.applicationStatus.completed ? `
+🎉 **APPLICATION COMPLETED!** 🎉
+
+This lead has SUBMITTED their mortgage application!
+- Completed: ${new Date(context.applicationStatus.completed).toLocaleDateString()}
+- Status: CONVERTED ✅
+
+🎯 **YOUR OBJECTIVE:**
+- Send a warm congratulations message
+- Let them know next steps (advisor will be in touch)
+- Offer to answer any questions while they wait
+- Keep them excited and reassured
+
+**Example message:**
+"Congrats on submitting your application, ${data.name?.split(' ')[0] || 'there'}! 🎉 That's a huge step!
+
+Greg/Jakub will review everything and be in touch within 24-48 hours. In the meantime, if you have any questions at all, I'm here to help!
+
+Exciting times ahead 🏡"
+
+**DO NOT:**
+- Ask them to do more work
+- Send generic messages
+- Forget to celebrate this milestone!
+
+` : context.applicationStatus.started ? `
+📝 **APPLICATION STARTED**
+
+This lead has STARTED their mortgage application!
+- Started: ${new Date(context.applicationStatus.started).toLocaleDateString()}
+- Status: In Progress
+
+🎯 **YOUR OBJECTIVE:**
+- Send encouragement and support
+- Offer to help if they're stuck
+- Gentle reminder to complete it (don't nag)
+- Make it feel easy and achievable
+
+**Example message:**
+"Hey ${data.name?.split(' ')[0] || 'there'}! 👋 Saw you started the application - awesome!
+
+It usually takes about 10-15 minutes to finish. If you get stuck on anything or have questions, just let me know!
+
+You're almost there 💪"
+
+**Follow-up strategy (if not completed within 48h):**
+- 24h: "Quick check-in - how's the application going? Any questions?"
+- 48h: "Want to hop on a quick call with Greg/Jakub to walk through it together?"
+- 72h: Slack alert to team - may need help completing
+
+` : ""}
+` : ""}
 
 # 📊 FOLLOW-UP INTELLIGENCE
 **This is message #${context.pipelineStatus.outboundCount + 1}** from you to this lead.

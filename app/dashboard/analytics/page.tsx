@@ -60,10 +60,40 @@ interface TopLeadsData {
   count: number;
 }
 
+interface WeeklyMetrics {
+  metrics: {
+    directBookingRate: { value: number; target: number; status: string; count: number; total: number };
+    hollyResponseRate: { value: number; target: number; status: string; count: number; total: number };
+    callToAppRate: { value: number; target: number; status: string; count: number; total: number };
+    noShowRate: { value: number; target: number; status: string; count: number; total: number };
+    cohortPerformance: Array<{
+      month: string;
+      totalLeads: number;
+      completedCalls: number;
+      conversions: number;
+      callRate: number;
+      conversionRate: number;
+    }>;
+  };
+  funnel: {
+    totalLeads: number;
+    contacted: number;
+    completedCalls: number;
+    appsStarted: number;
+    appsCompleted: number;
+    contactRate: number;
+    callBookingRate: number;
+    appStartRate: number;
+    appCompleteRate: number;
+    overallConversionRate: number;
+  };
+}
+
 export default function AnalyticsPage() {
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [funnel, setFunnel] = useState<FunnelData | null>(null);
   const [topLeads, setTopLeads] = useState<TopLeadsData | null>(null);
+  const [weeklyMetrics, setWeeklyMetrics] = useState<WeeklyMetrics | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -73,19 +103,22 @@ export default function AnalyticsPage() {
   const fetchAnalytics = async () => {
     setLoading(true);
     try {
-      const [overviewRes, funnelRes, topLeadsRes] = await Promise.all([
+      const [overviewRes, funnelRes, topLeadsRes, metricsRes] = await Promise.all([
         fetch("/api/analytics/overview"),
         fetch("/api/analytics/funnel"),
         fetch("/api/analytics/top-leads"),
+        fetch("/api/analytics/metrics"),
       ]);
 
       const overviewData = await overviewRes.json();
       const funnelData = await funnelRes.json();
       const topLeadsData = await topLeadsRes.json();
+      const metricsData = await metricsRes.json();
 
       if (overviewData.success) setOverview(overviewData.data);
       if (funnelData.success) setFunnel(funnelData.data);
       if (topLeadsData.success) setTopLeads(topLeadsData.data);
+      if (metricsData) setWeeklyMetrics(metricsData);
     } catch (error) {
       console.error("Failed to fetch analytics:", error);
     } finally {
@@ -161,6 +194,95 @@ export default function AnalyticsPage() {
       </header>
 
       <main className="max-w-full mx-auto px-8 py-8">
+        {/* Weekly Performance Scorecard */}
+        {weeklyMetrics && (
+          <div className="mb-8">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-[#1C1B1A] mb-2">Weekly Performance Scorecard</h2>
+              <p className="text-sm text-[#55514D]">Track the 5 key metrics that drive conversions</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+              {/* Direct Booking Rate */}
+              <div className={`backdrop-blur-sm rounded-xl shadow-sm border-2 p-6 ${getMetricBg(weeklyMetrics.metrics.directBookingRate.value, weeklyMetrics.metrics.directBookingRate.target)}`}>
+                <div className="text-sm text-[#55514D] font-medium mb-2">Direct Booking Rate</div>
+                <div className={`text-4xl font-bold ${getMetricColor(weeklyMetrics.metrics.directBookingRate.value, weeklyMetrics.metrics.directBookingRate.target)}`}>
+                  {weeklyMetrics.metrics.directBookingRate.value}%
+                </div>
+                <div className="text-xs text-[#55514D] mt-2">
+                  Target: {weeklyMetrics.metrics.directBookingRate.target}% • {weeklyMetrics.metrics.directBookingRate.count} of {weeklyMetrics.metrics.directBookingRate.total} leads
+                </div>
+              </div>
+
+              {/* Holly Response Rate */}
+              <div className={`backdrop-blur-sm rounded-xl shadow-sm border-2 p-6 ${getMetricBg(weeklyMetrics.metrics.hollyResponseRate.value, weeklyMetrics.metrics.hollyResponseRate.target)}`}>
+                <div className="text-sm text-[#55514D] font-medium mb-2">Holly Response Rate</div>
+                <div className={`text-4xl font-bold ${getMetricColor(weeklyMetrics.metrics.hollyResponseRate.value, weeklyMetrics.metrics.hollyResponseRate.target)}`}>
+                  {weeklyMetrics.metrics.hollyResponseRate.value}%
+                </div>
+                <div className="text-xs text-[#55514D] mt-2">
+                  Target: {weeklyMetrics.metrics.hollyResponseRate.target}% • {weeklyMetrics.metrics.hollyResponseRate.count} of {weeklyMetrics.metrics.hollyResponseRate.total} non-direct leads
+                </div>
+              </div>
+
+              {/* Call-to-App Rate */}
+              <div className={`backdrop-blur-sm rounded-xl shadow-sm border-2 p-6 ${getMetricBg(weeklyMetrics.metrics.callToAppRate.value, weeklyMetrics.metrics.callToAppRate.target)}`}>
+                <div className="text-sm text-[#55514D] font-medium mb-2">Call-to-App Rate</div>
+                <div className={`text-4xl font-bold ${getMetricColor(weeklyMetrics.metrics.callToAppRate.value, weeklyMetrics.metrics.callToAppRate.target)}`}>
+                  {weeklyMetrics.metrics.callToAppRate.value}%
+                </div>
+                <div className="text-xs text-[#55514D] mt-2">
+                  Target: {weeklyMetrics.metrics.callToAppRate.target}% • {weeklyMetrics.metrics.callToAppRate.count} of {weeklyMetrics.metrics.callToAppRate.total} completed calls
+                </div>
+              </div>
+
+              {/* No-Show Rate */}
+              <div className={`backdrop-blur-sm rounded-xl shadow-sm border-2 p-6 ${getMetricBg(weeklyMetrics.metrics.noShowRate.value, weeklyMetrics.metrics.noShowRate.target, false)}`}>
+                <div className="text-sm text-[#55514D] font-medium mb-2">No-Show Rate</div>
+                <div className={`text-4xl font-bold ${getMetricColor(weeklyMetrics.metrics.noShowRate.value, weeklyMetrics.metrics.noShowRate.target, false)}`}>
+                  {weeklyMetrics.metrics.noShowRate.value}%
+                </div>
+                <div className="text-xs text-[#55514D] mt-2">
+                  Target: &lt;{weeklyMetrics.metrics.noShowRate.target}% • {weeklyMetrics.metrics.noShowRate.count} of {weeklyMetrics.metrics.noShowRate.total} scheduled
+                </div>
+              </div>
+            </div>
+
+            {/* Cohort Performance Table */}
+            {weeklyMetrics.metrics.cohortPerformance.length > 0 && (
+              <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-6">
+                <h3 className="text-lg font-bold text-[#1C1B1A] mb-4">Cohort Performance by Month</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-[#E4DDD3]">
+                        <th className="text-left py-3 px-4 text-sm font-semibold text-[#55514D]">Month</th>
+                        <th className="text-left py-3 px-4 text-sm font-semibold text-[#55514D]">Total Leads</th>
+                        <th className="text-left py-3 px-4 text-sm font-semibold text-[#55514D]">Completed Calls</th>
+                        <th className="text-left py-3 px-4 text-sm font-semibold text-[#55514D]">Call Rate</th>
+                        <th className="text-left py-3 px-4 text-sm font-semibold text-[#55514D]">Conversions</th>
+                        <th className="text-left py-3 px-4 text-sm font-semibold text-[#55514D]">Conversion Rate</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {weeklyMetrics.metrics.cohortPerformance.map((cohort) => (
+                        <tr key={cohort.month} className="border-b border-[#E4DDD3]/50 hover:bg-[#FBF3E7]/30">
+                          <td className="py-3 px-4 text-sm font-semibold text-[#1C1B1A]">{cohort.month}</td>
+                          <td className="py-3 px-4 text-sm text-[#55514D]">{cohort.totalLeads}</td>
+                          <td className="py-3 px-4 text-sm text-[#55514D]">{cohort.completedCalls}</td>
+                          <td className="py-3 px-4 text-sm font-semibold text-[#625FFF]">{cohort.callRate.toFixed(1)}%</td>
+                          <td className="py-3 px-4 text-sm text-[#55514D]">{cohort.conversions}</td>
+                          <td className="py-3 px-4 text-sm font-semibold text-[#625FFF]">{cohort.conversionRate.toFixed(1)}%</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* 4 Core KPIs */}
         <div className="mb-6">
           <h2 className="text-2xl font-bold text-[#1C1B1A] mb-2">Core Performance Metrics</h2>

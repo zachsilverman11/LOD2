@@ -10,32 +10,36 @@ datasource db {
 }
 
 model Lead {
-  id                String             @id @default(cuid())
-  email             String             @unique
-  phone             String?
-  firstName         String
-  lastName          String
-  status            LeadStatus         @default(NEW)
-  source            String?
-  rawData           Json?
-  consentEmail      Boolean            @default(false)
-  consentSms        Boolean            @default(false)
-  consentCall       Boolean            @default(false)
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  lastContactedAt   DateTime?
-  convertedAt       DateTime?
-  appointments      Appointment[]
-  communications    Communication[]
-  activities        LeadActivity[]
-  notes             Note[]
-  scheduledMessages ScheduledMessage[]
-  tasks             Task[]
+  id                     String             @id @default(cuid())
+  email                  String             @unique
+  phone                  String?
+  firstName              String
+  lastName               String
+  status                 LeadStatus         @default(NEW)
+  source                 String?
+  rawData                Json?
+  consentEmail           Boolean            @default(false)
+  consentSms             Boolean            @default(false)
+  consentCall            Boolean            @default(false)
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+  lastContactedAt        DateTime?
+  convertedAt            DateTime?
+  applicationStartedAt   DateTime?          // When lead started mortgage application
+  applicationCompletedAt DateTime?          // When lead completed/submitted application
+  appointments           Appointment[]
+  communications         Communication[]
+  activities             LeadActivity[]
+  notes                  Note[]
+  scheduledMessages      ScheduledMessage[]
+  tasks                  Task[]
 
   @@index([email])
   @@index([phone])
   @@index([status])
   @@index([createdAt])
+  @@index([applicationStartedAt])
+  @@index([applicationCompletedAt])
 }
 
 model LeadActivity {

@@ -3,6 +3,7 @@
 import { LeadWithRelations, TEAM_MEMBERS } from "@/types/lead";
 import { format } from "date-fns";
 import { useState } from "react";
+import CallSummaryModal from "./call-summary-modal";
 
 interface LeadDetailModalProps {
   lead: LeadWithRelations | null;
@@ -19,6 +20,8 @@ export function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
   const [isAddingNote, setIsAddingNote] = useState(false);
   const [isAddingTask, setIsAddingTask] = useState(false);
   const [expandedEmails, setExpandedEmails] = useState<Set<string>>(new Set());
+  const [showCallSummaryModal, setShowCallSummaryModal] = useState(false);
+  const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
 
   if (!lead) return null;
 
@@ -354,11 +357,34 @@ export function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
               <h3 className="text-lg font-semibold mb-3 text-[#1C1B1A]">Appointments</h3>
               <div className="space-y-3">
                 {lead.appointments.map((appt) => {
-                  // Show no-show button if appointment is completed and within last 24 hours
                   const appointmentTime = new Date(appt.scheduledAt);
                   const now = new Date();
                   const hoursSince = (now.getTime() - appointmentTime.getTime()) / (1000 * 60 * 60);
                   const showNoShowButton = appt.status === 'completed' && hoursSince >= 0 && hoursSince <= 24;
+
+                  const hasCallOutcome = lead.rawData && typeof lead.rawData === 'object' && 'callOutcome' in lead.rawData;
+                  const callOutcome = hasCallOutcome ? (lead.rawData as any).callOutcome : null;
+                  const showCaptureButton = appt.status === 'completed';
+
+                  const handleClearOutcome = async () => {
+                    if (!confirm("Clear this call outcome? This will remove all captured data.")) return;
+
+                    try {
+                      const response = await fetch(`/api/leads/${lead.id}/route`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          rawData: {
+                            ...(lead.rawData as object || {}),
+                            callOutcome: undefined,
+                          },
+                        }),
+                      });
+                      if (response.ok) window.location.reload();
+                    } catch (error) {
+                      console.error("Error clearing outcome:", error);
+                    }
+                  };
 
                   return (
                     <div key={appt.id} className="border border-[#E4DDD3] rounded-lg p-4">
@@ -390,6 +416,57 @@ export function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
                         <a href={appt.meetingUrl} target="_blank" rel="noopener noreferrer" className="text-[#625FFF] hover:underline text-sm mt-2 block">
                           Join Meeting →
                         </a>
+                      )}
+
+                      {/* Call Outcome Card or Capture Button */}
+                      {showCaptureButton && (
+                        hasCallOutcome && callOutcome ? (
+                          <div className="mt-4 p-4 border border-[#E4DDD3] rounded-lg bg-[#FBF3E7]/30">
+                            <div className="flex justify-between items-start mb-2">
+                              <div className="font-semibold text-[#1C1B1A]">
+                                Call Outcome: <span className="text-[#625FFF]">{callOutcome.outcome?.replace('_', ' ')}</span>
+                              </div>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => {
+                                    setSelectedAppointmentId(appt.id);
+                                    setShowCallSummaryModal(true);
+                                  }}
+                                  className="px-3 py-1 text-sm text-[#625FFF] border border-[#625FFF] rounded hover:bg-[#625FFF]/10 transition-colors"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={handleClearOutcome}
+                                  className="px-3 py-1 text-sm text-[#55514D] border border-[#E4DDD3] rounded hover:bg-[#FBF3E7] transition-colors"
+                                >
+                                  Clear
+                                </button>
+                              </div>
+                            </div>
+                            {callOutcome.timeline && (
+                              <p className="text-sm text-[#55514D]">Timeline: {callOutcome.timeline.replace('_', ' ')}</p>
+                            )}
+                            {callOutcome.programsDiscussed && callOutcome.programsDiscussed.length > 0 && (
+                              <p className="text-sm text-[#55514D] mt-1">
+                                Programs: {callOutcome.programsDiscussed.join(', ')}
+                              </p>
+                            )}
+                            {callOutcome.notes && (
+                              <p className="text-sm text-[#55514D] mt-2 italic">"{callOutcome.notes}"</p>
+                            )}
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setSelectedAppointmentId(appt.id);
+                              setShowCallSummaryModal(true);
+                            }}
+                            className="mt-4 w-full px-4 py-2 bg-[#625FFF] text-white rounded-lg hover:bg-[#625FFF]/90 transition-colors text-sm font-medium"
+                          >
+                            Capture Call Outcome
+                          </button>
+                        )
                       )}
                     </div>
                   );
@@ -543,6 +620,22 @@ export function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
 
         </div>
       </div>
+
+      {/* Call Summary Modal */}
+      {showCallSummaryModal && selectedAppointmentId && (
+        <CallSummaryModal
+          leadId={lead.id}
+          appointmentId={selectedAppointmentId}
+          existingOutcome={lead.rawData && typeof lead.rawData === 'object' && 'callOutcome' in lead.rawData ? (lead.rawData as any).callOutcome : undefined}
+          onClose={() => {
+            setShowCallSummaryModal(false);
+            setSelectedAppointmentId(null);
+          }}
+          onSubmit={() => {
+            window.location.reload();
+          }}
+        />
+      )}
     </div>
   );
 }
