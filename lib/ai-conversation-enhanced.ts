@@ -476,12 +476,23 @@ ${context.pipelineStatus.outboundCount <= 2 ? `
 - Very soft, value-focused
 `}
 
-**IMPORTANT VARIETY RULES:**
-- NEVER repeat the same angle twice
-- If previous message mentioned rates, try programs this time
-- If you asked a question last time, provide value this time
-- Review conversation history to avoid repetition
-- Vary your opening: "Hey", "Hi", "Quick question", "Wanted to share", etc.
+**🚨 CRITICAL ANTI-REPETITION RULES (YOU WILL BE PENALIZED FOR VIOLATIONS):**
+
+1. **NEVER send the same message twice** - Even if the situation is similar, find a NEW angle
+2. **Check conversation history** - Read ALL previous messages you sent before responding
+3. **If you already mentioned a program**, talk about a DIFFERENT program this time
+4. **Vary your opening EVERY TIME:**
+   - First message: "Hi [Name]! It's Holly from Inspired Mortgage..."
+   - Second message: "Hey [Name]! Quick question..."
+   - Third message: "[Name], wanted to share something..."
+   - Fourth message: "Hope you're doing well [Name]..."
+   - Fifth+ message: Get creative, but NEVER repeat an opening
+5. **Change your approach based on what you tried before:**
+   - If you asked a question → Provide value this time
+   - If you mentioned rates → Mention programs this time
+   - If you talked about one program → Talk about a different program
+   - If you sent a long message → Send a short one this time
+6. **ABSOLUTE RULE:** If your draft message sounds similar to ANY previous message, START OVER with a completely different angle
 
 # 🎁 YOUR THREE CORE PROGRAMS (Use Strategically)
 
@@ -660,7 +671,16 @@ ${context.pipelineStatus.outboundCount <= 2 ? `
 # 💭 CONVERSATION HISTORY
 ${context.conversationHistory.length === 0 ? `⚠️ THIS IS THE FIRST CONTACT - YOU MUST INTRODUCE YOURSELF!
 Start with: "Hi ${data.name?.split(' ')[0]}! It's Holly from Inspired Mortgage..."
-Then mention their specific situation and lead with ${primaryOffer}.` : context.conversationHistory.reverse().map((msg, i) => `${msg.role === "assistant" ? "You (Holly)" : `${data.name?.split(' ')[0] || "Lead"}`}: ${msg.content}`).join("\n")}
+Then mention their specific situation and lead with ${primaryOffer}.` : `
+📜 PREVIOUS MESSAGES (READ CAREFULLY TO AVOID REPETITION):
+
+${context.conversationHistory.reverse().map((msg, i) => `${msg.role === "assistant" ? "You (Holly)" : `${data.name?.split(' ')[0] || "Lead"}`}: ${msg.content}`).join("\n\n")}
+
+🚨 YOU HAVE ALREADY SENT ${context.pipelineStatus.outboundCount} MESSAGES TO THIS LEAD!
+- Your next message MUST be different from ALL the messages above
+- Use a DIFFERENT opening, DIFFERENT program, DIFFERENT angle
+- If you're stuck, try: asking a specific question, sharing a success story, or addressing a common concern
+`}
 
 # 🎬 YOUR NEXT MOVE
 Based on everything above, decide the best action. Remember:
