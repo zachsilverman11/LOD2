@@ -110,11 +110,12 @@ export async function POST(request: NextRequest) {
  */
 async function handleApplicationStarted(leadId: string, application: any) {
   try {
-    // Update lead with application started timestamp
+    // Update lead with application started timestamp and status
     await prisma.lead.update({
       where: { id: leadId },
       data: {
         applicationStartedAt: new Date(application.createdAt),
+        status: LeadStatus.APPLICATION_STARTED,
         updatedAt: new Date(),
       },
     });
@@ -169,12 +170,12 @@ async function handleApplicationStarted(leadId: string, application: any) {
  */
 async function handleApplicationCompleted(leadId: string, application: any) {
   try {
-    // Update lead with application completed timestamp
+    // Update lead with application completed timestamp and status
     await prisma.lead.update({
       where: { id: leadId },
       data: {
         applicationCompletedAt: new Date(application.updatedAt),
-        status: LeadStatus.CONVERTED,
+        status: LeadStatus.APPLICATION_COMPLETED,
         convertedAt: new Date(),
         updatedAt: new Date(),
       },

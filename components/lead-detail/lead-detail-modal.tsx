@@ -147,6 +147,31 @@ export function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
             </div>
           </div>
 
+          {/* Application Status */}
+          {(lead.applicationStartedAt || lead.applicationCompletedAt) && (
+            <div className="mb-6 p-4 border-2 border-[#D9F36E] bg-[#D9F36E]/10 rounded-lg">
+              <h3 className="text-lg font-semibold mb-3 text-[#1C1B1A]">🎉 Application Status</h3>
+              <div className="space-y-2">
+                {lead.applicationStartedAt && (
+                  <p className="text-[#1C1B1A]">
+                    <strong>Started:</strong> {new Date(lead.applicationStartedAt).toLocaleDateString()} at {new Date(lead.applicationStartedAt).toLocaleTimeString()}
+                  </p>
+                )}
+                {lead.applicationCompletedAt && (
+                  <p className="text-[#1C1B1A]">
+                    <strong>Completed:</strong> {new Date(lead.applicationCompletedAt).toLocaleDateString()} at {new Date(lead.applicationCompletedAt).toLocaleTimeString()}
+                    <span className="ml-2 px-2 py-1 bg-[#76C63E] text-white rounded font-semibold">CONVERTED ✓</span>
+                  </p>
+                )}
+                {lead.applicationStartedAt && !lead.applicationCompletedAt && (
+                  <p className="text-sm text-[#55514D] italic">
+                    Application in progress - Holly is nurturing to completion
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Consent Information */}
           <div className="mb-6">
             <h3 className="text-lg font-semibold mb-3 text-[#1C1B1A]">Consent</h3>

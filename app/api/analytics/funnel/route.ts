@@ -56,10 +56,22 @@ export async function GET() {
         color: "#B8E986",
       },
       {
+        stage: "APPLICATION_STARTED",
+        label: "Application Started",
+        count: statusMap.get("APPLICATION_STARTED") || 0,
+        color: "#A8E86E",
+      },
+      {
+        stage: "APPLICATION_COMPLETED",
+        label: "Application Completed",
+        count: statusMap.get("APPLICATION_COMPLETED") || 0,
+        color: "#8FD94E",
+      },
+      {
         stage: "CONVERTED",
         label: "Converted",
         count: statusMap.get("CONVERTED") || 0,
-        color: "#A8D96E",
+        color: "#76C63E",
       },
     ];
 

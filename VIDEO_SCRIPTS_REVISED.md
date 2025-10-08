@@ -186,7 +186,7 @@ When we buy down your rate, we're essentially investing our commission into your
 
 **Who qualifies:**
 
-✅ **Fully income-qualified** - W2/T4 employees, clear income verification, no complications
+✅ **Fully income-qualified** - T4 employees, clear income verification, no complications
 
 ✅ **Excellent credit** - You're an A+ file, straightforward approval
 

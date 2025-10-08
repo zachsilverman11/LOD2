@@ -241,6 +241,7 @@ export async function processTimeBasedAutomations() {
     await processAppointmentReminders();
     await processSmartFollowUps();
     await processPostCallConfirmations();
+    await processApplicationNudges();
     await processStaleLeadAlerts();
 
     // Then process custom automation rules from database
@@ -809,6 +810,150 @@ async function processPostCallConfirmations() {
       console.error(`[Automation] Error processing post-call for appointment ${appointment.id}:`, error);
     }
   }
+}
+
+/**
+ * Application Nudges: Follow up with leads who have started but not completed applications
+ */
+async function processApplicationNudges() {
+  console.log("[Automation] Processing application nudges...");
+
+  const now = new Date();
+  const twentyFourHoursAgo = new Date(now.getTime() - 24 * 3600000);
+  const fortyEightHoursAgo = new Date(now.getTime() - 48 * 3600000);
+  const seventyTwoHoursAgo = new Date(now.getTime() - 72 * 3600000);
+
+  // 1. Find leads with APPLICATION_STARTED for 24+ hours (first nudge)
+  const incompleteApps24h = await prisma.lead.findMany({
+    where: {
+      status: LeadStatus.APPLICATION_STARTED,
+      applicationStartedAt: {
+        lte: twentyFourHoursAgo,
+        gte: fortyEightHoursAgo, // Only those between 24-48h
+      },
+    },
+    include: {
+      communications: {
+        where: {
+          createdAt: { gte: twentyFourHoursAgo },
+        },
+      },
+    },
+  });
+
+  // 2. Find leads with APPLICATION_STARTED for 48+ hours (urgent nudge)
+  const incompleteApps48h = await prisma.lead.findMany({
+    where: {
+      status: LeadStatus.APPLICATION_STARTED,
+      applicationStartedAt: {
+        lte: fortyEightHoursAgo,
+      },
+    },
+    include: {
+      communications: {
+        where: {
+          createdAt: { gte: fortyEightHoursAgo },
+        },
+      },
+    },
+  });
+
+  // 3. Find leads with CALL_COMPLETED for 72+ hours (no app started)
+  const callsWithoutApp = await prisma.lead.findMany({
+    where: {
+      status: LeadStatus.CALL_COMPLETED,
+      updatedAt: {
+        lte: seventyTwoHoursAgo,
+      },
+    },
+    include: {
+      communications: {
+        where: {
+          createdAt: { gte: seventyTwoHoursAgo },
+        },
+      },
+    },
+  });
+
+  // Send 24-hour nudges
+  for (const lead of incompleteApps24h) {
+    if (lead.communications.length > 0) continue; // Already messaged in last 24h
+
+    try {
+      console.log(`[Automation] Sending 24h app nudge to lead ${lead.id}`);
+
+      const decision = await handleConversation(lead.id);
+      await executeDecision(lead.id, decision);
+
+      await prisma.lead.update({
+        where: { id: lead.id },
+        data: { lastContactedAt: now },
+      });
+
+      await sendSlackNotification({
+        type: "lead_updated",
+        leadName: `${lead.firstName} ${lead.lastName}`,
+        leadId: lead.id,
+        details: "📝 Application started 24h ago - Holly sent encouragement",
+      });
+    } catch (error) {
+      console.error(`[Automation] Error sending 24h app nudge to lead ${lead.id}:`, error);
+    }
+  }
+
+  // Send 48-hour urgent nudges
+  for (const lead of incompleteApps48h) {
+    if (lead.communications.length > 0) continue; // Already messaged in last 48h
+
+    try {
+      console.log(`[Automation] Sending 48h URGENT app nudge to lead ${lead.id}`);
+
+      const decision = await handleConversation(lead.id);
+      await executeDecision(lead.id, decision);
+
+      await prisma.lead.update({
+        where: { id: lead.id },
+        data: { lastContactedAt: now },
+      });
+
+      await sendSlackNotification({
+        type: "lead_updated",
+        leadName: `${lead.firstName} ${lead.lastName}`,
+        leadId: lead.id,
+        details: "⚠️ Application started 48h ago - Holly sent urgent nudge",
+      });
+    } catch (error) {
+      console.error(`[Automation] Error sending 48h app nudge to lead ${lead.id}:`, error);
+    }
+  }
+
+  // Send "ready to start app?" to completed calls
+  for (const lead of callsWithoutApp) {
+    if (lead.communications.length > 0) continue; // Already messaged in last 72h
+
+    try {
+      console.log(`[Automation] Sending app start prompt to lead ${lead.id} (call completed 72h ago)`);
+
+      const decision = await handleConversation(lead.id);
+      await executeDecision(lead.id, decision);
+
+      await prisma.lead.update({
+        where: { id: lead.id },
+        data: { lastContactedAt: now },
+      });
+
+      await sendSlackNotification({
+        type: "lead_updated",
+        leadName: `${lead.firstName} ${lead.lastName}`,
+        leadId: lead.id,
+        details: "🚀 Call completed 72h ago, no app - Holly sending application link",
+      });
+    } catch (error) {
+      console.error(`[Automation] Error sending app start prompt to lead ${lead.id}:`, error);
+    }
+  }
+
+  console.log(`[Automation] Sent ${incompleteApps24h.length} x 24h nudges, ${incompleteApps48h.length} x 48h nudges, ${callsWithoutApp.length} x app start prompts`);
 }
 
 /**
