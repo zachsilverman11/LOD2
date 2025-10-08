@@ -200,6 +200,19 @@ model Task {
   @@index([dueDate])
 }
 
+model AnalyticsTarget {
+  id               String   @id @default(cuid())
+  contactRateTarget      Float    @default(80)  // Target % of new leads to contact
+  engagementRateTarget   Float    @default(60)  // Target % of contacted leads that engage
+  bookingRateTarget      Float    @default(40)  // Target % of engaged leads that book calls
+  conversionRateTarget   Float    @default(20)  // Target % of total leads that convert
+  dealsWonRateTarget     Float    @default(70)  // Target % of converted leads that fund
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("analytics_targets")
+}
+
 enum LeadStatus {
   NEW
   CONTACTED
@@ -208,6 +221,7 @@ enum LeadStatus {
   CALL_COMPLETED
   APPLICATION_STARTED
   CONVERTED
+  DEALS_WON
   NURTURING
   LOST
 }

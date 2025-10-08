@@ -62,6 +62,12 @@ export async function GET() {
         color: "#76C63E",
       },
       {
+        stage: "DEALS_WON",
+        label: "Deals Won",
+        count: statusMap.get("DEALS_WON") || 0,
+        color: "#2E7D32",
+      },
+      {
         stage: "NURTURING",
         label: "Nurturing",
         count: statusMap.get("NURTURING") || 0,
@@ -106,19 +112,43 @@ export async function GET() {
     const engaged = (statusMap.get("ENGAGED") || 0) + (statusMap.get("NURTURING") || 0);
     const callScheduled = statusMap.get("CALL_SCHEDULED") || 0;
     const converted = statusMap.get("CONVERTED") || 0;
+    const dealsWon = statusMap.get("DEALS_WON") || 0;
 
     const metrics = {
       contactRate: newLeads > 0 ? ((contacted / newLeads) * 100).toFixed(2) : "0",
       engagementRate: contacted > 0 ? ((engaged / contacted) * 100).toFixed(2) : "0",
       bookingRate: engaged > 0 ? ((callScheduled / engaged) * 100).toFixed(2) : "0",
       conversionRate: totalLeads > 0 ? ((converted / totalLeads) * 100).toFixed(2) : "0",
+      dealsWonRate: converted > 0 ? ((dealsWon / converted) * 100).toFixed(2) : "0",
     };
+
+    // Fetch targets
+    let targets = await prisma.analyticsTarget.findFirst();
+    if (!targets) {
+      // Create default targets if none exist
+      targets = await prisma.analyticsTarget.create({
+        data: {
+          contactRateTarget: 80,
+          engagementRateTarget: 60,
+          bookingRateTarget: 40,
+          conversionRateTarget: 20,
+          dealsWonRateTarget: 70,
+        },
+      });
+    }
 
     return NextResponse.json({
       success: true,
       data: {
         funnel: funnelWithRates,
         metrics,
+        targets: {
+          contactRate: targets.contactRateTarget,
+          engagementRate: targets.engagementRateTarget,
+          bookingRate: targets.bookingRateTarget,
+          conversionRate: targets.conversionRateTarget,
+          dealsWonRate: targets.dealsWonRateTarget,
+        },
         totalLeads,
         lostLeads: statusMap.get("LOST") || 0,
       },

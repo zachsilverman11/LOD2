@@ -18,7 +18,8 @@ export const PIPELINE_STAGES: { id: LeadStatus; label: string; color: string }[]
   { id: "CALL_SCHEDULED", label: "Call Scheduled", color: "bg-[#D9F36E]" }, // Lime - action pending
   { id: "CALL_COMPLETED", label: "Call Completed", color: "bg-[#B8E986]" }, // Olive green - action complete
   { id: "APPLICATION_STARTED", label: "Application Started", color: "bg-[#A8E86E]" }, // Bright green - in progress
-  { id: "CONVERTED", label: "Converted", color: "bg-[#76C63E]" }, // Success green - won
+  { id: "CONVERTED", label: "Converted", color: "bg-[#76C63E]" }, // Success green - application completed
+  { id: "DEALS_WON", label: "Deals Won", color: "bg-[#2E7D32]" }, // Dark green - funded & commissioned
   { id: "NURTURING", label: "Nurturing", color: "bg-[#E0BBE4]" }, // Soft lavender - long-term nurture (parallel track)
   { id: "LOST", label: "Lost", color: "bg-[#55514D]" }, // Gray - closed lost
 ];
