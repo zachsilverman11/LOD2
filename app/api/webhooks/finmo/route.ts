@@ -295,9 +295,8 @@ async function createPipedriveDeal(leadId: string) {
           value: rawData.loanAmount || 0,
           currency: "CAD",
           status: "open",
-          // Custom fields - you'll need to map these to your Pipedrive field IDs
-          // Example: "loan_type": rawData.loanType,
-          // Add more custom fields as needed
+          pipeline_id: 22, // Active Mortgage Pipeline
+          stage_id: 152, // Doc Collection stage
         }),
       }
     );
