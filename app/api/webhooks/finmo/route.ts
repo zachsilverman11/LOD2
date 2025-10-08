@@ -238,12 +238,15 @@ async function handleApplicationCompleted(leadId: string, application: any) {
  */
 async function createPipedriveDeal(leadId: string) {
   const PIPEDRIVE_API_TOKEN = process.env.PIPEDRIVE_API_TOKEN;
-  const PIPEDRIVE_DOMAIN = process.env.PIPEDRIVE_DOMAIN || "api.pipedrive.com";
+  const PIPEDRIVE_COMPANY_DOMAIN = process.env.PIPEDRIVE_COMPANY_DOMAIN || "api";
 
   if (!PIPEDRIVE_API_TOKEN) {
     console.log("[Pipedrive] API token not configured, skipping deal creation");
     return;
   }
+
+  // Build API base URL
+  const API_BASE = `https://${PIPEDRIVE_COMPANY_DOMAIN}.pipedrive.com`;
 
   try {
     const lead = await prisma.lead.findUnique({
@@ -259,7 +262,7 @@ async function createPipedriveDeal(leadId: string) {
 
     // Create person in Pipedrive first
     const personResponse = await fetch(
-      `https://${PIPEDRIVE_DOMAIN}/v1/persons?api_token=${PIPEDRIVE_API_TOKEN}`,
+      `${API_BASE}/v1/persons?api_token=${PIPEDRIVE_API_TOKEN}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -282,7 +285,7 @@ async function createPipedriveDeal(leadId: string) {
     const dealTitle = `${lead.firstName} ${lead.lastName} - ${rawData.propertyType || "Property"} in ${rawData.city || "Unknown"}`;
 
     const dealResponse = await fetch(
-      `https://${PIPEDRIVE_DOMAIN}/v1/deals?api_token=${PIPEDRIVE_API_TOKEN}`,
+      `${API_BASE}/v1/deals?api_token=${PIPEDRIVE_API_TOKEN}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -330,7 +333,7 @@ ${callOutcome.preferredProgram ? `- Preferred Program: ${callOutcome.preferredPr
     `.trim();
 
     await fetch(
-      `https://${PIPEDRIVE_DOMAIN}/v1/notes?api_token=${PIPEDRIVE_API_TOKEN}`,
+      `${API_BASE}/v1/notes?api_token=${PIPEDRIVE_API_TOKEN}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
