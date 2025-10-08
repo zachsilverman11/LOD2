@@ -38,12 +38,6 @@ export async function GET() {
         color: "#FFB6E1",
       },
       {
-        stage: "NURTURING",
-        label: "Nurturing",
-        count: statusMap.get("NURTURING") || 0,
-        color: "#E0BBE4",
-      },
-      {
         stage: "CALL_SCHEDULED",
         label: "Call Scheduled",
         count: statusMap.get("CALL_SCHEDULED") || 0,
@@ -62,16 +56,22 @@ export async function GET() {
         color: "#A8E86E",
       },
       {
-        stage: "APPLICATION_COMPLETED",
-        label: "Application Completed",
-        count: statusMap.get("APPLICATION_COMPLETED") || 0,
-        color: "#8FD94E",
-      },
-      {
         stage: "CONVERTED",
         label: "Converted",
         count: statusMap.get("CONVERTED") || 0,
         color: "#76C63E",
+      },
+      {
+        stage: "NURTURING",
+        label: "Nurturing",
+        count: statusMap.get("NURTURING") || 0,
+        color: "#E0BBE4",
+      },
+      {
+        stage: "LOST",
+        label: "Lost",
+        count: statusMap.get("LOST") || 0,
+        color: "#999999",
       },
     ];
 

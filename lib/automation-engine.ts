@@ -242,6 +242,7 @@ export async function processTimeBasedAutomations() {
     await processSmartFollowUps();
     await processPostCallConfirmations();
     await processApplicationNudges();
+    await processNurturingTransitions();
     await processStaleLeadAlerts();
 
     // Then process custom automation rules from database
@@ -954,6 +955,210 @@ async function processApplicationNudges() {
   }
 
   console.log(`[Automation] Sent ${incompleteApps24h.length} x 24h nudges, ${incompleteApps48h.length} x 48h nudges, ${callsWithoutApp.length} x app start prompts`);
+}
+
+/**
+ * NURTURING Transitions: Auto-move leads to/from NURTURING based on engagement
+ */
+async function processNurturingTransitions() {
+  console.log("[Automation] Processing NURTURING transitions...");
+
+  const now = new Date();
+  const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 3600000);
+  const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 3600000);
+
+  // 1. Move active leads to NURTURING after 14 days with no inbound reply
+  const activeLeadsToNurture = await prisma.lead.findMany({
+    where: {
+      status: {
+        in: [LeadStatus.CONTACTED, LeadStatus.ENGAGED, LeadStatus.CALL_COMPLETED],
+      },
+      createdAt: {
+        lte: fourteenDaysAgo,
+      },
+    },
+    include: {
+      communications: {
+        where: {
+          direction: "INBOUND",
+        },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+      },
+    },
+  });
+
+  let movedToNurturing = 0;
+
+  for (const lead of activeLeadsToNurture) {
+    // Check if they've EVER replied
+    const hasReplied = lead.communications.length > 0;
+
+    // If no reply in 14 days, move to NURTURING
+    if (!hasReplied) {
+      try {
+        await prisma.lead.update({
+          where: { id: lead.id },
+          data: { status: LeadStatus.NURTURING },
+        });
+
+        await prisma.leadActivity.create({
+          data: {
+            leadId: lead.id,
+            type: ActivityType.STATUS_CHANGE,
+            channel: CommunicationChannel.SYSTEM,
+            content: "Moved to NURTURING - 14 days with no response",
+            metadata: { automated: true, reason: "no_response_14_days" },
+          },
+        });
+
+        movedToNurturing++;
+        console.log(`[Automation] Moved lead ${lead.id} to NURTURING (no response in 14 days)`);
+      } catch (error) {
+        console.error(`[Automation] Error moving lead ${lead.id} to NURTURING:`, error);
+      }
+    }
+  }
+
+  // 2. Move leads from NURTURING back to ENGAGED when they reply
+  const nurturingLeads = await prisma.lead.findMany({
+    where: {
+      status: LeadStatus.NURTURING,
+    },
+    include: {
+      communications: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+      },
+    },
+  });
+
+  let reEngaged = 0;
+
+  for (const lead of nurturingLeads) {
+    const lastComm = lead.communications[0];
+
+    // If their last communication was inbound (they replied), re-engage them
+    if (lastComm?.direction === "INBOUND") {
+      try {
+        await prisma.lead.update({
+          where: { id: lead.id },
+          data: { status: LeadStatus.ENGAGED },
+        });
+
+        await prisma.leadActivity.create({
+          data: {
+            leadId: lead.id,
+            type: ActivityType.STATUS_CHANGE,
+            channel: CommunicationChannel.SYSTEM,
+            content: "Re-engaged from NURTURING - Lead replied!",
+            metadata: { automated: true, reason: "lead_replied" },
+          },
+        });
+
+        reEngaged++;
+        console.log(`[Automation] Re-engaged lead ${lead.id} from NURTURING`);
+      } catch (error) {
+        console.error(`[Automation] Error re-engaging lead ${lead.id}:`, error);
+      }
+    }
+  }
+
+  // 3. Move NURTURING leads to LOST after 90 days with zero engagement
+  const longTermNurturing = await prisma.lead.findMany({
+    where: {
+      status: LeadStatus.NURTURING,
+      updatedAt: {
+        lte: ninetyDaysAgo,
+      },
+    },
+    include: {
+      communications: {
+        where: {
+          direction: "INBOUND",
+          createdAt: {
+            gte: ninetyDaysAgo,
+          },
+        },
+      },
+    },
+  });
+
+  let movedToLost = 0;
+
+  for (const lead of longTermNurturing) {
+    // If zero engagement in 90 days, mark as LOST
+    if (lead.communications.length === 0) {
+      try {
+        await prisma.lead.update({
+          where: { id: lead.id },
+          data: { status: LeadStatus.LOST },
+        });
+
+        await prisma.leadActivity.create({
+          data: {
+            leadId: lead.id,
+            type: ActivityType.STATUS_CHANGE,
+            channel: CommunicationChannel.SYSTEM,
+            content: "Moved to LOST - 90 days in NURTURING with no engagement",
+            metadata: { automated: true, reason: "90_days_no_engagement" },
+          },
+        });
+
+        await sendSlackNotification({
+          type: "lead_rotting",
+          leadName: `${lead.firstName} ${lead.lastName}`,
+          leadId: lead.id,
+          details: "Moved to LOST after 90 days in NURTURING with zero engagement",
+        });
+
+        movedToLost++;
+        console.log(`[Automation] Moved lead ${lead.id} to LOST (90 days, no engagement)`);
+      } catch (error) {
+        console.error(`[Automation] Error moving lead ${lead.id} to LOST:`, error);
+      }
+    }
+  }
+
+  // 4. Auto-move "long_timeline" call outcomes to NURTURING
+  const callCompletedLeads = await prisma.lead.findMany({
+    where: {
+      status: LeadStatus.CALL_COMPLETED,
+    },
+  });
+
+  let longTimelineToNurturing = 0;
+
+  for (const lead of callCompletedLeads) {
+    const rawData = lead.rawData as any || {};
+    const callOutcome = rawData.callOutcome;
+
+    if (callOutcome?.outcome === "long_timeline") {
+      try {
+        await prisma.lead.update({
+          where: { id: lead.id },
+          data: { status: LeadStatus.NURTURING },
+        });
+
+        await prisma.leadActivity.create({
+          data: {
+            leadId: lead.id,
+            type: ActivityType.STATUS_CHANGE,
+            channel: CommunicationChannel.SYSTEM,
+            content: "Moved to NURTURING - Long timeline (6+ months)",
+            metadata: { automated: true, reason: "long_timeline_call_outcome" },
+          },
+        });
+
+        longTimelineToNurturing++;
+        console.log(`[Automation] Moved lead ${lead.id} to NURTURING (long timeline)`);
+      } catch (error) {
+        console.error(`[Automation] Error moving long_timeline lead ${lead.id}:`, error);
+      }
+    }
+  }
+
+  console.log(`[Automation] NURTURING transitions: ${movedToNurturing} to NURTURING, ${reEngaged} re-engaged, ${movedToLost} to LOST, ${longTimelineToNurturing} long timeline`);
 }
 
 /**

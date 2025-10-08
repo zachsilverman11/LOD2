@@ -170,12 +170,12 @@ async function handleApplicationStarted(leadId: string, application: any) {
  */
 async function handleApplicationCompleted(leadId: string, application: any) {
   try {
-    // Update lead with application completed timestamp and status
+    // Update lead with application completed timestamp and CONVERTED status
     await prisma.lead.update({
       where: { id: leadId },
       data: {
         applicationCompletedAt: new Date(application.updatedAt),
-        status: LeadStatus.APPLICATION_COMPLETED,
+        status: LeadStatus.CONVERTED,
         convertedAt: new Date(),
         updatedAt: new Date(),
       },
@@ -211,6 +211,13 @@ async function handleApplicationCompleted(leadId: string, application: any) {
       });
     }
 
+    // Create Pipedrive deal
+    try {
+      await createPipedriveDeal(leadId);
+    } catch (error) {
+      console.error("[Finmo Webhook] Error creating Pipedrive deal:", error);
+    }
+
     // Holly sends congratulations message
     try {
       const decision = await handleConversation(leadId);
@@ -222,6 +229,128 @@ async function handleApplicationCompleted(leadId: string, application: any) {
     console.log(`[Finmo Webhook] Application completed tracked for lead ${leadId}`);
   } catch (error) {
     console.error("[Finmo Webhook] Error handling application.completed:", error);
+    throw error;
+  }
+}
+
+/**
+ * Create deal in Pipedrive when lead converts
+ */
+async function createPipedriveDeal(leadId: string) {
+  const PIPEDRIVE_API_TOKEN = process.env.PIPEDRIVE_API_TOKEN;
+  const PIPEDRIVE_DOMAIN = process.env.PIPEDRIVE_DOMAIN || "api.pipedrive.com";
+
+  if (!PIPEDRIVE_API_TOKEN) {
+    console.log("[Pipedrive] API token not configured, skipping deal creation");
+    return;
+  }
+
+  try {
+    const lead = await prisma.lead.findUnique({
+      where: { id: leadId },
+    });
+
+    if (!lead) {
+      throw new Error("Lead not found");
+    }
+
+    const rawData = lead.rawData as any || {};
+    const callOutcome = rawData.callOutcome || {};
+
+    // Create person in Pipedrive first
+    const personResponse = await fetch(
+      `https://${PIPEDRIVE_DOMAIN}/v1/persons?api_token=${PIPEDRIVE_API_TOKEN}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: `${lead.firstName} ${lead.lastName}`,
+          email: [{ value: lead.email, primary: true }],
+          phone: lead.phone ? [{ value: lead.phone, primary: true }] : [],
+        }),
+      }
+    );
+
+    const personData = await personResponse.json();
+    const personId = personData?.data?.id;
+
+    if (!personId) {
+      throw new Error("Failed to create Pipedrive person");
+    }
+
+    // Create deal in Pipedrive
+    const dealTitle = `${lead.firstName} ${lead.lastName} - ${rawData.propertyType || "Property"} in ${rawData.city || "Unknown"}`;
+
+    const dealResponse = await fetch(
+      `https://${PIPEDRIVE_DOMAIN}/v1/deals?api_token=${PIPEDRIVE_API_TOKEN}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: dealTitle,
+          person_id: personId,
+          value: rawData.loanAmount || 0,
+          currency: "CAD",
+          status: "open",
+          // Custom fields - you'll need to map these to your Pipedrive field IDs
+          // Example: "loan_type": rawData.loanType,
+          // Add more custom fields as needed
+        }),
+      }
+    );
+
+    const dealData = await dealResponse.json();
+
+    if (!dealData?.success) {
+      throw new Error(`Pipedrive API error: ${JSON.stringify(dealData)}`);
+    }
+
+    // Add note to deal with full context
+    const noteContent = `
+Lead converted from LOD2 system:
+
+**Loan Details:**
+- Loan Type: ${rawData.loanType || "N/A"}
+- Loan Amount: $${rawData.loanAmount?.toLocaleString() || "N/A"}
+- Property Type: ${rawData.propertyType || "N/A"}
+- Property City: ${rawData.city || "N/A"}, ${rawData.province || "N/A"}
+- Purchase Price: $${rawData.purchasePrice?.toLocaleString() || "N/A"}
+- Down Payment: $${rawData.downPayment?.toLocaleString() || "N/A"}
+- Credit Score: ${rawData.creditScore || "N/A"}
+
+**Call Outcome:**
+${callOutcome.outcome ? `- Outcome: ${callOutcome.outcome}` : ""}
+${callOutcome.notes ? `- Notes: ${callOutcome.notes}` : ""}
+${callOutcome.programsDiscussed?.length ? `- Programs Discussed: ${callOutcome.programsDiscussed.join(", ")}` : ""}
+${callOutcome.preferredProgram ? `- Preferred Program: ${callOutcome.preferredProgram}` : ""}
+
+**Application:**
+- Started: ${lead.applicationStartedAt ? new Date(lead.applicationStartedAt).toLocaleString() : "N/A"}
+- Completed: ${lead.applicationCompletedAt ? new Date(lead.applicationCompletedAt).toLocaleString() : "N/A"}
+    `.trim();
+
+    await fetch(
+      `https://${PIPEDRIVE_DOMAIN}/v1/notes?api_token=${PIPEDRIVE_API_TOKEN}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          deal_id: dealData.data.id,
+          content: noteContent,
+        }),
+      }
+    );
+
+    console.log(`[Pipedrive] Deal created successfully: ${dealData.data.id}`);
+
+    await sendSlackNotification({
+      type: "lead_updated",
+      leadName: `${lead.firstName} ${lead.lastName}`,
+      leadId: lead.id,
+      details: `💼 Pipedrive deal created: ${dealTitle}`,
+    });
+  } catch (error) {
+    console.error("[Pipedrive] Error creating deal:", error);
     throw error;
   }
 }
