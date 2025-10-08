@@ -589,11 +589,27 @@ async function processSmartFollowUps() {
         orderBy: { createdAt: "desc" },
         take: 10,
       },
+      appointments: {
+        where: {
+          status: { in: ["SCHEDULED", "CONFIRMED"] },
+          OR: [
+            { scheduledFor: { gte: now } },
+            { scheduledAt: { gte: now } }
+          ]
+        },
+        take: 1,
+      },
     },
   });
 
   for (const lead of leads) {
     try {
+      // 🚨 SKIP if they have an upcoming appointment (handled by appointment reminders instead)
+      if (lead.appointments.length > 0) {
+        console.log(`[Automation] Skipping lead ${lead.id} - has upcoming appointment`);
+        continue;
+      }
+
       const hoursSinceContact = Math.floor(
         (now.getTime() - (lead.lastContactedAt?.getTime() || lead.createdAt.getTime())) / 3600000
       );
@@ -604,6 +620,18 @@ async function processSmartFollowUps() {
 
       // Count total outbound messages to this lead
       const outboundCount = lead.communications.filter((c) => c.direction === "OUTBOUND").length;
+
+      // 🚨 CRITICAL ANTI-SPAM CHECK: Don't send if we already sent in last 4 hours
+      const mostRecentOutbound = lead.communications.find((c) => c.direction === "OUTBOUND");
+      if (mostRecentOutbound) {
+        const hoursSinceLastOutbound = Math.floor(
+          (now.getTime() - mostRecentOutbound.createdAt.getTime()) / 3600000
+        );
+        if (hoursSinceLastOutbound < 4) {
+          console.log(`[Automation] Skipping lead ${lead.id} - sent message ${hoursSinceLastOutbound}h ago (minimum 4h gap)`);
+          continue;
+        }
+      }
 
       // Multi-phase follow-up strategy
       let shouldFollowUp = false;
@@ -627,37 +655,32 @@ async function processSmartFollowUps() {
         continue;
       }
 
-      // 🔥 FIRST 48 HOURS: STRIKE WHILE HOT (Critical window!)
+      // 🔥 FIRST 7 DAYS: Strategic follow-up (NOT spam)
+      // CRITICAL: Only send if we haven't heard back AND enough time has passed
       if (daysSinceContact === 0) {
-        if (outboundCount === 1 && hoursSinceContact >= 1) {
-          // Message 2: 1 hour after initial contact
+        // Day 1: Only send ONE more message after initial contact, and wait at least 6 hours
+        if (outboundCount === 1 && hoursSinceContact >= 6) {
           shouldFollowUp = true;
-          followUpReason = "1-hour hot follow-up";
-        } else if (outboundCount === 2 && hoursSinceContact >= 4) {
-          // Message 3: 4 hours after initial
-          shouldFollowUp = true;
-          followUpReason = "4-hour follow-up";
-        } else if (outboundCount === 3 && hoursSinceContact >= 12) {
-          // Message 4: 12 hours after initial
-          shouldFollowUp = true;
-          followUpReason = "12-hour follow-up";
+          followUpReason = "Day 1 follow-up (6h)";
         }
-      } else if (daysSinceContact === 1 && outboundCount <= 5) {
-        // Day 2: Morning follow-up
-        shouldFollowUp = true;
-        followUpReason = "Day 2 morning touch";
-      } else if (daysSinceContact === 2 && outboundCount <= 6) {
-        // Day 3: Afternoon check-in
-        shouldFollowUp = true;
-        followUpReason = "Day 3 check-in";
-      } else if (daysSinceContact === 4 && outboundCount <= 7) {
-        // Day 5: Mid-week touch
-        shouldFollowUp = true;
-        followUpReason = "Day 5 mid-week";
-      } else if (daysSinceContact === 6 && outboundCount <= 8) {
-        // Day 7: End of week
-        shouldFollowUp = true;
-        followUpReason = "Day 7 week-end";
+      } else if (daysSinceContact === 1) {
+        // Day 2: One check-in if still no response
+        if (outboundCount <= 2) {
+          shouldFollowUp = true;
+          followUpReason = "Day 2 check-in";
+        }
+      } else if (daysSinceContact === 3) {
+        // Day 4: Mid-week touch (skip day 3 to avoid spam)
+        if (outboundCount <= 3) {
+          shouldFollowUp = true;
+          followUpReason = "Day 4 mid-week";
+        }
+      } else if (daysSinceContact === 6) {
+        // Day 7: End of first week
+        if (outboundCount <= 4) {
+          shouldFollowUp = true;
+          followUpReason = "Day 7 week-end";
+        }
       }
       // 📅 WEEK 2 (Days 8-14): Every 2-3 days
       else if (daysSinceContact >= 8 && daysSinceContact <= 14) {
