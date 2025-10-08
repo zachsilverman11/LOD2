@@ -75,14 +75,8 @@ export async function POST(
       details: `Marked as no-show for ${appointment.scheduledAt.toLocaleString()}. Moved back to ENGAGED.`,
     });
 
-    // Trigger Holly's no-show recovery message
-    try {
-      const decision = await handleConversation(appointment.lead.id);
-      await executeDecision(appointment.lead.id, decision);
-    } catch (error) {
-      console.error("Failed to send no-show recovery message via Holly:", error);
-      // Don't throw - appointment is already marked
-    }
+    // Don't send Holly message for no-shows - advisor will handle re-booking
+    console.log(`[Appointments] No-show marked - advisor will follow up to reschedule`);
 
     return NextResponse.json({
       success: true,

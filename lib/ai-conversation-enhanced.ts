@@ -298,7 +298,7 @@ This lead is ready to move forward! Your job:
 6. Follow up if they don't start the application within 24-48h
 
 **Example message:**
-"Hey [Name]! 🎉 So glad you and [Advisor] had a great call! Based on what you discussed about [reference specific program/situation], here's your application link to get started: ${process.env.APPLICATION_URL}
+"Hey [Name]! So glad you and [Advisor] had a great call! Based on what you discussed about [reference specific program/situation], here's your application link to get started: ${process.env.APPLICATION_URL}
 
 Should take about 10 minutes. I'll check in tomorrow to see if you have any questions!"
 
@@ -345,7 +345,7 @@ This lead doesn't fit our programs right now. Your job:
 
 I understand you're exploring all your options right now. If your situation changes or you have questions down the road, we're here!
 
-Best of luck with everything 😊"
+Best of luck with everything"
 
 **DO NOT:**
 - Try to resurrect the conversation
@@ -400,11 +400,11 @@ This lead has SUBMITTED their mortgage application!
 - Keep them excited and reassured
 
 **Example message:**
-"Congrats on submitting your application, ${data.name?.split(' ')[0] || 'there'}! 🎉 That's a huge step!
+"Congrats on submitting your application, ${data.name?.split(' ')[0] || 'there'}! That's a huge step!
 
 Greg/Jakub will review everything and be in touch within 24-48 hours. In the meantime, if you have any questions at all, I'm here to help!
 
-Exciting times ahead 🏡"
+Exciting times ahead!"
 
 **DO NOT:**
 - Ask them to do more work
@@ -425,11 +425,11 @@ This lead has STARTED their mortgage application!
 - Make it feel easy and achievable
 
 **Example message:**
-"Hey ${data.name?.split(' ')[0] || 'there'}! 👋 Saw you started the application - awesome!
+"Hey ${data.name?.split(' ')[0] || 'there'}! Saw you started the application - awesome!
 
 It usually takes about 10-15 minutes to finish. If you get stuck on anything or have questions, just let me know!
 
-You're almost there 💪"
+You're almost there!"
 
 **Follow-up strategy (if not completed within 48h):**
 - 24h: "Quick check-in - how's the application going? Any questions?"
@@ -630,7 +630,7 @@ ${context.pipelineStatus.outboundCount <= 2 ? `
 **SMS Content:**
 - 1-2 sentences max (under 160 chars ideal)
 - No formatting needed
-- Emoji okay (1-2 max, don't overdo it)
+- **NO EMOJIS** - Keep it human and professional, like a real person texting
 - Conversational, casual tone
 - End with question or call-to-action
 
@@ -643,7 +643,7 @@ ${context.pipelineStatus.outboundCount <= 2 ? `
 - Subject line: Personal, benefit-driven, under 50 chars
 
 **Both Content:**
-- SMS: Short alert/teaser (e.g., "Just emailed you something important 📧")
+- SMS: Short alert/teaser (e.g., "Just emailed you something important")
 - Email: Full detailed content with all context
 - Make them work together - SMS drives urgency, Email provides value
 
@@ -868,7 +868,7 @@ export async function handleConversation(
             properties: {
               smsMessage: {
                 type: "string",
-                description: "Short, attention-grabbing SMS under 160 chars (e.g. 'Hey Sarah! Just sent you an email with your mortgage programs. Check it out 📧')",
+                description: "Short, attention-grabbing SMS under 160 chars (e.g. 'Hey Sarah! Just sent you an email with your mortgage programs. Check it out')",
               },
               emailSubject: {
                 type: "string",

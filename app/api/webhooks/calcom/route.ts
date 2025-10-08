@@ -155,14 +155,28 @@ async function handleBookingCreated(payload: any) {
     })}`,
   });
 
-  // Send confirmation message via Holly (initial contact with appointment awareness)
-  // Holly will see the appointment exists and send appropriate confirmation
-  try {
-    const decision = await handleConversation(lead.id);
-    await executeDecision(lead.id, decision);
-  } catch (error) {
-    console.error("Failed to send appointment confirmation via Holly:", error);
-    // Don't throw - appointment is already created, this is just a nice-to-have
+  // Only send booking confirmation if this is their first appointment
+  // OR if they haven't been contacted in the last hour (prevents spam)
+  const recentCommunications = await prisma.communication.findMany({
+    where: {
+      leadId: lead.id,
+      direction: "OUTBOUND",
+      createdAt: {
+        gte: new Date(Date.now() - 60 * 60 * 1000), // Last hour
+      },
+    },
+  });
+
+  if (recentCommunications.length === 0) {
+    try {
+      const decision = await handleConversation(lead.id);
+      await executeDecision(lead.id, decision);
+    } catch (error) {
+      console.error("Failed to send appointment confirmation via Holly:", error);
+      // Don't throw - appointment is already created, this is just a nice-to-have
+    }
+  } else {
+    console.log(`[Cal.com] Skipping booking confirmation - lead contacted within last hour`);
   }
 }
 
@@ -202,25 +216,8 @@ async function handleBookingRescheduled(payload: any) {
     },
   });
 
-  // Send reschedule confirmation via Holly
-  try {
-    const lead = appointment.lead;
-    const newTime = new Date(startTime).toLocaleString('en-US', {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-      timeZone: 'America/Vancouver'
-    });
-
-    const decision = await handleConversation(lead.id);
-    await executeDecision(lead.id, decision);
-  } catch (error) {
-    console.error("Failed to send reschedule confirmation via Holly:", error);
-    // Don't throw - appointment is already updated
-  }
+  // Don't send Holly message for reschedules - advisor will communicate directly
+  console.log(`[Cal.com] Appointment rescheduled - advisor will follow up directly`);
 }
 
 async function handleBookingCancelled(payload: any) {
@@ -259,13 +256,6 @@ async function handleBookingCancelled(payload: any) {
     },
   });
 
-  // Send cancellation recovery message via Holly
-  try {
-    const lead = appointment.lead;
-    const decision = await handleConversation(lead.id);
-    await executeDecision(lead.id, decision);
-  } catch (error) {
-    console.error("Failed to send cancellation recovery message via Holly:", error);
-    // Don't throw - appointment is already cancelled
-  }
+  // Don't send Holly message for cancellations - advisor will handle re-booking
+  console.log(`[Cal.com] Appointment cancelled - advisor will follow up to reschedule`);
 }
