@@ -39,6 +39,14 @@ interface FunnelData {
     engagementRate: string;
     bookingRate: string;
     conversionRate: string;
+    dealsWonRate?: string;
+  };
+  targets?: {
+    contactRate: number;
+    engagementRate: number;
+    bookingRate: number;
+    conversionRate: number;
+    dealsWonRate: number;
   };
   totalLeads: number;
   lostLeads: number;
@@ -95,6 +103,15 @@ export default function AnalyticsPage() {
   const [topLeads, setTopLeads] = useState<TopLeadsData | null>(null);
   const [weeklyMetrics, setWeeklyMetrics] = useState<WeeklyMetrics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [editingTargets, setEditingTargets] = useState(false);
+  const [targets, setTargets] = useState({
+    contactRateTarget: 80,
+    engagementRateTarget: 60,
+    bookingRateTarget: 40,
+    conversionRateTarget: 20,
+    dealsWonRateTarget: 70,
+  });
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetchAnalytics();
@@ -116,13 +133,50 @@ export default function AnalyticsPage() {
       const metricsData = await metricsRes.json();
 
       if (overviewData.success) setOverview(overviewData.data);
-      if (funnelData.success) setFunnel(funnelData.data);
+      if (funnelData.success) {
+        setFunnel(funnelData.data);
+        // Set targets from API response
+        if (funnelData.data.targets) {
+          setTargets({
+            contactRateTarget: funnelData.data.targets.contactRate,
+            engagementRateTarget: funnelData.data.targets.engagementRate,
+            bookingRateTarget: funnelData.data.targets.bookingRate,
+            conversionRateTarget: funnelData.data.targets.conversionRate,
+            dealsWonRateTarget: funnelData.data.targets.dealsWonRate,
+          });
+        }
+      }
       if (topLeadsData.success) setTopLeads(topLeadsData.data);
       if (metricsData) setWeeklyMetrics(metricsData);
     } catch (error) {
       console.error("Failed to fetch analytics:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const saveTargets = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/analytics/targets", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(targets),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setEditingTargets(false);
+        // Refresh analytics to show new targets
+        await fetchAnalytics();
+      } else {
+        alert("Failed to save targets: " + (data.error || "Unknown error"));
+      }
+    } catch (error) {
+      console.error("Failed to save targets:", error);
+      alert("Failed to save targets");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -383,7 +437,15 @@ export default function AnalyticsPage() {
 
         {/* Conversion Funnel */}
         <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-8 mb-8">
-          <h2 className="text-2xl font-bold text-[#1C1B1A] mb-6">Conversion Funnel</h2>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-[#1C1B1A]">Conversion Funnel</h2>
+            <button
+              onClick={() => setEditingTargets(true)}
+              className="px-4 py-2 text-sm font-medium text-white bg-[#625FFF] rounded-md hover:bg-[#524DD9] transition-colors"
+            >
+              Edit Targets
+            </button>
+          </div>
           <div className="space-y-4">
             {funnel?.funnel.map((stage, index) => {
               const maxCount = funnel.funnel[0]?.count || 1;
@@ -418,11 +480,14 @@ export default function AnalyticsPage() {
             })}
           </div>
 
-          <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4 pt-6 border-t border-[#E4DDD3]">
+          <div className="mt-8 grid grid-cols-2 md:grid-cols-5 gap-4 pt-6 border-t border-[#E4DDD3]">
             <div>
               <div className="text-xs text-[#55514D]">Contact Rate</div>
               <div className="text-xl font-bold text-[#625FFF]">
                 {funnel?.metrics.contactRate || 0}%
+              </div>
+              <div className="text-xs text-[#55514D] mt-1">
+                Target: {funnel?.targets?.contactRate || 80}%
               </div>
             </div>
             <div>
@@ -430,21 +495,150 @@ export default function AnalyticsPage() {
               <div className="text-xl font-bold text-[#625FFF]">
                 {funnel?.metrics.engagementRate || 0}%
               </div>
+              <div className="text-xs text-[#55514D] mt-1">
+                Target: {funnel?.targets?.engagementRate || 60}%
+              </div>
             </div>
             <div>
               <div className="text-xs text-[#55514D]">Booking Rate</div>
               <div className="text-xl font-bold text-[#625FFF]">
                 {funnel?.metrics.bookingRate || 0}%
               </div>
+              <div className="text-xs text-[#55514D] mt-1">
+                Target: {funnel?.targets?.bookingRate || 40}%
+              </div>
             </div>
             <div>
               <div className="text-xs text-[#55514D]">Conversion Rate</div>
-              <div className="text-xl font-bold text-[#D9F36E]">
+              <div className="text-xl font-bold text-[#625FFF]">
                 {funnel?.metrics.conversionRate || 0}%
+              </div>
+              <div className="text-xs text-[#55514D] mt-1">
+                Target: {funnel?.targets?.conversionRate || 20}%
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-[#55514D]">Deals Won Rate</div>
+              <div className="text-xl font-bold text-[#2E7D32]">
+                {funnel?.metrics.dealsWonRate || 0}%
+              </div>
+              <div className="text-xs text-[#55514D] mt-1">
+                Target: {funnel?.targets?.dealsWonRate || 70}%
               </div>
             </div>
           </div>
         </div>
+
+        {/* Edit Targets Modal */}
+        {editingTargets && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+              <h3 className="text-2xl font-bold text-[#1C1B1A] mb-4">Edit Conversion Targets</h3>
+              <p className="text-sm text-[#55514D] mb-6">
+                Set your target conversion rates for each stage of the funnel
+              </p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-[#1C1B1A] mb-1">
+                    Contact Rate Target (%)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={targets.contactRateTarget}
+                    onChange={(e) =>
+                      setTargets({ ...targets, contactRateTarget: parseFloat(e.target.value) || 0 })
+                    }
+                    className="w-full px-3 py-2 border border-[#E4DDD3] rounded-md focus:outline-none focus:ring-2 focus:ring-[#625FFF]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[#1C1B1A] mb-1">
+                    Engagement Rate Target (%)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={targets.engagementRateTarget}
+                    onChange={(e) =>
+                      setTargets({ ...targets, engagementRateTarget: parseFloat(e.target.value) || 0 })
+                    }
+                    className="w-full px-3 py-2 border border-[#E4DDD3] rounded-md focus:outline-none focus:ring-2 focus:ring-[#625FFF]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[#1C1B1A] mb-1">
+                    Booking Rate Target (%)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={targets.bookingRateTarget}
+                    onChange={(e) =>
+                      setTargets({ ...targets, bookingRateTarget: parseFloat(e.target.value) || 0 })
+                    }
+                    className="w-full px-3 py-2 border border-[#E4DDD3] rounded-md focus:outline-none focus:ring-2 focus:ring-[#625FFF]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[#1C1B1A] mb-1">
+                    Conversion Rate Target (%)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={targets.conversionRateTarget}
+                    onChange={(e) =>
+                      setTargets({ ...targets, conversionRateTarget: parseFloat(e.target.value) || 0 })
+                    }
+                    className="w-full px-3 py-2 border border-[#E4DDD3] rounded-md focus:outline-none focus:ring-2 focus:ring-[#625FFF]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[#1C1B1A] mb-1">
+                    Deals Won Rate Target (%)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={targets.dealsWonRateTarget}
+                    onChange={(e) =>
+                      setTargets({ ...targets, dealsWonRateTarget: parseFloat(e.target.value) || 0 })
+                    }
+                    className="w-full px-3 py-2 border border-[#E4DDD3] rounded-md focus:outline-none focus:ring-2 focus:ring-[#625FFF]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setEditingTargets(false)}
+                  disabled={saving}
+                  className="flex-1 px-4 py-2 text-sm font-medium text-[#55514D] border border-[#E4DDD3] rounded-md hover:bg-[#FBF3E7] transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveTargets}
+                  disabled={saving}
+                  className="flex-1 px-4 py-2 text-sm font-medium text-white bg-[#625FFF] rounded-md hover:bg-[#524DD9] transition-colors disabled:opacity-50"
+                >
+                  {saving ? "Saving..." : "Save Targets"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Top Leads by Value */}
         <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-8">
