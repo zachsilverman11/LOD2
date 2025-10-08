@@ -95,6 +95,28 @@ export function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
     }
   };
 
+  const handleMarkNoShow = async (appointmentId: string) => {
+    if (!confirm("Mark this appointment as no-show? This will move the lead back to ENGAGED and trigger a recovery message.")) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/appointments/${appointmentId}/mark-no-show`, {
+        method: "POST",
+      });
+
+      if (response.ok) {
+        alert("Appointment marked as no-show");
+        window.location.reload(); // Simple refresh for now
+      } else {
+        alert("Failed to mark as no-show");
+      }
+    } catch (error) {
+      console.error("Error marking as no-show:", error);
+      alert("Error marking as no-show");
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
       <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-[#E4DDD3]" onClick={(e) => e.stopPropagation()}>
@@ -331,30 +353,47 @@ export function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
             <div className="mb-6">
               <h3 className="text-lg font-semibold mb-3 text-[#1C1B1A]">Appointments</h3>
               <div className="space-y-3">
-                {lead.appointments.map((appt) => (
-                  <div key={appt.id} className="border border-[#E4DDD3] rounded-lg p-4">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="font-medium text-[#1C1B1A]">
-                          {format(new Date(appt.scheduledAt), "MMMM d, yyyy 'at' h:mm a")}
-                        </p>
-                        <p className="text-sm text-[#55514D]">Duration: {appt.duration} minutes</p>
-                        <p className="text-sm text-[#55514D]">
-                          Status: <span className={`px-2 py-1 rounded border ${
-                            appt.status === 'scheduled' ? 'bg-[#D9F36E]/30 text-[#1C1B1A] border-[#D9F36E]' :
-                            appt.status === 'completed' ? 'bg-[#625FFF]/10 text-[#625FFF] border-[#625FFF]/30' :
-                            'bg-[#FBF3E7] text-[#55514D] border-[#E4DDD3]'
-                          }`}>{appt.status}</span>
-                        </p>
+                {lead.appointments.map((appt) => {
+                  // Show no-show button if appointment is completed and within last 24 hours
+                  const appointmentTime = new Date(appt.scheduledAt);
+                  const now = new Date();
+                  const hoursSince = (now.getTime() - appointmentTime.getTime()) / (1000 * 60 * 60);
+                  const showNoShowButton = appt.status === 'completed' && hoursSince >= 0 && hoursSince <= 24;
+
+                  return (
+                    <div key={appt.id} className="border border-[#E4DDD3] rounded-lg p-4">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-medium text-[#1C1B1A]">
+                            {format(new Date(appt.scheduledAt), "MMMM d, yyyy 'at' h:mm a")}
+                          </p>
+                          <p className="text-sm text-[#55514D]">Duration: {appt.duration} minutes</p>
+                          <p className="text-sm text-[#55514D]">
+                            Status: <span className={`px-2 py-1 rounded border ${
+                              appt.status === 'scheduled' ? 'bg-[#D9F36E]/30 text-[#1C1B1A] border-[#D9F36E]' :
+                              appt.status === 'completed' ? 'bg-[#625FFF]/10 text-[#625FFF] border-[#625FFF]/30' :
+                              appt.status === 'no_show' ? 'bg-red-100 text-red-700 border-red-300' :
+                              'bg-[#FBF3E7] text-[#55514D] border-[#E4DDD3]'
+                            }`}>{appt.status === 'no_show' ? 'no-show' : appt.status}</span>
+                          </p>
+                        </div>
+                        {showNoShowButton && (
+                          <button
+                            onClick={() => handleMarkNoShow(appt.id)}
+                            className="px-3 py-1 text-sm bg-red-50 text-red-700 border border-red-300 rounded hover:bg-red-100 transition-colors"
+                          >
+                            Mark as No-Show
+                          </button>
+                        )}
                       </div>
+                      {appt.meetingUrl && (
+                        <a href={appt.meetingUrl} target="_blank" rel="noopener noreferrer" className="text-[#625FFF] hover:underline text-sm mt-2 block">
+                          Join Meeting →
+                        </a>
+                      )}
                     </div>
-                    {appt.meetingUrl && (
-                      <a href={appt.meetingUrl} target="_blank" rel="noopener noreferrer" className="text-[#625FFF] hover:underline text-sm mt-2 block">
-                        Join Meeting →
-                      </a>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

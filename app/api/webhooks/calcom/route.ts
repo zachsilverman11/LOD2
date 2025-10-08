@@ -201,6 +201,26 @@ async function handleBookingRescheduled(payload: any) {
       content: `Call rescheduled to ${new Date(startTime).toLocaleString()}`,
     },
   });
+
+  // Send reschedule confirmation via Holly
+  try {
+    const lead = appointment.lead;
+    const newTime = new Date(startTime).toLocaleString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'America/Vancouver'
+    });
+
+    const decision = await handleConversation(lead.id);
+    await executeDecision(lead.id, decision);
+  } catch (error) {
+    console.error("Failed to send reschedule confirmation via Holly:", error);
+    // Don't throw - appointment is already updated
+  }
 }
 
 async function handleBookingCancelled(payload: any) {
@@ -238,4 +258,14 @@ async function handleBookingCancelled(payload: any) {
       content: "Discovery call was cancelled",
     },
   });
+
+  // Send cancellation recovery message via Holly
+  try {
+    const lead = appointment.lead;
+    const decision = await handleConversation(lead.id);
+    await executeDecision(lead.id, decision);
+  } catch (error) {
+    console.error("Failed to send cancellation recovery message via Holly:", error);
+    // Don't throw - appointment is already cancelled
+  }
 }
