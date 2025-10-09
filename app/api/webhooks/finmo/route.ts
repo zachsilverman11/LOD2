@@ -260,6 +260,15 @@ async function createPipedriveDeal(leadId: string) {
             createdAt: "asc",
           },
         },
+        appointments: {
+          where: {
+            advisorEmail: { not: null },
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+          take: 1,
+        },
       },
     });
 
@@ -291,6 +300,33 @@ async function createPipedriveDeal(leadId: string) {
       throw new Error("Failed to create Pipedrive person");
     }
 
+    // Look up Pipedrive user ID by advisor email (if available)
+    let assignedUserId = null;
+    const advisorEmail = lead.appointments[0]?.advisorEmail;
+
+    if (advisorEmail) {
+      try {
+        const userSearchResponse = await fetch(
+          `${API_BASE}/v1/users/find?term=${encodeURIComponent(advisorEmail)}&api_token=${PIPEDRIVE_API_TOKEN}`
+        );
+        const userData = await userSearchResponse.json();
+
+        if (userData?.data && userData.data.length > 0) {
+          // Find exact email match
+          const exactMatch = userData.data.find(
+            (user: any) => user.email?.toLowerCase() === advisorEmail.toLowerCase()
+          );
+          if (exactMatch) {
+            assignedUserId = exactMatch.id;
+            console.log(`[Pipedrive] Found advisor ${exactMatch.name} (${advisorEmail}) - ID: ${assignedUserId}`);
+          }
+        }
+      } catch (error) {
+        console.error("[Pipedrive] Error looking up advisor user:", error);
+        // Continue without assignment - don't fail the whole deal creation
+      }
+    }
+
     // Create deal in Pipedrive
     const dealTitle = `${lead.firstName} ${lead.lastName} - ${rawData.propertyType || "Property"} in ${rawData.city || "Unknown"}`;
 
@@ -307,6 +343,7 @@ async function createPipedriveDeal(leadId: string) {
           status: "open",
           pipeline_id: 22, // Active Mortgage Pipeline
           stage_id: 152, // Doc Collection stage
+          ...(assignedUserId && { user_id: assignedUserId }), // Assign to advisor if found
         }),
       }
     );
@@ -335,6 +372,9 @@ async function createPipedriveDeal(leadId: string) {
     // Add note to deal with full context
     const noteContent = `
 Lead converted from LOD2 system:
+
+**Advisor:**
+${lead.appointments[0]?.advisorName ? `- Discovery Call with: ${lead.appointments[0].advisorName}` : "- No advisor information available"}
 
 **Loan Details:**
 - Loan Type: ${rawData.loanType || "N/A"}

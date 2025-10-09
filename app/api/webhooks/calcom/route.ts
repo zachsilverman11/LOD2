@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
 }
 
 async function handleBookingCreated(payload: any) {
-  const { uid, id, startTime, endTime, attendees, metadata, responses } = payload;
+  const { uid, id, startTime, endTime, attendees, metadata, responses, organizer } = payload;
 
   // Find lead by email or phone
   const attendeeEmail = attendees[0]?.email;
@@ -119,6 +119,8 @@ async function handleBookingCreated(payload: any) {
       duration: Math.round((new Date(endTime).getTime() - new Date(startTime).getTime()) / 60000),
       status: "scheduled",
       meetingUrl: meetingUrl,
+      advisorName: organizer?.name || null,
+      advisorEmail: organizer?.email || null,
       notes: payload.location ? `Meeting location: ${typeof payload.location === 'string' ? payload.location : JSON.stringify(payload.location)}` : undefined,
     },
   });

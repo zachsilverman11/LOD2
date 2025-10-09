@@ -69,6 +69,8 @@ model Appointment {
   status           String
   meetingUrl       String?
   notes            String?
+  advisorName      String?   // Name of advisor from Cal.com organizer
+  advisorEmail     String?   // Email of advisor from Cal.com organizer
   reminder24hSent  Boolean   @default(false)
   reminder1hSent   Boolean   @default(false)
   createdAt        DateTime  @default(now())
@@ -78,6 +80,7 @@ model Appointment {
   @@index([leadId])
   @@index([scheduledAt])
   @@index([scheduledFor])
+  @@index([advisorEmail])
 }
 
 model EmailTemplate {
