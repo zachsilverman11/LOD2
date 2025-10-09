@@ -251,6 +251,16 @@ async function createPipedriveDeal(leadId: string) {
   try {
     const lead = await prisma.lead.findUnique({
       where: { id: leadId },
+      include: {
+        communications: {
+          where: {
+            channel: "SMS",
+          },
+          orderBy: {
+            createdAt: "asc",
+          },
+        },
+      },
     });
 
     if (!lead) {
@@ -307,6 +317,21 @@ async function createPipedriveDeal(leadId: string) {
       throw new Error(`Pipedrive API error: ${JSON.stringify(dealData)}`);
     }
 
+    // Format SMS conversation history
+    const smsHistory = lead.communications
+      .map((comm) => {
+        const timestamp = new Date(comm.createdAt).toLocaleString("en-US", {
+          month: "short",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+        });
+        const direction = comm.direction === "OUTBOUND" ? "Holly →" : "Lead →";
+        return `[${timestamp}] ${direction}\n${comm.content}`;
+      })
+      .join("\n\n");
+
     // Add note to deal with full context
     const noteContent = `
 Lead converted from LOD2 system:
@@ -329,6 +354,9 @@ ${callOutcome.preferredProgram ? `- Preferred Program: ${callOutcome.preferredPr
 **Application:**
 - Started: ${lead.applicationStartedAt ? new Date(lead.applicationStartedAt).toLocaleString() : "N/A"}
 - Completed: ${lead.applicationCompletedAt ? new Date(lead.applicationCompletedAt).toLocaleString() : "N/A"}
+
+**SMS Conversation History:**
+${smsHistory || "No SMS conversations recorded"}
     `.trim();
 
     await fetch(
