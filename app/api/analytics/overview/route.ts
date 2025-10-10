@@ -121,11 +121,61 @@ export async function GET() {
     const leadToAppRate = totalLeads > 0 ? (convertedCount / totalLeads) * 100 : 0;
     const callToAppRate = callsCompleted > 0 ? (convertedCount / callsCompleted) * 100 : 0;
 
+    // Calculate Active Pipeline Value (only active leads, not LOST/CONVERTED/DEALS_WON)
+    const activePipelineValue = activeLeads.reduce((sum, lead) => {
+      const rawData = lead.rawData as any;
+      const loanAmount = parseFloat(rawData?.loanAmount || rawData?.loan_amount || "0");
+      return sum + (isNaN(loanAmount) ? 0 : loanAmount);
+    }, 0);
+
+    // Calculate average days in current stage for active leads
+    const now = new Date();
+    const leadsWithDaysInStage = await prisma.lead.findMany({
+      where: {
+        status: {
+          notIn: ["LOST", "CONVERTED", "DEALS_WON"],
+        },
+      },
+      include: {
+        activities: {
+          where: {
+            type: "STATUS_CHANGE",
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+          take: 1,
+        },
+      },
+    });
+
+    let totalDaysInStage = 0;
+    let leadsWithStageData = 0;
+
+    leadsWithDaysInStage.forEach((lead) => {
+      const lastStatusChange = lead.activities[0];
+      const stageStartDate = lastStatusChange ? lastStatusChange.createdAt : lead.createdAt;
+      const daysInStage = Math.floor((now.getTime() - stageStartDate.getTime()) / (1000 * 60 * 60 * 24));
+      totalDaysInStage += daysInStage;
+      leadsWithStageData++;
+    });
+
+    const avgDaysInStage = leadsWithStageData > 0 ? totalDaysInStage / leadsWithStageData : 0;
+
+    // Calculate leads stuck (> 7 days in same stage)
+    const leadsStuck = leadsWithDaysInStage.filter((lead) => {
+      const lastStatusChange = lead.activities[0];
+      const stageStartDate = lastStatusChange ? lastStatusChange.createdAt : lead.createdAt;
+      const daysInStage = Math.floor((now.getTime() - stageStartDate.getTime()) / (1000 * 60 * 60 * 24));
+      return daysInStage > 7;
+    }).length;
+
     return NextResponse.json({
       success: true,
       data: {
         totalLeads,
-        totalPipelineValue,
+        totalPipelineValue, // Keep old calculation for backwards compatibility
+        activePipelineValue: parseFloat(activePipelineValue.toFixed(2)), // NEW: Only active leads
         conversionRate: parseFloat(conversionRate.toFixed(2)),
         callsScheduled,
         callsCompleted,
@@ -133,10 +183,12 @@ export async function GET() {
         totalAppointments,
         responseRate: parseFloat(responseRate.toFixed(2)),
         avgTimeToResponse: parseFloat(avgTimeToResponse.toFixed(2)),
+        avgDaysInStage: parseFloat(avgDaysInStage.toFixed(1)), // NEW
+        leadsStuck, // NEW: Leads sitting > 7 days
         statusBreakdown,
         convertedCount,
         activeLeadsCount: activeLeads.length,
-        // New KPIs
+        // KPIs
         leadToCallRate: parseFloat(leadToCallRate.toFixed(2)),
         leadToAppRate: parseFloat(leadToAppRate.toFixed(2)),
         callToAppRate: parseFloat(callToAppRate.toFixed(2)),

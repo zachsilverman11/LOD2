@@ -107,18 +107,42 @@ export async function GET() {
     });
 
     // Calculate key funnel metrics
+    // CRITICAL FIX: Use total leads (not just NEW) as denominator
     const newLeads = statusMap.get("NEW") || 0;
     const contacted = statusMap.get("CONTACTED") || 0;
-    const engaged = (statusMap.get("ENGAGED") || 0) + (statusMap.get("NURTURING") || 0);
+
+    // CRITICAL FIX: Engaged includes all active stages (not just ENGAGED/NURTURING)
+    const engaged =
+      (statusMap.get("CONTACTED") || 0) +
+      (statusMap.get("ENGAGED") || 0) +
+      (statusMap.get("NURTURING") || 0) +
+      (statusMap.get("CALL_SCHEDULED") || 0) +
+      (statusMap.get("CALL_COMPLETED") || 0) +
+      (statusMap.get("APPLICATION_STARTED") || 0);
+
     const callScheduled = statusMap.get("CALL_SCHEDULED") || 0;
+    const callCompleted = statusMap.get("CALL_COMPLETED") || 0;
+    const applicationStarted = statusMap.get("APPLICATION_STARTED") || 0;
     const converted = statusMap.get("CONVERTED") || 0;
     const dealsWon = statusMap.get("DEALS_WON") || 0;
 
+    // Calculate active leads (excluding LOST)
+    const activeLostNurturing = totalLeads - (statusMap.get("LOST") || 0);
+
     const metrics = {
-      contactRate: newLeads > 0 ? ((contacted / newLeads) * 100).toFixed(2) : "0",
-      engagementRate: contacted > 0 ? ((engaged / contacted) * 100).toFixed(2) : "0",
+      // Contact Rate = % of total leads that were contacted (moved beyond NEW)
+      contactRate: totalLeads > 0 ? ((activeLostNurturing - newLeads) / totalLeads * 100).toFixed(2) : "0",
+
+      // Engagement Rate = % of contacted leads that engaged beyond initial contact
+      engagementRate: activeLostNurturing > 0 ? ((engaged / activeLostNurturing) * 100).toFixed(2) : "0",
+
+      // Booking Rate = % of engaged leads that scheduled a call
       bookingRate: engaged > 0 ? ((callScheduled / engaged) * 100).toFixed(2) : "0",
+
+      // Conversion Rate = % of total leads that converted to application
       conversionRate: totalLeads > 0 ? ((converted / totalLeads) * 100).toFixed(2) : "0",
+
+      // Deals Won Rate = % of converted leads that closed (funded)
       dealsWonRate: converted > 0 ? ((dealsWon / converted) * 100).toFixed(2) : "0",
     };
 

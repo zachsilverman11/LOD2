@@ -404,12 +404,22 @@ export default function AnalyticsPage() {
           </div>
 
           <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-6">
-            <div className="text-sm text-[#55514D] font-medium mb-2">Total Pipeline Value</div>
+            <div className="text-sm text-[#55514D] font-medium mb-2">Active Pipeline Value</div>
             <div className="text-3xl font-bold text-[#625FFF]">
-              {formatCurrency(overview?.totalPipelineValue || 0)}
+              {formatCurrency((overview as any)?.activePipelineValue || overview?.totalPipelineValue || 0)}
             </div>
             <div className="text-xs text-[#55514D] mt-2">
-              {overview?.activeLeadsCount || 0} active leads
+              {overview?.activeLeadsCount || 0} active leads (excludes lost/won)
+            </div>
+          </div>
+
+          <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-6">
+            <div className="text-sm text-[#55514D] font-medium mb-2">Avg. Days in Stage</div>
+            <div className="text-3xl font-bold text-[#1C1B1A]">
+              {(overview as any)?.avgDaysInStage ? `${(overview as any).avgDaysInStage.toFixed(1)}` : "0.0"}
+            </div>
+            <div className="text-xs text-[#55514D] mt-2">
+              {(overview as any)?.leadsStuck || 0} leads stuck (&gt;7 days)
             </div>
           </div>
 
