@@ -125,6 +125,82 @@ export async function sendSlackNotification(notification: SlackNotification) {
   }
 }
 
+export async function sendDevCardNotification(card: {
+  id: string;
+  title: string;
+  type: string;
+  priority: string;
+  createdBy: string;
+  description?: string | null;
+}) {
+  const isAI = card.createdBy === "HOLLY_AI";
+  const priorityEmoji = card.priority === "CRITICAL" ? "🚨" : card.priority === "HIGH" ? "⚠️" : "📋";
+  const typeEmoji = card.type === "BUG_FIX" ? "🐛" : card.type === "FEATURE_REQUEST" ? "✨" : "🔧";
+
+  const payload = {
+    attachments: [
+      {
+        color: card.priority === "CRITICAL" ? "#FF0000" : card.priority === "HIGH" ? "#FFA500" : "#625FFF",
+        blocks: [
+          {
+            type: "header",
+            text: {
+              type: "plain_text",
+              text: `${priorityEmoji} ${typeEmoji} ${isAI ? "Holly Detected Issue" : "New Dev Card"}`,
+              emoji: true,
+            },
+          },
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: `*${card.title}*${card.description ? `\n\n${card.description.substring(0, 200)}${card.description.length > 200 ? "..." : ""}` : ""}`,
+            },
+          },
+          {
+            type: "context",
+            elements: [
+              {
+                type: "mrkdwn",
+                text: `${isAI ? "🤖 AI-Detected" : `Created by ${card.createdBy}`} • Priority: ${card.priority} • Type: ${card.type.replace(/_/g, " ")}`,
+              },
+            ],
+          },
+          {
+            type: "actions",
+            elements: [
+              {
+                type: "button",
+                text: {
+                  type: "plain_text",
+                  text: "View Dev Board",
+                  emoji: true,
+                },
+                url: "https://lod2.vercel.app/dev-board",
+                style: card.priority === "CRITICAL" ? "danger" : "primary",
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+
+  try {
+    const response = await fetch(SLACK_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      console.error("Slack dev card notification failed:", await response.text());
+    }
+  } catch (error) {
+    console.error("Failed to send Slack dev card notification:", error);
+  }
+}
+
 export async function sendErrorAlert({ error, context }: ErrorAlert) {
   const { location, leadId, details } = context;
 

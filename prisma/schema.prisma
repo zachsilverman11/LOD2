@@ -276,3 +276,55 @@ enum ActivityType {
   NOTE_ADDED
   WEBHOOK_RECEIVED
 }
+
+model DevCard {
+  id          String         @id @default(cuid())
+  title       String
+  description String?
+  type        DevCardType
+  status      DevCardStatus  @default(NEW)
+  priority    DevCardPriority @default(MEDIUM)
+  createdBy   String         // User name or "HOLLY_AI"
+  metadata    Json?          // AI-detected issues, evidence, suggestions
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  deployedAt  DateTime?      // When moved to DEPLOYED
+  comments    DevCardComment[]
+
+  @@index([status])
+  @@index([type])
+  @@index([priority])
+  @@index([createdAt])
+}
+
+model DevCardComment {
+  id         String   @id @default(cuid())
+  cardId     String
+  content    String
+  authorName String
+  createdAt  DateTime @default(now())
+  card       DevCard  @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([cardId])
+  @@index([createdAt])
+}
+
+enum DevCardType {
+  FEATURE_REQUEST
+  BUG_FIX
+  IMPROVEMENT
+  OPTIMIZATION
+}
+
+enum DevCardStatus {
+  NEW
+  IN_PROGRESS
+  DEPLOYED
+}
+
+enum DevCardPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}

@@ -23,6 +23,12 @@ export default function DashboardPage() {
             </div>
             <div className="flex items-center gap-3">
               <Link
+                href="/dev-board"
+                className="px-4 py-2 text-sm text-[#625FFF] border border-[#625FFF] rounded-md hover:bg-[#625FFF] hover:text-white transition-colors"
+              >
+                Dev Board
+              </Link>
+              <Link
                 href="/dashboard/analytics"
                 className="px-4 py-2 text-sm text-[#625FFF] border border-[#625FFF] rounded-md hover:bg-[#625FFF] hover:text-white transition-colors"
               >
