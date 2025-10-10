@@ -107,19 +107,8 @@ export async function GET() {
     });
 
     // Calculate key funnel metrics
-    // CRITICAL FIX: Use total leads (not just NEW) as denominator
     const newLeads = statusMap.get("NEW") || 0;
     const contacted = statusMap.get("CONTACTED") || 0;
-
-    // CRITICAL FIX: Engaged includes all active stages (not just ENGAGED/NURTURING)
-    const engaged =
-      (statusMap.get("CONTACTED") || 0) +
-      (statusMap.get("ENGAGED") || 0) +
-      (statusMap.get("NURTURING") || 0) +
-      (statusMap.get("CALL_SCHEDULED") || 0) +
-      (statusMap.get("CALL_COMPLETED") || 0) +
-      (statusMap.get("APPLICATION_STARTED") || 0);
-
     const callScheduled = statusMap.get("CALL_SCHEDULED") || 0;
     const callCompleted = statusMap.get("CALL_COMPLETED") || 0;
     const applicationStarted = statusMap.get("APPLICATION_STARTED") || 0;
@@ -129,15 +118,26 @@ export async function GET() {
     // Calculate active leads (excluding LOST)
     const activeLostNurturing = totalLeads - (statusMap.get("LOST") || 0);
 
+    // CRITICAL FIX: Engaged = leads who actually REPLIED to Holly (not just status-based)
+    const leadsWhoReplied = await prisma.lead.count({
+      where: {
+        communications: {
+          some: {
+            direction: "INBOUND",
+          },
+        },
+      },
+    });
+
     const metrics = {
       // Contact Rate = % of total leads that were contacted (moved beyond NEW)
       contactRate: totalLeads > 0 ? ((activeLostNurturing - newLeads) / totalLeads * 100).toFixed(2) : "0",
 
-      // Engagement Rate = % of contacted leads that engaged beyond initial contact
-      engagementRate: activeLostNurturing > 0 ? ((engaged / activeLostNurturing) * 100).toFixed(2) : "0",
+      // Engagement Rate = % of leads who actually replied to Holly
+      engagementRate: totalLeads > 0 ? ((leadsWhoReplied / totalLeads) * 100).toFixed(2) : "0",
 
-      // Booking Rate = % of engaged leads that scheduled a call
-      bookingRate: engaged > 0 ? ((callScheduled / engaged) * 100).toFixed(2) : "0",
+      // Booking Rate = % of leads who replied that booked a call
+      bookingRate: leadsWhoReplied > 0 ? ((callScheduled / leadsWhoReplied) * 100).toFixed(2) : "0",
 
       // Conversion Rate = % of total leads that converted to application
       conversionRate: totalLeads > 0 ? ((converted / totalLeads) * 100).toFixed(2) : "0",
