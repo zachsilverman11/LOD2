@@ -153,8 +153,9 @@ async function handleBookingCreated(payload: any) {
       day: 'numeric',
       hour: 'numeric',
       minute: '2-digit',
-      hour12: true
-    })}`,
+      hour12: true,
+      timeZone: 'America/Vancouver'
+    })} PT`,
   });
 
   // Only send booking confirmation if this is their first appointment
