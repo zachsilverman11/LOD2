@@ -26,11 +26,14 @@ export function DevBoardColumn({
   return (
     <div className="flex-shrink-0 w-80">
       <div
-        className="rounded-lg p-1 mb-3"
-        style={{ backgroundColor: `${color}20` }}
+        className="rounded-lg mb-3 border-2"
+        style={{
+          borderColor: color,
+          backgroundColor: 'white'
+        }}
       >
         <h2
-          className="text-base font-bold px-3 py-2"
+          className="text-base font-bold px-4 py-3"
           style={{ color }}
         >
           {label}
