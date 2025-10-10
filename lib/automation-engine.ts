@@ -668,6 +668,28 @@ async function processSmartFollowUps() {
         if (outboundCount <= 2) {
           shouldFollowUp = true;
           followUpReason = "Day 2 check-in";
+
+          // 🚨 HOT LEAD ALERT: Send Slack notification at 24h mark for manual outreach
+          // This alert helps catch leads before they go completely cold
+          const loanAmount = (lead.rawData as any)?.loanAmount || (lead.rawData as any)?.loan_amount;
+          const loanType = (lead.rawData as any)?.loanType || (lead.rawData as any)?.loan_type;
+          const creditScore = (lead.rawData as any)?.creditScore || (lead.rawData as any)?.credit_score;
+          const propertyType = (lead.rawData as any)?.propertyType || (lead.rawData as any)?.property_type;
+
+          const leadDetails = [
+            loanAmount ? `$${parseInt(loanAmount).toLocaleString()} ${loanType || 'loan'}` : null,
+            creditScore ? `${creditScore} credit` : null,
+            propertyType ? propertyType : null,
+          ].filter(Boolean).join(', ');
+
+          await sendSlackNotification({
+            type: "hot_lead_going_cold",
+            leadName: `${lead.firstName} ${lead.lastName}`,
+            leadId: lead.id,
+            details: leadDetails || "New lead inquiry",
+          });
+
+          console.log(`[Automation] 🚨 Sent hot lead alert for ${lead.id} - 24h no response`);
         }
       } else if (daysSinceContact === 3) {
         // Day 4: Mid-week touch (skip day 3 to avoid spam)

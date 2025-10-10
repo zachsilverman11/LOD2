@@ -1,7 +1,7 @@
 const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL || "";
 
 interface SlackNotification {
-  type: "new_lead" | "no_response" | "lead_rotting" | "call_booked" | "call_missed" | "converted";
+  type: "new_lead" | "no_response" | "lead_rotting" | "hot_lead_going_cold" | "call_booked" | "call_missed" | "converted";
   leadName: string;
   leadId: string;
   details?: string;
@@ -45,6 +45,13 @@ export async function sendSlackNotification(notification: SlackNotification) {
       color = "#FF6B6B";
       title = "Lead Going Cold";
       message = `*${leadName}* is going cold!\n${details || "Time to take action"}`;
+      break;
+
+    case "hot_lead_going_cold":
+      emoji = "🚨";
+      color = "#FFA500";
+      title = "HOT LEAD GOING COLD";
+      message = `*${leadName}* hasn't responded in 24 hours.\n\n${details || ""}\n\n💡 *Consider personal outreach from Greg or Jakub*`;
       break;
 
     case "call_booked":
