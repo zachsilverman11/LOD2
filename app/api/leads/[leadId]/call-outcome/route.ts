@@ -1,169 +1,166 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { ActivityType, CommunicationChannel, LeadStatus } from "@/app/generated/prisma";
 import { sendSlackNotification } from "@/lib/slack";
-import { handleConversation, executeDecision } from "@/lib/ai-conversation-enhanced";
 
-type CallOutcome = "hot_lead" | "needs_followup" | "not_qualified" | "long_timeline";
-type CallTimeline = "asap" | "1-2_weeks" | "1-3_months" | "3-6_months" | "6+_months";
-type NextStep = "send_application" | "request_documents" | "compare_rates" | "schedule_followup" | "none";
-
-interface CallOutcomeRequest {
-  outcome: CallOutcome;
-  timeline?: CallTimeline;
-  nextStep?: NextStep;
-  notes?: string;
-  programsDiscussed?: string[];
-  preferredProgram?: string;
-}
-
+/**
+ * POST /api/leads/[leadId]/call-outcome
+ * Log the outcome of an advisor phone call with a lead
+ */
 export async function POST(
-  request: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ leadId: string }> }
 ) {
   try {
     const { leadId } = await params;
-    const body: CallOutcomeRequest = await request.json();
-    const { outcome, timeline, nextStep, notes, programsDiscussed, preferredProgram } = body;
+    const body = await req.json();
+    const { advisorName, reached, outcome, notes, leadQuality } = body;
 
-    if (!outcome) {
+    // Validate required fields
+    if (!advisorName || reached === undefined || !outcome) {
       return NextResponse.json(
-        { error: "Call outcome is required" },
+        { error: "Missing required fields: advisorName, reached, outcome" },
         { status: 400 }
       );
     }
 
-    // Find the lead
+    // Get the lead
     const lead = await prisma.lead.findUnique({
       where: { id: leadId },
-      include: { appointments: true },
     });
 
     if (!lead) {
-      return NextResponse.json(
-        { error: "Lead not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Lead not found" }, { status: 404 });
     }
 
-    // Prepare call outcome data
-    const callOutcomeData = {
-      outcome,
-      timeline,
-      nextStep,
-      notes,
-      programsDiscussed,
-      preferredProgram,
-      capturedAt: new Date().toISOString(),
-    };
-
-    // Update lead with call outcome in rawData
-    const updatedLead = await prisma.lead.update({
-      where: { id: leadId },
+    // Create the call outcome record
+    const callOutcome = await prisma.callOutcome.create({
       data: {
-        rawData: {
-          ...(lead.rawData as object || {}),
-          callOutcome: callOutcomeData,
-        },
-        // Update lead status based on outcome
-        status: getLeadStatusForOutcome(outcome),
+        leadId,
+        advisorName,
+        reached,
+        outcome,
+        notes,
+        leadQuality,
       },
     });
 
     // Log activity
     await prisma.leadActivity.create({
       data: {
-        leadId: leadId,
-        type: ActivityType.NOTE_ADDED,
-        channel: CommunicationChannel.SYSTEM,
-        subject: `Call outcome: ${outcome.replace("_", " ")}`,
-        content: notes || `Call marked as ${outcome.replace("_", " ")}`,
-        metadata: { callOutcome: callOutcomeData },
+        leadId,
+        type: "CALL_COMPLETED",
+        content: `${advisorName} ${reached ? "spoke with" : "attempted to reach"} lead. Outcome: ${outcome}${notes ? `. Notes: ${notes}` : ""}`,
+        metadata: {
+          callOutcomeId: callOutcome.id,
+          reached,
+          outcome,
+          leadQuality,
+        },
       },
     });
 
+    // Take action based on outcome
+    let newStatus = lead.status;
+    let actionTaken = "";
+
+    switch (outcome) {
+      case "READY_FOR_APP":
+        // Move to CALL_COMPLETED (they're ready for app, skip formal discovery)
+        newStatus = "CALL_COMPLETED";
+        actionTaken = "Moved to CALL_COMPLETED. Holly will send Finmo application link.";
+
+        await prisma.lead.update({
+          where: { id: leadId },
+          data: { status: "CALL_COMPLETED" },
+        });
+        break;
+
+      case "BOOK_DISCOVERY":
+        // Keep current status, Holly will send Cal.com link
+        actionTaken = "Holly will send discovery call booking link.";
+        break;
+
+      case "FOLLOW_UP_SOON":
+        // Keep current status, Holly will pause for 48h then resume
+        actionTaken = "Holly will pause automation for 48h, then resume nurturing.";
+        break;
+
+      case "NOT_INTERESTED":
+        // Move to LOST
+        newStatus = "LOST";
+        actionTaken = "Moved to LOST. Holly will stop all automation.";
+
+        await prisma.lead.update({
+          where: { id: leadId },
+          data: { status: "LOST" },
+        });
+        break;
+
+      case "WRONG_NUMBER":
+        // Flag for review
+        actionTaken = "Flagged for contact info review. Holly will pause SMS.";
+        break;
+
+      case "NO_ANSWER":
+        // Continue normal automation
+        actionTaken = "Holly will continue normal nurturing schedule.";
+        break;
+    }
+
     // Send Slack notification
+    const loanAmount = (lead.rawData as any)?.loanAmount;
+    const loanType = (lead.rawData as any)?.loanType;
+
     await sendSlackNotification({
-      type: "lead_updated",
+      type: "call_booked",
       leadName: `${lead.firstName} ${lead.lastName}`,
       leadId: lead.id,
-      details: `Call outcome captured: ${outcome.replace("_", " ").toUpperCase()}${notes ? ` - ${notes}` : ""}`,
+      details: `📞 ${advisorName} ${reached ? "spoke with" : "called"} lead\n\n**Outcome:** ${outcome.replace(/_/g, " ")}\n**Quality:** ${leadQuality || "Not assessed"}\n**Action:** ${actionTaken}${notes ? `\n\n**Notes:** ${notes}` : ""}\n\n${loanAmount ? `Loan: $${parseInt(loanAmount).toLocaleString()} ${loanType}` : ""}`,
     });
-
-    // Schedule Holly's follow-up based on outcome
-    await scheduleHollyFollowUp(leadId, outcome);
 
     return NextResponse.json({
       success: true,
-      message: "Call outcome recorded successfully",
-      lead: updatedLead,
+      callOutcome,
+      newStatus,
+      actionTaken,
     });
   } catch (error) {
-    console.error("Error recording call outcome:", error);
+    console.error("[Call Outcome] Error logging call outcome:", error);
     return NextResponse.json(
-      { error: "Failed to record call outcome" },
+      {
+        error: "Failed to log call outcome",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }
 }
 
 /**
- * Determine lead status based on call outcome
+ * GET /api/leads/[leadId]/call-outcome
+ * Get call outcomes for a lead
  */
-function getLeadStatusForOutcome(outcome: CallOutcome): LeadStatus {
-  switch (outcome) {
-    case "hot_lead":
-      return LeadStatus.CALL_COMPLETED; // Hot leads stay in CALL_COMPLETED until they submit app
-    case "needs_followup":
-      return LeadStatus.ENGAGED; // Back to engaged for nurturing
-    case "not_qualified":
-      return LeadStatus.LOST; // Mark as lost
-    case "long_timeline":
-      return LeadStatus.NURTURING; // Long-term nurture
-    default:
-      return LeadStatus.CALL_COMPLETED;
-  }
-}
-
-/**
- * Schedule Holly's intelligent follow-up based on call outcome
- */
-async function scheduleHollyFollowUp(leadId: string, outcome: CallOutcome) {
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ leadId: string }> }
+) {
   try {
-    // For hot leads, send follow-up with application link immediately (within 2 hours)
-    // For other outcomes, send appropriate follow-up
-    const scheduledFor = new Date();
+    const { leadId } = await params;
 
-    if (outcome === "hot_lead") {
-      // Send hot lead follow-up within 2 hours
-      scheduledFor.setHours(scheduledFor.getHours() + 2);
-    } else if (outcome === "needs_followup") {
-      // Send needs follow-up check-in within 4 hours
-      scheduledFor.setHours(scheduledFor.getHours() + 4);
-    } else if (outcome === "long_timeline") {
-      // Schedule for 2 weeks from now for long timeline
-      scheduledFor.setDate(scheduledFor.getDate() + 14);
-    } else if (outcome === "not_qualified") {
-      // Send polite close message within 1 hour
-      scheduledFor.setHours(scheduledFor.getHours() + 1);
-    }
-
-    await prisma.scheduledMessage.create({
-      data: {
-        leadId,
-        channel: "SMS",
-        content: `POST_CALL_FOLLOWUP_${outcome.toUpperCase()}`, // Special marker for AI to generate message
-        scheduledFor,
-        metadata: {
-          messageType: "post_call_followup",
-          callOutcome: outcome,
-          automated: true,
-        },
-      },
+    const callOutcomes = await prisma.callOutcome.findMany({
+      where: { leadId },
+      orderBy: { createdAt: "desc" },
     });
 
-    console.log(`[Call Outcome] Scheduled ${outcome} follow-up for ${scheduledFor.toLocaleString()}`);
+    return NextResponse.json({ success: true, callOutcomes });
   } catch (error) {
-    console.error(`[Call Outcome] Error scheduling follow-up for ${outcome}:`, error);
+    console.error("[Call Outcome] Error fetching call outcomes:", error);
+    return NextResponse.json(
+      {
+        error: "Failed to fetch call outcomes",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 }
+    );
   }
 }

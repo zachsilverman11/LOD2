@@ -33,6 +33,7 @@ model Lead {
   notes                  Note[]
   scheduledMessages      ScheduledMessage[]
   tasks                  Task[]
+  callOutcomes           CallOutcome[]
 
   @@index([email])
   @@index([phone])
@@ -214,6 +215,31 @@ model AnalyticsTarget {
   updatedAt        DateTime @updatedAt
 
   @@map("analytics_targets")
+}
+
+model CallOutcome {
+  id           String           @id @default(cuid())
+  leadId       String
+  advisorName  String           // Greg Williamson, Jakub Huncik, etc.
+  reached      Boolean          // Did the advisor actually speak with the lead?
+  outcome      CallOutcomeType  // What's the next action?
+  notes        String?          // Optional context from the call
+  leadQuality  String?          // hot, warm, cold (optional quick assessment)
+  createdAt    DateTime         @default(now())
+  lead         Lead             @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([createdAt])
+  @@index([outcome])
+}
+
+enum CallOutcomeType {
+  READY_FOR_APP      // Lead is ready to apply, send Finmo link
+  BOOK_DISCOVERY     // Lead wants formal discovery call, send Cal.com link
+  FOLLOW_UP_SOON     // Lead interested but needs time (2-3 days), Holly pauses then resumes
+  NOT_INTERESTED     // Lead not interested, move to LOST
+  WRONG_NUMBER       // Invalid contact info
+  NO_ANSWER          // Voicemail left, Holly continues nurturing
 }
 
 enum LeadStatus {

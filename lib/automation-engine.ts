@@ -599,11 +599,63 @@ async function processSmartFollowUps() {
         },
         take: 1,
       },
+      callOutcomes: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+      },
     },
   });
 
   for (const lead of leads) {
     try {
+      // 🚨 CHECK FOR RECENT CALL OUTCOME - Advisor may have just called them
+      const recentCallOutcome = lead.callOutcomes[0];
+      if (recentCallOutcome) {
+        const hoursSinceCall = Math.floor(
+          (now.getTime() - recentCallOutcome.createdAt.getTime()) / 3600000
+        );
+
+        // If advisor called within last 48 hours, follow the call outcome instructions
+        if (hoursSinceCall < 48) {
+          console.log(`[Automation] Lead ${lead.id} has recent call outcome (${hoursSinceCall}h ago): ${recentCallOutcome.outcome}`);
+
+          switch (recentCallOutcome.outcome) {
+            case "READY_FOR_APP":
+              // Send Finmo link if they're in CALL_COMPLETED status
+              if (lead.status === "CALL_COMPLETED") {
+                // TODO: Send Finmo application link via Holly
+                console.log(`[Automation] Lead ${lead.id} is READY_FOR_APP - should send Finmo link`);
+              }
+              continue; // Skip normal automation
+
+            case "BOOK_DISCOVERY":
+              // Send Cal.com link once
+              // TODO: Send Cal.com booking link via Holly
+              console.log(`[Automation] Lead ${lead.id} needs BOOK_DISCOVERY - should send Cal.com link`);
+              continue; // Skip normal automation
+
+            case "FOLLOW_UP_SOON":
+              // Only resume automation after 48h
+              if (hoursSinceCall < 48) {
+                console.log(`[Automation] Skipping lead ${lead.id} - waiting 48h before resuming (${hoursSinceCall}h elapsed)`);
+                continue;
+              }
+              // After 48h, fall through to normal automation with context from notes
+              break;
+
+            case "NOT_INTERESTED":
+            case "WRONG_NUMBER":
+              // These should already be in LOST status, skip automation
+              console.log(`[Automation] Skipping lead ${lead.id} - outcome is ${recentCallOutcome.outcome}`);
+              continue;
+
+            case "NO_ANSWER":
+              // Continue normal automation
+              break;
+          }
+        }
+      }
+
       // 🚨 SKIP if they have an upcoming appointment (handled by appointment reminders instead)
       if (lead.appointments.length > 0) {
         console.log(`[Automation] Skipping lead ${lead.id} - has upcoming appointment`);
