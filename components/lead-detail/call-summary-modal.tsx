@@ -167,7 +167,7 @@ export default function CallSummaryModal({
                   >
                     <div className="font-semibold text-[#1C1B1A]">🚀 Ready to Apply</div>
                     <div className="text-xs text-[#55514D]">
-                      Lead is ready now - Holly will send Finmo application link & move to CALL_COMPLETED
+                      Lead is ready now - Holly sends Finmo link immediately & moves to CALL_COMPLETED
                     </div>
                   </button>
 
@@ -182,7 +182,7 @@ export default function CallSummaryModal({
                   >
                     <div className="font-semibold text-[#1C1B1A]">📅 Book Discovery Call</div>
                     <div className="text-xs text-[#55514D]">
-                      Lead wants formal call - Holly will send Cal.com booking link
+                      Lead wants formal call - Holly sends Cal.com booking link immediately
                     </div>
                   </button>
 

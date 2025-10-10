@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { sendSlackNotification } from "@/lib/slack";
+import { handleConversation, executeDecision } from "@/lib/ai-conversation-enhanced";
 
 /**
  * POST /api/leads/[leadId]/call-outcome
@@ -67,17 +68,53 @@ export async function POST(
       case "READY_FOR_APP":
         // Move to CALL_COMPLETED (they're ready for app, skip formal discovery)
         newStatus = "CALL_COMPLETED";
-        actionTaken = "Moved to CALL_COMPLETED. Holly will send Finmo application link.";
+        actionTaken = "Moved to CALL_COMPLETED. Holly sending Finmo application link now...";
 
         await prisma.lead.update({
           where: { id: leadId },
           data: { status: "CALL_COMPLETED" },
         });
+
+        // 🚀 SEND FINMO LINK IMMEDIATELY (within 5 minutes)
+        try {
+          console.log(`[Call Outcome] Triggering immediate Finmo link for lead ${leadId}`);
+
+          // Generate AI message with Finmo link
+          const decision = await handleConversation(leadId);
+
+          // Send immediately
+          await executeDecision(leadId, decision);
+
+          actionTaken = "Moved to CALL_COMPLETED. Holly sent Finmo application link! ✅";
+
+          console.log(`[Call Outcome] ✅ Finmo link sent successfully to lead ${leadId}`);
+        } catch (error) {
+          console.error(`[Call Outcome] Error sending Finmo link:`, error);
+          actionTaken = "Moved to CALL_COMPLETED. Holly will send Finmo link on next automation run.";
+        }
         break;
 
       case "BOOK_DISCOVERY":
-        // Keep current status, Holly will send Cal.com link
-        actionTaken = "Holly will send discovery call booking link.";
+        // Keep current status, Holly will send Cal.com link immediately
+        actionTaken = "Holly sending Cal.com booking link now...";
+
+        // 📅 SEND CAL.COM LINK IMMEDIATELY
+        try {
+          console.log(`[Call Outcome] Triggering immediate Cal.com link for lead ${leadId}`);
+
+          // Generate AI message with Cal.com link
+          const decision = await handleConversation(leadId);
+
+          // Send immediately
+          await executeDecision(leadId, decision);
+
+          actionTaken = "Holly sent Cal.com booking link! ✅";
+
+          console.log(`[Call Outcome] ✅ Cal.com link sent successfully to lead ${leadId}`);
+        } catch (error) {
+          console.error(`[Call Outcome] Error sending Cal.com link:`, error);
+          actionTaken = "Holly will send Cal.com link on next automation run.";
+        }
         break;
 
       case "FOLLOW_UP_SOON":
