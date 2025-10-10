@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { handleConversation, executeDecision } from "@/lib/ai-conversation-enhanced";
 import { sendSlackNotification, sendErrorAlert } from "@/lib/slack";
+import { correctNames } from "@/lib/name-correction";
 
 /**
  * Webhook endpoint for Leads on Demand
@@ -24,17 +25,53 @@ export async function POST(req: NextRequest) {
     });
 
     // Validate required fields
-    if (!payload.email || !payload.phone || !payload.name) {
+    // Support both "name" field OR "first_name"+"last_name" fields
+    if (!payload.email || !payload.phone) {
       return NextResponse.json(
-        { error: "Missing required fields: email, phone, or name" },
+        { error: "Missing required fields: email, phone" },
         { status: 400 }
       );
     }
 
-    // Parse name (could be "First Last" format)
-    const nameParts = payload.name.trim().split(" ");
-    const firstName = nameParts[0] || "Unknown";
-    const lastName = nameParts.slice(1).join(" ") || "";
+    // Parse and correct names
+    let firstName: string;
+    let lastName: string;
+    let nameCorrectionResult;
+
+    if (payload.first_name && payload.last_name) {
+      // LOD sends separate first_name and last_name fields
+      nameCorrectionResult = correctNames(payload.first_name, payload.last_name);
+      firstName = nameCorrectionResult.firstName;
+      lastName = nameCorrectionResult.lastName;
+
+      if (nameCorrectionResult.wasCorrected) {
+        console.log(
+          `[Name Correction] Reversed names detected: "${nameCorrectionResult.originalFirstName} ${nameCorrectionResult.originalLastName}" → "${firstName} ${lastName}"`
+        );
+        console.log(`[Name Correction] Reason: ${nameCorrectionResult.reason}`);
+      }
+    } else if (payload.name) {
+      // Fallback: parse single name field
+      const nameParts = payload.name.trim().split(" ");
+      const parsedFirst = nameParts[0] || "Unknown";
+      const parsedLast = nameParts.slice(1).join(" ") || "";
+
+      nameCorrectionResult = correctNames(parsedFirst, parsedLast);
+      firstName = nameCorrectionResult.firstName;
+      lastName = nameCorrectionResult.lastName;
+
+      if (nameCorrectionResult.wasCorrected) {
+        console.log(
+          `[Name Correction] Reversed names detected: "${nameCorrectionResult.originalFirstName} ${nameCorrectionResult.originalLastName}" → "${firstName} ${lastName}"`
+        );
+        console.log(`[Name Correction] Reason: ${nameCorrectionResult.reason}`);
+      }
+    } else {
+      return NextResponse.json(
+        { error: "Missing required fields: name or (first_name + last_name)" },
+        { status: 400 }
+      );
+    }
 
     // Format phone (remove any non-digits, add +1 for Canada)
     let phone = payload.phone.replace(/\D/g, "");
@@ -109,6 +146,24 @@ export async function POST(req: NextRequest) {
         },
       });
 
+      // Log name correction if it occurred
+      if (nameCorrectionResult?.wasCorrected) {
+        await prisma.leadActivity.create({
+          data: {
+            leadId: lead.id,
+            type: "NOTE_ADDED",
+            content: `✅ Name auto-corrected: "${nameCorrectionResult.originalFirstName} ${nameCorrectionResult.originalLastName}" → "${firstName} ${lastName}"`,
+            metadata: {
+              reason: nameCorrectionResult.reason,
+              originalFirstName: nameCorrectionResult.originalFirstName,
+              originalLastName: nameCorrectionResult.originalLastName,
+              correctedFirstName: firstName,
+              correctedLastName: lastName,
+            },
+          },
+        });
+      }
+
       console.log(`[Leads on Demand] Created new lead: ${lead.id}`);
 
       // Send Slack notification for new lead
@@ -118,11 +173,16 @@ export async function POST(req: NextRequest) {
         ? `$${payload.loanAmount || "Unknown"} refinance in ${payload.city || "Unknown"}`
         : `${payload.loanType || "mortgage"} inquiry`;
 
+      // Add name correction note to Slack if applicable
+      const slackDetails = nameCorrectionResult?.wasCorrected
+        ? `${loanInfo}\n\n✅ Name auto-corrected from "${nameCorrectionResult.originalFirstName} ${nameCorrectionResult.originalLastName}"`
+        : loanInfo;
+
       await sendSlackNotification({
         type: "new_lead",
         leadName: `${firstName} ${lastName}`,
         leadId: lead.id,
-        details: loanInfo,
+        details: slackDetails,
       });
     }
 
