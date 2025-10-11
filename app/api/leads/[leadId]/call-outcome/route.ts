@@ -14,7 +14,7 @@ export async function POST(
   try {
     const { leadId } = await params;
     const body = await req.json();
-    const { advisorName, reached, outcome, notes, leadQuality } = body;
+    const { advisorName, reached, outcome, notes, leadQuality, appointmentId } = body;
 
     // Validate required fields
     if (!advisorName || reached === undefined || !outcome) {
@@ -37,6 +37,7 @@ export async function POST(
     const callOutcome = await prisma.callOutcome.create({
       data: {
         leadId,
+        appointmentId: appointmentId || null,
         advisorName,
         reached,
         outcome,

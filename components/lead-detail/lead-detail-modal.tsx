@@ -136,6 +136,54 @@ export function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
         </div>
 
         <div className="p-6">
+          {/* Log Call Outcome - Always Available */}
+          <div className="mb-6 flex justify-between items-center p-4 bg-[#FBF3E7]/50 border border-[#625FFF]/30 rounded-lg">
+            <div>
+              <span className="text-sm font-semibold text-[#1C1B1A]">📞 Log Call Outcome</span>
+              <p className="text-xs text-[#55514D]">Record any phone conversation</p>
+            </div>
+            <button
+              onClick={() => {
+                setSelectedAppointmentId(null);
+                setShowCallSummaryModal(true);
+              }}
+              className="px-4 py-2 bg-[#625FFF] text-white rounded-md hover:bg-[#4E4BCC] transition-colors text-sm font-medium"
+            >
+              Log Call
+            </button>
+          </div>
+
+          {/* Call History */}
+          {lead.callOutcomes && lead.callOutcomes.length > 0 && (
+            <div className="mb-6">
+              <h3 className="text-sm font-semibold mb-2 text-[#625FFF]">Call History ({lead.callOutcomes.length})</h3>
+              <div className="space-y-2">
+                {lead.callOutcomes.slice(0, 5).map((outcome) => (
+                  <div key={outcome.id} className="border border-[#E4DDD3] rounded p-3 bg-white text-sm">
+                    <div className="flex justify-between items-start mb-1">
+                      <div>
+                        <span className="font-medium text-[#1C1B1A]">{outcome.advisorName}</span>
+                        <span className={`ml-2 px-1.5 py-0.5 rounded text-xs ${
+                          outcome.outcome === 'READY_FOR_APP' ? 'bg-[#D9F36E]/30 text-[#1C1B1A]' :
+                          outcome.outcome === 'NOT_INTERESTED' ? 'bg-red-100 text-red-700' :
+                          'bg-[#FBF3E7] text-[#55514D]'
+                        }`}>
+                          {outcome.outcome.replace(/_/g, ' ')}
+                        </span>
+                      </div>
+                      <span className="text-xs text-[#55514D]">
+                        {format(new Date(outcome.createdAt), "MMM d, h:mm a")}
+                      </span>
+                    </div>
+                    {outcome.notes && (
+                      <p className="text-xs text-[#55514D] mt-1 italic">"{outcome.notes.substring(0, 100)}{outcome.notes.length > 100 ? '...' : ''}"</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Contact Information */}
           <div className="mb-6">
             <h3 className="text-lg font-semibold mb-3 text-[#1C1B1A]">Contact Information</h3>
@@ -387,30 +435,6 @@ export function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
                   const hoursSince = (now.getTime() - appointmentTime.getTime()) / (1000 * 60 * 60);
                   const showNoShowButton = appt.status === 'completed' && hoursSince >= 0 && hoursSince <= 24;
 
-                  const hasCallOutcome = lead.rawData && typeof lead.rawData === 'object' && 'callOutcome' in lead.rawData;
-                  const callOutcome = hasCallOutcome ? (lead.rawData as any).callOutcome : null;
-                  const showCaptureButton = appt.status === 'completed';
-
-                  const handleClearOutcome = async () => {
-                    if (!confirm("Clear this call outcome? This will remove all captured data.")) return;
-
-                    try {
-                      const response = await fetch(`/api/leads/${lead.id}/route`, {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          rawData: {
-                            ...(lead.rawData as object || {}),
-                            callOutcome: undefined,
-                          },
-                        }),
-                      });
-                      if (response.ok) window.location.reload();
-                    } catch (error) {
-                      console.error("Error clearing outcome:", error);
-                    }
-                  };
-
                   return (
                     <div key={appt.id} className="border border-[#E4DDD3] rounded-lg p-4">
                       <div className="flex justify-between items-start">
@@ -427,6 +451,9 @@ export function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
                               'bg-[#FBF3E7] text-[#55514D] border-[#E4DDD3]'
                             }`}>{appt.status === 'no_show' ? 'no-show' : appt.status}</span>
                           </p>
+                          {appt.advisorName && (
+                            <p className="text-sm text-[#55514D]">with {appt.advisorName}</p>
+                          )}
                         </div>
                         {showNoShowButton && (
                           <button
@@ -441,57 +468,6 @@ export function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
                         <a href={appt.meetingUrl} target="_blank" rel="noopener noreferrer" className="text-[#625FFF] hover:underline text-sm mt-2 block">
                           Join Meeting →
                         </a>
-                      )}
-
-                      {/* Call Outcome Card or Capture Button */}
-                      {showCaptureButton && (
-                        hasCallOutcome && callOutcome ? (
-                          <div className="mt-4 p-4 border border-[#E4DDD3] rounded-lg bg-[#FBF3E7]/30">
-                            <div className="flex justify-between items-start mb-2">
-                              <div className="font-semibold text-[#1C1B1A]">
-                                Call Outcome: <span className="text-[#625FFF]">{callOutcome.outcome?.replace('_', ' ')}</span>
-                              </div>
-                              <div className="flex gap-2">
-                                <button
-                                  onClick={() => {
-                                    setSelectedAppointmentId(appt.id);
-                                    setShowCallSummaryModal(true);
-                                  }}
-                                  className="px-3 py-1 text-sm text-[#625FFF] border border-[#625FFF] rounded hover:bg-[#625FFF]/10 transition-colors"
-                                >
-                                  Edit
-                                </button>
-                                <button
-                                  onClick={handleClearOutcome}
-                                  className="px-3 py-1 text-sm text-[#55514D] border border-[#E4DDD3] rounded hover:bg-[#FBF3E7] transition-colors"
-                                >
-                                  Clear
-                                </button>
-                              </div>
-                            </div>
-                            {callOutcome.timeline && (
-                              <p className="text-sm text-[#55514D]">Timeline: {callOutcome.timeline.replace('_', ' ')}</p>
-                            )}
-                            {callOutcome.programsDiscussed && callOutcome.programsDiscussed.length > 0 && (
-                              <p className="text-sm text-[#55514D] mt-1">
-                                Programs: {callOutcome.programsDiscussed.join(', ')}
-                              </p>
-                            )}
-                            {callOutcome.notes && (
-                              <p className="text-sm text-[#55514D] mt-2 italic">"{callOutcome.notes}"</p>
-                            )}
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => {
-                              setSelectedAppointmentId(appt.id);
-                              setShowCallSummaryModal(true);
-                            }}
-                            className="mt-4 w-full px-4 py-2 bg-[#625FFF] text-white rounded-lg hover:bg-[#625FFF]/90 transition-colors text-sm font-medium"
-                          >
-                            Capture Call Outcome
-                          </button>
-                        )
                       )}
                     </div>
                   );
@@ -647,11 +623,11 @@ export function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
       </div>
 
       {/* Call Summary Modal */}
-      {showCallSummaryModal && selectedAppointmentId && (
+      {showCallSummaryModal && (
         <CallSummaryModal
           leadId={lead.id}
+          leadName={`${lead.firstName} ${lead.lastName}`}
           appointmentId={selectedAppointmentId}
-          existingOutcome={lead.rawData && typeof lead.rawData === 'object' && 'callOutcome' in lead.rawData ? (lead.rawData as any).callOutcome : undefined}
           onClose={() => {
             setShowCallSummaryModal(false);
             setSelectedAppointmentId(null);

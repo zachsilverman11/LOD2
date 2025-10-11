@@ -1,4 +1,4 @@
-import { Lead, LeadActivity, Appointment, Communication, LeadStatus, Note, Task } from "@/app/generated/prisma";
+import { Lead, LeadActivity, Appointment, Communication, LeadStatus, Note, Task, CallOutcome } from "@/app/generated/prisma";
 
 export type LeadWithRelations = Lead & {
   activities: LeadActivity[];
@@ -6,6 +6,7 @@ export type LeadWithRelations = Lead & {
   communications: Communication[];
   notes: Note[];
   tasks: Task[];
+  callOutcomes: CallOutcome[];
 };
 
 export const TEAM_MEMBERS = ["Greg", "Jakub", "Admin Team"] as const;

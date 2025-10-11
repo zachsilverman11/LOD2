@@ -17,6 +17,18 @@ export async function GET(
         appointments: {
           orderBy: { scheduledAt: "desc" },
         },
+        communications: {
+          orderBy: { createdAt: "desc" },
+        },
+        notes: {
+          orderBy: { createdAt: "desc" },
+        },
+        tasks: {
+          orderBy: { createdAt: "desc" },
+        },
+        callOutcomes: {
+          orderBy: { createdAt: "desc" },
+        },
       },
     });
 

@@ -5,6 +5,7 @@ import { useState } from "react";
 interface CallSummaryModalProps {
   leadId: string;
   leadName: string;
+  appointmentId?: string | null;
   onClose: () => void;
   onSubmit: () => void;
 }
@@ -12,6 +13,7 @@ interface CallSummaryModalProps {
 export default function CallSummaryModal({
   leadId,
   leadName,
+  appointmentId,
   onClose,
   onSubmit,
 }: CallSummaryModalProps) {
@@ -40,7 +42,10 @@ export default function CallSummaryModal({
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          appointmentId: appointmentId || null,
+        }),
       });
 
       if (response.ok) {

@@ -29,6 +29,9 @@ export async function GET(request: NextRequest) {
           orderBy: { createdAt: "desc" },
           take: 5,
         },
+        callOutcomes: {
+          orderBy: { createdAt: "desc" },
+        },
       },
       orderBy: { createdAt: "desc" },
     });

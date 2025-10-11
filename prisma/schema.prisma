@@ -60,23 +60,24 @@ model LeadActivity {
 }
 
 model Appointment {
-  id               String    @id @default(cuid())
+  id               String         @id @default(cuid())
   leadId           String
-  calComEventId    String?   @unique
-  calComBookingUid String?   @unique
+  calComEventId    String?        @unique
+  calComBookingUid String?        @unique
   scheduledAt      DateTime
-  scheduledFor     DateTime? // Actual appointment time (defaults to scheduledAt for backwards compatibility)
+  scheduledFor     DateTime?      // Actual appointment time (defaults to scheduledAt for backwards compatibility)
   duration         Int
   status           String
   meetingUrl       String?
   notes            String?
-  advisorName      String?   // Name of advisor from Cal.com organizer
-  advisorEmail     String?   // Email of advisor from Cal.com organizer
-  reminder24hSent  Boolean   @default(false)
-  reminder1hSent   Boolean   @default(false)
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  lead             Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  advisorName      String?        // Name of advisor from Cal.com organizer
+  advisorEmail     String?        // Email of advisor from Cal.com organizer
+  reminder24hSent  Boolean        @default(false)
+  reminder1hSent   Boolean        @default(false)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  lead             Lead           @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  callOutcomes     CallOutcome[]  // Outcomes logged for this specific appointment
 
   @@index([leadId])
   @@index([scheduledAt])
@@ -218,17 +219,20 @@ model AnalyticsTarget {
 }
 
 model CallOutcome {
-  id           String           @id @default(cuid())
-  leadId       String
-  advisorName  String           // Greg Williamson, Jakub Huncik, etc.
-  reached      Boolean          // Did the advisor actually speak with the lead?
-  outcome      CallOutcomeType  // What's the next action?
-  notes        String?          // Optional context from the call
-  leadQuality  String?          // hot, warm, cold (optional quick assessment)
-  createdAt    DateTime         @default(now())
-  lead         Lead             @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  id            String           @id @default(cuid())
+  leadId        String
+  appointmentId String?          // Optional - link to appointment if this was a scheduled call
+  advisorName   String           // Greg Williamson, Jakub Huncik, etc.
+  reached       Boolean          // Did the advisor actually speak with the lead?
+  outcome       CallOutcomeType  // What's the next action?
+  notes         String?          // Optional context from the call
+  leadQuality   String?          // hot, warm, cold (optional quick assessment)
+  createdAt     DateTime         @default(now())
+  lead          Lead             @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  appointment   Appointment?     @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
 
   @@index([leadId])
+  @@index([appointmentId])
   @@index([createdAt])
   @@index([outcome])
 }
