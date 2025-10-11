@@ -729,7 +729,7 @@ Based on everything above, decide the best action. Remember:
 export async function handleConversation(
   leadId: string,
   incomingMessage?: string,
-  incomingChannel?: "SMS" | "EMAIL"
+  specialContext?: string
 ): Promise<AIDecision> {
   const context = await buildLeadContext(leadId);
 
@@ -756,13 +756,19 @@ export async function handleConversation(
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
 
   if (incomingMessage) {
-    const channelNote = incomingChannel
-      ? `\n\n⚠️ IMPORTANT: The lead sent this via ${incomingChannel}. If you respond via a different channel, ACKNOWLEDGE the original channel (e.g., "Thanks for your ${incomingChannel === 'EMAIL' ? 'email' : 'text'}!")`
-      : '';
+    // Detect channel from incoming message if not explicitly provided
+    const incomingChannel = incomingMessage.includes('@') ? 'EMAIL' : 'SMS';
+    const channelNote = `\n\n⚠️ IMPORTANT: The lead sent this via ${incomingChannel}. If you respond via a different channel, ACKNOWLEDGE the original channel (e.g., "Thanks for your ${incomingChannel === 'EMAIL' ? 'email' : 'text'}!")`;
 
     messages.push({
       role: "user",
       content: `The lead just sent this message: "${incomingMessage}"${channelNote}\n\nAnalyze this message and decide what action to take. Consider:\n- Their intent and sentiment\n- Where they are in the pipeline\n- What information you still need\n- Whether they're ready to book or need more nurturing\n- Which of the 3 programs would resonate most\n${existingAppointment ? `\n⚠️ CRITICAL: This lead ALREADY HAS A CALL SCHEDULED for ${(existingAppointment.scheduledFor || existingAppointment.scheduledAt).toLocaleString()}. DO NOT try to book them again. Focus on confirming, preparing, and ensuring they show up.` : ''}\n\nUse one of the available tools to respond.`,
+    });
+  } else if (specialContext) {
+    // Special context provided (e.g., after call outcome, cancellation)
+    messages.push({
+      role: "user",
+      content: specialContext,
     });
   } else {
     // Initial contact
