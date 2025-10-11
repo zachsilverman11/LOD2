@@ -229,7 +229,8 @@ Based on the above context and conversation, decide the best next action.`;
  */
 export async function handleConversation(
   leadId: string,
-  incomingMessage?: string
+  incomingMessage?: string,
+  specialContext?: string
 ): Promise<AIDecision> {
   // Build full context
   const context = await buildLeadContext(leadId);
@@ -244,6 +245,12 @@ export async function handleConversation(
     messages.push({
       role: "user",
       content: `The lead just sent this message: "${incomingMessage}"\n\nAnalyze this message and decide what action to take. Consider:\n- Their intent and sentiment\n- Where they are in the pipeline\n- What information you still need\n- Whether they're ready to book or need more nurturing\n\nUse one of the available tools to respond.`,
+    });
+  } else if (specialContext) {
+    // Special context provided (e.g., cancellation, no-show)
+    messages.push({
+      role: "user",
+      content: specialContext,
     });
   } else {
     // Initial contact

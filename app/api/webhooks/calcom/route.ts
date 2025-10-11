@@ -269,7 +269,19 @@ async function handleBookingCancelled(payload: any) {
 
   // Have Holly reach out to re-engage and try to rebook
   try {
-    const decision = await handleConversation(appointment.leadId);
+    const cancellationContext = `The lead just cancelled their scheduled discovery call. They had booked the appointment but then cancelled it.
+
+Your job is to:
+1. Acknowledge the cancellation empathetically (don't ignore it happened)
+2. Ask if there's anything we can help with or if they have questions
+3. Offer to help them rebook if they're still interested
+4. Be understanding - maybe the time didn't work, or they're not ready yet
+
+DO NOT just pitch the same "ultra-low rates" message. This is about understanding what happened and being helpful.
+
+Keep it SHORT (under 160 chars), conversational, and human. Use the send_sms tool.`;
+
+    const decision = await handleConversation(appointment.leadId, undefined, cancellationContext);
     await executeDecision(appointment.leadId, decision);
     console.log(`[Cal.com] Holly reaching out to re-engage after cancellation`);
   } catch (error) {
