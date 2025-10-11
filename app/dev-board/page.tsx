@@ -90,7 +90,7 @@ export default function DevBoardPage() {
                     required
                     value={formData.title}
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    className="w-full px-3 py-2 border border-[#E4DDD3] rounded-md focus:outline-none focus:border-[#625FFF]"
+                    className="w-full px-3 py-2 border border-[#E4DDD3] rounded-md focus:outline-none focus:border-[#625FFF] text-[#1C1B1A]"
                     placeholder="Brief title for the card"
                   />
                 </div>
@@ -103,7 +103,7 @@ export default function DevBoardPage() {
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     rows={3}
-                    className="w-full px-3 py-2 border border-[#E4DDD3] rounded-md focus:outline-none focus:border-[#625FFF]"
+                    className="w-full px-3 py-2 border border-[#E4DDD3] rounded-md focus:outline-none focus:border-[#625FFF] text-[#1C1B1A]"
                     placeholder="Detailed description..."
                   />
                 </div>
@@ -116,7 +116,7 @@ export default function DevBoardPage() {
                     <select
                       value={formData.type}
                       onChange={(e) => setFormData({ ...formData, type: e.target.value as DevCardType })}
-                      className="w-full px-3 py-2 border border-[#E4DDD3] rounded-md focus:outline-none focus:border-[#625FFF]"
+                      className="w-full px-3 py-2 border border-[#E4DDD3] rounded-md focus:outline-none focus:border-[#625FFF] text-[#1C1B1A]"
                     >
                       <option value="FEATURE_REQUEST">Feature Request</option>
                       <option value="BUG_FIX">Bug Fix</option>
@@ -132,7 +132,7 @@ export default function DevBoardPage() {
                     <select
                       value={formData.priority}
                       onChange={(e) => setFormData({ ...formData, priority: e.target.value as DevCardPriority })}
-                      className="w-full px-3 py-2 border border-[#E4DDD3] rounded-md focus:outline-none focus:border-[#625FFF]"
+                      className="w-full px-3 py-2 border border-[#E4DDD3] rounded-md focus:outline-none focus:border-[#625FFF] text-[#1C1B1A]"
                     >
                       <option value="LOW">Low</option>
                       <option value="MEDIUM">Medium</option>
@@ -150,7 +150,7 @@ export default function DevBoardPage() {
                       required
                       value={formData.createdBy}
                       onChange={(e) => setFormData({ ...formData, createdBy: e.target.value })}
-                      className="w-full px-3 py-2 border border-[#E4DDD3] rounded-md focus:outline-none focus:border-[#625FFF]"
+                      className="w-full px-3 py-2 border border-[#E4DDD3] rounded-md focus:outline-none focus:border-[#625FFF] text-[#1C1B1A]"
                       placeholder="Your name"
                     />
                   </div>

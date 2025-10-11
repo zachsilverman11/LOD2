@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "./db";
 import { sendSMS } from "./sms";
+import { sendSlackNotification } from "./slack";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -46,7 +47,7 @@ export async function buildLeadContext(leadId: string): Promise<LeadContext> {
     include: {
       communications: {
         orderBy: { createdAt: "desc" },
-        take: 20, // Last 20 messages
+        take: 50, // Last 50 messages (increased from 20)
       },
       appointments: {
         orderBy: { createdAt: "desc" },
@@ -73,12 +74,26 @@ export async function buildLeadContext(leadId: string): Promise<LeadContext> {
       )
     : 0;
 
-  // Build conversation history
-  const conversationHistory = lead.communications.map((comm) => ({
-    role: comm.direction === "OUTBOUND" ? ("assistant" as const) : ("user" as const),
-    content: comm.content,
-    timestamp: comm.createdAt,
-  }));
+  // Build conversation history with manual message flags
+  const conversationHistory = lead.communications.map((comm) => {
+    const isManual = comm.metadata &&
+      typeof comm.metadata === 'object' &&
+      'isManual' in comm.metadata &&
+      comm.metadata.isManual === true;
+
+    const sentBy = isManual &&
+      comm.metadata &&
+      typeof comm.metadata === 'object' &&
+      'sentBy' in comm.metadata
+      ? String(comm.metadata.sentBy)
+      : null;
+
+    return {
+      role: comm.direction === "OUTBOUND" ? ("assistant" as const) : ("user" as const),
+      content: isManual ? `[MANUAL - ${sentBy}]: ${comm.content}` : comm.content,
+      timestamp: comm.createdAt,
+    };
+  });
 
   return {
     leadId: lead.id,
@@ -142,28 +157,42 @@ Total Messages Exchanged: ${context.pipelineStatus.totalMessages}
 Has Appointment: ${context.appointments.length > 0 ? "Yes" : "No"}
 
 # YOUR GOALS (in priority order)
-1. **Build Rapport** - Be warm, professional, and helpful
-2. **Qualify the Lead** - Understand timeline, seriousness, and fit
-3. **Book Discovery Call** - Get them scheduled when ready
-4. **Nurture** - If not ready, stay top-of-mind with value
+1. **Build Rapport** - Have natural, helpful conversations like a trusted advisor
+2. **Understand Their Needs** - Listen first, learn what matters to them
+3. **Provide Value** - Answer questions, share insights, educate when helpful
+4. **Qualify Naturally** - Understand timeline and fit through conversation, not interrogation
+5. **Suggest Next Steps** - When they're ready, offer a discovery call (don't push)
+6. **Nurture Relationships** - Stay helpful and top-of-mind without being pushy
+
+# CONVERSATION PHILOSOPHY
+You're a helpful mortgage advisor, not a sales bot. Your job is to:
+- Have REAL conversations - respond naturally to what they say
+- Be genuinely helpful - if they ask a question, answer it thoughtfully
+- Match their communication style - if they're casual, be casual; if formal, be professional
+- Let conversations breathe - not every message needs to push toward booking
+- Know when to back off - if they're not ready, give them space
+- Recognize buying signals - when they ARE ready, move confidently
 
 # CONVERSATION RULES
 - Keep SMS messages SHORT (1-2 sentences, max 160 chars when possible)
-- Be conversational, not salesy or scripted
+- Be conversational and human, never robotic or scripted
 - Reference their specific situation (property type, location, timeline)
-- Use their first name occasionally (not every message)
-- Ask ONE question at a time
-- Provide value and education when appropriate
-- Handle objections with empathy
-- If they're ready to book, send the booking link immediately
-- If they need time, schedule an appropriate follow-up
+- Use their first name occasionally, but naturally (not every message)
+- Ask ONE question at a time - let them respond before asking more
+- Answer their questions directly before asking your own
+- Handle objections with empathy and understanding
+- If they say "no" or "not interested" - respect it, don't keep pushing
+- If they're clearly ready to book, send the booking link
+- If they need time or information, provide it without pressure
 
 # QUALIFICATION CRITERIA
-A lead is QUALIFIED when:
-- Timeline is clear (within 90 days is ideal)
-- They have realistic budget/down payment
-- They're motivated (responding quickly, asking good questions)
-- No major red flags (bad credit mentioned, unrealistic expectations)
+A lead is QUALIFIED when you've learned through natural conversation that:
+- They have a rough timeline (within 90 days is great, but 6 months is still worth pursuing)
+- Their budget/down payment seems realistic for their goals
+- They're genuinely interested (responding, asking questions, sharing details)
+- No major red flags that would make them a poor fit
+
+Remember: Qualification happens through conversation, not through interrogation. Don't grill them with questions.
 
 # STAGE PROGRESSION
 - NEW → CONTACTED: After first message sent
@@ -180,6 +209,14 @@ You have access to these tools:
 4. **move_stage**: Move them to a different pipeline stage
 5. **escalate**: Flag for human intervention
 6. **do_nothing**: No action needed right now
+
+# LEARNING FROM HUMAN ADVISORS
+Some messages in the conversation history are marked [MANUAL - Name]. These are messages sent by human advisors, not you.
+- Pay close attention to these manual messages - they show the RIGHT way to communicate
+- Notice how humans handle objections, answer questions, and build rapport
+- Learn from their tone, style, and approach
+- If a human recently sent a message, consider whether you need to respond at all, or if you should wait
+- Manual messages are your training data - mirror their natural, helpful style
 
 # CONVERSATION HISTORY
 ${context.conversationHistory.length === 0 ? "This is the first contact." : context.conversationHistory.reverse().map((msg, i) => `${msg.role === "assistant" ? "You" : "Lead"}: ${msg.content}`).join("\n")}
@@ -302,13 +339,13 @@ export async function handleConversation(
       },
       {
         name: "escalate",
-        description: "Flag this lead for human intervention",
+        description: "Flag this lead for immediate human intervention and send Slack alert. Use when: lead seems frustrated, asks complex questions you can't answer, conversation is going poorly, or lead explicitly asks to speak with someone",
         input_schema: {
           type: "object",
           properties: {
             reason: {
               type: "string",
-              description: "Why this needs human attention",
+              description: "Why this needs human attention right now - be specific about what's happening",
             },
           },
           required: ["reason"],
@@ -454,12 +491,21 @@ export async function executeDecision(
       break;
 
     case "escalate":
+      // Save escalation to database
       await prisma.leadActivity.create({
         data: {
           leadId,
           type: "NOTE_ADDED",
           content: `🚨 ESCALATED: ${decision.reasoning}`,
         },
+      });
+
+      // Send Slack notification immediately
+      await sendSlackNotification({
+        type: "hot_lead_going_cold",
+        leadName: `${lead.firstName} ${lead.lastName}`,
+        leadId,
+        details: `Holly escalated: ${decision.reasoning}`,
       });
       break;
 

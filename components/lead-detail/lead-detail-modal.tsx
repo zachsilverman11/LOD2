@@ -22,6 +22,9 @@ export function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
   const [expandedEmails, setExpandedEmails] = useState<Set<string>>(new Set());
   const [showCallSummaryModal, setShowCallSummaryModal] = useState(false);
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
+  const [showManualSms, setShowManualSms] = useState(false);
+  const [manualSmsText, setManualSmsText] = useState("");
+  const [isSendingSms, setIsSendingSms] = useState(false);
 
   if (!lead) return null;
 
@@ -95,6 +98,36 @@ export function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
       window.location.reload(); // Simple refresh for now
     } catch (error) {
       console.error("Error toggling task:", error);
+    }
+  };
+
+  const handleSendManualSms = async () => {
+    if (!manualSmsText.trim()) return;
+
+    setIsSendingSms(true);
+    try {
+      const response = await fetch(`/api/leads/${lead.id}/manual-sms`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: manualSmsText,
+          sentBy: noteAuthor // Use same author selector as notes
+        }),
+      });
+
+      if (response.ok) {
+        setManualSmsText("");
+        setShowManualSms(false);
+        window.location.reload(); // Simple refresh for now
+      } else {
+        const error = await response.json();
+        alert(`Failed to send SMS: ${error.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error("Error sending manual SMS:", error);
+      alert("Error sending SMS");
+    } finally {
+      setIsSendingSms(false);
     }
   };
 
@@ -183,6 +216,67 @@ export function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
               </div>
             </div>
           )}
+
+          {/* Manual SMS - Human Intervention */}
+          <div className="mb-6">
+            <div className="flex justify-between items-center mb-2">
+              <h3 className="text-sm font-semibold text-[#625FFF]">💬 Manual Text Message</h3>
+              <button
+                onClick={() => setShowManualSms(!showManualSms)}
+                className="text-xs px-3 py-1 bg-[#625FFF] text-white rounded hover:bg-[#4E4BCC] transition-colors"
+              >
+                {showManualSms ? "Cancel" : "Send Manual SMS"}
+              </button>
+            </div>
+
+            {showManualSms && (
+              <div className="border border-[#625FFF]/30 rounded-lg p-4 bg-[#FBF3E7]/30">
+                <p className="text-xs text-[#55514D] mb-3 italic">
+                  Holly will see this message and learn from your communication style
+                </p>
+
+                <div className="mb-3">
+                  <label className="block text-xs font-medium text-[#55514D] mb-1">
+                    Your Name
+                  </label>
+                  <select
+                    value={noteAuthor}
+                    onChange={(e) => setNoteAuthor(e.target.value)}
+                    className="w-full px-3 py-2 border border-[#E4DDD3] rounded text-sm focus:outline-none focus:border-[#625FFF] text-[#1C1B1A]"
+                  >
+                    {TEAM_MEMBERS.map((member) => (
+                      <option key={member} value={member}>{member}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="mb-3">
+                  <label className="block text-xs font-medium text-[#55514D] mb-1">
+                    Message
+                  </label>
+                  <textarea
+                    value={manualSmsText}
+                    onChange={(e) => setManualSmsText(e.target.value)}
+                    rows={4}
+                    maxLength={1600}
+                    placeholder="Type your message to the customer..."
+                    className="w-full px-3 py-2 border border-[#E4DDD3] rounded text-sm focus:outline-none focus:border-[#625FFF] text-[#1C1B1A]"
+                  />
+                  <p className="text-xs text-[#55514D] mt-1">
+                    {manualSmsText.length}/1600 characters
+                  </p>
+                </div>
+
+                <button
+                  onClick={handleSendManualSms}
+                  disabled={isSendingSms || !manualSmsText.trim()}
+                  className="w-full px-4 py-2 bg-[#625FFF] text-white rounded hover:bg-[#4E4BCC] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                >
+                  {isSendingSms ? "Sending..." : "Send SMS Now"}
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* Contact Information */}
           <div className="mb-6">
@@ -484,29 +578,45 @@ export function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
                 {lead.communications
                   .filter((comm) => comm.channel === "SMS")
                   .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-                  .map((comm) => (
-                    <div
-                      key={comm.id}
-                      className={`flex ${comm.direction === "OUTBOUND" ? "justify-end" : "justify-start"}`}
-                    >
+                  .map((comm) => {
+                    const isManual = comm.metadata && typeof comm.metadata === 'object' && 'isManual' in comm.metadata && comm.metadata.isManual === true;
+                    const sentBy = comm.metadata && typeof comm.metadata === 'object' && 'sentBy' in comm.metadata ? String(comm.metadata.sentBy) : null;
+
+                    return (
                       <div
-                        className={`max-w-[75%] rounded-lg px-4 py-2 ${
-                          comm.direction === "OUTBOUND"
-                            ? "bg-[#625FFF] text-white"
-                            : "bg-white border border-[#E4DDD3]"
-                        }`}
+                        key={comm.id}
+                        className={`flex ${comm.direction === "OUTBOUND" ? "justify-end" : "justify-start"}`}
                       >
-                        <p className="text-sm">{comm.content}</p>
-                        <p
-                          className={`text-xs mt-1 ${
-                            comm.direction === "OUTBOUND" ? "text-[#B1AFFF]" : "text-[#55514D]"
+                        <div
+                          className={`max-w-[75%] rounded-lg px-4 py-2 ${
+                            comm.direction === "OUTBOUND"
+                              ? isManual
+                                ? "bg-[#D9F36E] text-[#1C1B1A]"
+                                : "bg-[#625FFF] text-white"
+                              : "bg-white border border-[#E4DDD3]"
                           }`}
                         >
-                          {format(new Date(comm.createdAt), "MMM d, h:mm a")}
-                        </p>
+                          {isManual && (
+                            <p className="text-xs font-semibold mb-1 opacity-75">
+                              👤 {sentBy || 'Manual'}
+                            </p>
+                          )}
+                          <p className="text-sm">{comm.content}</p>
+                          <p
+                            className={`text-xs mt-1 ${
+                              comm.direction === "OUTBOUND"
+                                ? isManual
+                                  ? "text-[#55514D]"
+                                  : "text-[#B1AFFF]"
+                                : "text-[#55514D]"
+                            }`}
+                          >
+                            {format(new Date(comm.createdAt), "MMM d, h:mm a")}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
               </div>
             </div>
           )}

@@ -1,5 +1,6 @@
 "use client";
 
+import { useDraggable } from "@dnd-kit/core";
 import { DevCardWithComments, PRIORITY_COLORS, TYPE_LABELS } from "@/types/dev-card";
 import { format } from "date-fns";
 
@@ -13,10 +14,25 @@ export function DevCard({ card, onClick }: DevCardProps) {
   const priorityColor = PRIORITY_COLORS[card.priority];
   const typeLabel = TYPE_LABELS[card.type];
 
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: card.id,
+  });
+
+  const style = transform
+    ? {
+        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+        opacity: isDragging ? 0.5 : 1,
+      }
+    : undefined;
+
   return (
     <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
       onClick={onClick}
-      className="bg-white p-4 rounded-lg shadow-sm border border-[#E4DDD3] cursor-pointer hover:shadow-lg hover:border-[#625FFF] transition-all duration-200 hover:-translate-y-0.5"
+      className="bg-white p-4 rounded-lg shadow-sm border border-[#E4DDD3] cursor-grab active:cursor-grabbing hover:shadow-lg hover:border-[#625FFF] transition-all duration-200 hover:-translate-y-0.5"
     >
       <div className="flex items-start justify-between mb-2">
         <div className="flex-1">
