@@ -242,10 +242,10 @@ async function handleBookingCancelled(payload: any) {
     data: { status: "cancelled" },
   });
 
-  // Update lead status back to qualified
+  // Update lead status back to NURTURING (they need to be re-engaged)
   await prisma.lead.update({
     where: { id: appointment.leadId },
-    data: { status: LeadStatus.QUALIFIED },
+    data: { status: LeadStatus.NURTURING },
   });
 
   // Log activity
@@ -259,6 +259,21 @@ async function handleBookingCancelled(payload: any) {
     },
   });
 
-  // Don't send Holly message for cancellations - advisor will handle re-booking
-  console.log(`[Cal.com] Appointment cancelled - advisor will follow up to reschedule`);
+  // Send Slack notification about cancellation
+  await sendSlackNotification({
+    type: "lead_rotting",
+    leadName: `${appointment.lead.firstName} ${appointment.lead.lastName}`,
+    leadId: appointment.leadId,
+    details: `Appointment cancelled. Holly will reach out to re-engage.`,
+  });
+
+  // Have Holly reach out to re-engage and try to rebook
+  try {
+    const decision = await handleConversation(appointment.leadId);
+    await executeDecision(appointment.leadId, decision);
+    console.log(`[Cal.com] Holly reaching out to re-engage after cancellation`);
+  } catch (error) {
+    console.error("Failed to send re-engagement message via Holly:", error);
+    // Still notify in Slack even if Holly message fails
+  }
 }
