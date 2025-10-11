@@ -851,12 +851,19 @@ async function processPostCallConfirmations() {
   const oneHourAgo = new Date(now.getTime() - 3600000);
 
   // Find leads with scheduled appointments that have passed
+  // Use scheduledFor if available (from Cal.com), otherwise fall back to scheduledAt
   const appointments = await prisma.appointment.findMany({
     where: {
       status: "scheduled",
-      scheduledAt: {
-        lte: oneHourAgo, // Call was scheduled for at least 1 hour ago
-      },
+      OR: [
+        { scheduledFor: { lte: oneHourAgo } },
+        {
+          AND: [
+            { scheduledFor: null },
+            { scheduledAt: { lte: oneHourAgo } }
+          ]
+        }
+      ]
     },
     include: {
       lead: true,
@@ -866,11 +873,12 @@ async function processPostCallConfirmations() {
   for (const appointment of appointments) {
     try {
       // Send Slack alert to confirm if call happened
+      const appointmentTime = appointment.scheduledFor || appointment.scheduledAt;
       await sendSlackNotification({
         type: "call_missed",
         leadName: `${appointment.lead.firstName} ${appointment.lead.lastName}`,
         leadId: appointment.lead.id,
-        details: `Call was scheduled for ${appointment.scheduledAt.toLocaleString()}. Did it happen? You have 1 hour to mark as no-show if needed.`,
+        details: `Call was scheduled for ${appointmentTime.toLocaleString()}. Did it happen? **IMPORTANT: Click "Capture Call Outcome" in dashboard!** You have 1 hour to mark as no-show if needed.`,
       });
 
       // Mark appointment as completed
