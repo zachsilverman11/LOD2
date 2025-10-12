@@ -76,7 +76,7 @@ export async function POST(
           data: { status: "CALL_COMPLETED" },
         });
 
-        // 🚀 SEND FINMO LINK IMMEDIATELY (within 5 minutes)
+        // 🚀 SEND FINMO LINK IMMEDIATELY (within 5 minutes) via SMS + EMAIL
         try {
           console.log(`[Call Outcome] Triggering immediate Finmo link for lead ${leadId}`);
 
@@ -88,9 +88,13 @@ The message should:
 - Acknowledge the call just happened with ${advisorName}
 - Say you're excited to get their application started
 - Include the Finmo link: ${process.env.FINMO_APPLICATION_URL || "https://apply.finmo.ca/inspired-mortgage"}
-- Be SHORT and action-oriented (under 160 chars)
+- Be SHORT and action-oriented (under 160 chars for SMS)
 
-Use the send_sms tool.`;
+🚨 CRITICAL: Use the send_both tool to send via SMS + Email for maximum delivery!
+
+SMS: Keep it brief and action-oriented (under 160 chars)
+Email Subject: Something like "Ready to Apply - Your Finmo Link Inside"
+Email Body: More detailed with HTML formatting, include the link prominently`;
 
           // Generate AI message with Finmo link
           const decision = await handleConversation(leadId, undefined, finmoContext);
@@ -111,7 +115,7 @@ Use the send_sms tool.`;
         // Keep current status, Holly will send Cal.com link immediately
         actionTaken = "Holly sending Cal.com booking link now...";
 
-        // 📅 SEND CAL.COM LINK IMMEDIATELY
+        // 📅 SEND CAL.COM LINK IMMEDIATELY via SMS + EMAIL
         try {
           console.log(`[Call Outcome] Triggering immediate Cal.com link for lead ${leadId}`);
 
@@ -123,9 +127,13 @@ The message should:
 - Acknowledge the conversation with ${advisorName}
 - Include the Cal.com booking link: ${process.env.CAL_COM_BOOKING_URL || "https://cal.com/inspired-mortgage"}
 - Make it easy for them to pick a time
-- Be SHORT and action-oriented (under 160 chars)
+- Be SHORT and action-oriented (under 160 chars for SMS)
 
-Use the send_booking_link tool.`;
+🚨 CRITICAL: Use the send_both tool to send via SMS + Email for maximum delivery!
+
+SMS: Keep it brief (under 160 chars)
+Email Subject: Something like "Book Your Discovery Call - Link Inside"
+Email Body: More detailed with HTML formatting, include the link prominently`;
 
           // Generate AI message with Cal.com link
           const decision = await handleConversation(leadId, undefined, calContext);
