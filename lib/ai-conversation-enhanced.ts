@@ -402,7 +402,7 @@ This lead has SUBMITTED their mortgage application!
 **Example message:**
 "Congrats on submitting your application, ${data.name?.split(' ')[0] || 'there'}! That's a huge step!
 
-Greg/Jakub will review everything and be in touch within 24-48 hours. In the meantime, if you have any questions at all, I'm here to help!
+Our team will review everything and be in touch within 24-48 hours. In the meantime, if you have any questions at all, I'm here to help!
 
 Exciting times ahead!"
 
