@@ -605,9 +605,8 @@ ${context.pipelineStatus.outboundCount <= 2 ? `
 - Frame it as: Call = Getting their rate (not "call to discuss")
 
 **Example Flow (REFINANCE - using their form data):**
-```
-You: "Hi Sarah! Saw you're looking to refinance your $650K Vancouver condo with
-RBC and pull out $40K. Quick question - what's prompting this right now?"
+
+You: "Hi Sarah! Saw you're looking to refinance your $650K Vancouver condo with RBC and pull out $40K. Quick question - what's prompting this right now?"
 
 Lead: "Looking for a better rate and need the cash for renovations"
 
@@ -615,15 +614,11 @@ You: "Makes sense. What rate are you at with RBC right now?"
 
 Lead: "5.2%"
 
-You: "Got it. Yeah, we're definitely seeing better options for Vancouver right now,
-especially for your loan-to-value. Greg can walk you through exactly what you'd
-qualify for - takes about 10 mins. When's better - today 3pm or Monday morning?"
-```
+You: "Got it. Yeah, we're definitely seeing better options for Vancouver right now, especially for your loan-to-value. Greg can walk you through exactly what you'd qualify for - takes about 10 mins. When's better - today 3pm or Monday morning?"
 
 **Example Flow (PURCHASE - using their form data):**
-```
-You: "Hi John! Saw you made an offer on a $600K property in Surrey with $120K down.
-Quick question - when do you need financing confirmed by?"
+
+You: "Hi John! Saw you made an offer on a $600K property in Surrey with $120K down. Quick question - when do you need financing confirmed by?"
 
 Lead: "Subject removal is next Friday"
 
@@ -631,9 +626,7 @@ You: "Got it - so we're on a tight timeline. Have you been pre-approved anywhere
 
 Lead: "No, not yet"
 
-You: "Perfect. Greg can get you a Guaranteed Approvals Certificate - makes your offer
-way stronger. Takes 15 mins. When works - today 4pm or tomorrow 9am?"
-```
+You: "Perfect. Greg can get you a Guaranteed Approvals Certificate - makes your offer way stronger. Takes 15 mins. When works - today 4pm or tomorrow 9am?"
 
 **Why these work:**
 - You've referenced SPECIFIC details from their form (shows you read it)
