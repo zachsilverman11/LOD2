@@ -114,7 +114,72 @@ export default function DevBoardPage() {
                   <label className="block text-sm font-medium text-[#55514D] mb-1">
                     Screenshot (optional)
                   </label>
+
+                  {/* Drag & Drop Zone */}
+                  <div
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const file = e.dataTransfer.files[0];
+                      if (file && file.type.startsWith('image/')) {
+                        if (file.size > 5 * 1024 * 1024) {
+                          alert('File too large. Max size is 5MB.');
+                          return;
+                        }
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          setFormData({ ...formData, screenshotUrl: reader.result as string });
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                    onDragOver={(e) => e.preventDefault()}
+                    onPaste={(e) => {
+                      const items = e.clipboardData.items;
+                      for (let i = 0; i < items.length; i++) {
+                        if (items[i].type.startsWith('image/')) {
+                          const file = items[i].getAsFile();
+                          if (file) {
+                            if (file.size > 5 * 1024 * 1024) {
+                              alert('File too large. Max size is 5MB.');
+                              return;
+                            }
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                              setFormData({ ...formData, screenshotUrl: reader.result as string });
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                          e.preventDefault();
+                          break;
+                        }
+                      }
+                    }}
+                    className="border-2 border-dashed border-[#E4DDD3] rounded-md p-4 text-center bg-[#FBF3E7]/50 hover:border-[#625FFF] transition-colors cursor-pointer"
+                    onClick={() => document.getElementById('screenshot-input')?.click()}
+                    tabIndex={0}
+                  >
+                    {formData.screenshotUrl ? (
+                      <div className="space-y-2">
+                        <img
+                          src={formData.screenshotUrl}
+                          alt="Screenshot preview"
+                          className="max-h-32 mx-auto rounded"
+                        />
+                        <p className="text-xs text-[#55514D]">✓ Screenshot attached (click to change)</p>
+                      </div>
+                    ) : (
+                      <div className="py-4">
+                        <p className="text-sm text-[#55514D]">
+                          📸 Drag & drop screenshot here, paste (Cmd+V), or click to upload
+                        </p>
+                        <p className="text-xs text-[#999] mt-1">Max 5MB</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Hidden file input */}
                   <input
+                    id="screenshot-input"
                     type="file"
                     accept="image/*"
                     onChange={(e) => {
@@ -132,11 +197,8 @@ export default function DevBoardPage() {
                         reader.readAsDataURL(file);
                       }
                     }}
-                    className="w-full px-3 py-2 border border-[#E4DDD3] rounded-md focus:outline-none focus:border-[#625FFF] text-[#1C1B1A]"
+                    className="hidden"
                   />
-                  {formData.screenshotUrl && (
-                    <p className="text-xs text-[#55514D] mt-1">✓ Screenshot attached</p>
-                  )}
                 </div>
 
                 <div className="grid grid-cols-3 gap-4">
