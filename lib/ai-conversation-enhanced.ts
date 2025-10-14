@@ -1446,22 +1446,8 @@ export async function executeDecision(
         try {
           const bookingUrl = process.env.CAL_COM_BOOKING_URL || "https://cal.com/your-link";
 
-          // Pre-fill phone number and email if available
-          const urlParams = new URLSearchParams();
-          if (lead.phone) {
-            // Format phone as E.164 with +1 country code if not already present
-            const formattedPhone = lead.phone.startsWith('+') ? lead.phone : `+1${lead.phone.replace(/\D/g, '')}`;
-            urlParams.set('phone', formattedPhone);
-          }
-          if (lead.email) {
-            urlParams.set('email', lead.email);
-          }
-          if (lead.name) {
-            urlParams.set('name', lead.name);
-          }
-
-          const bookingUrlWithParams = `${bookingUrl}${urlParams.toString() ? '?' + urlParams.toString() : ''}`;
-          const messageWithLink = `${decision.message}\n\n${bookingUrlWithParams}`;
+          // Send clean link without pre-filled parameters for better aesthetics
+          const messageWithLink = `${decision.message}\n\n${bookingUrl}`;
 
           await sendSms({
             to: lead.phone,
