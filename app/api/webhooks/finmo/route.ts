@@ -56,6 +56,14 @@ export async function POST(request: NextRequest) {
     const signature = request.headers.get("x-finmo-signature");
     const rawBody = await request.text();
 
+    // 🔍 LOG: Full payload for debugging
+    console.log("[Finmo Webhook] ========== INCOMING WEBHOOK ==========");
+    console.log("[Finmo Webhook] Headers:", {
+      signature,
+      contentType: request.headers.get("content-type"),
+    });
+    console.log("[Finmo Webhook] Raw Body:", rawBody);
+
     // Verify webhook signature (security measure)
     if (signature && !verifyFinmoSignature(rawBody, signature)) {
       console.error("[Finmo Webhook] Invalid signature");
@@ -65,10 +73,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const payload: FinmoWebhookPayload = JSON.parse(rawBody);
-    const { event, application } = payload;
+    const payload: any = JSON.parse(rawBody);
+    console.log("[Finmo Webhook] Parsed Payload:", JSON.stringify(payload, null, 2));
 
-    console.log(`[Finmo Webhook] Received ${event} for ${application.email}`);
+    const rawEvent = payload.event;
+    const application = payload.application;
+
+    if (!application?.email) {
+      console.error("[Finmo Webhook] No email in application data");
+      await sendSlackNotification({
+        type: "error",
+        message: "Finmo Webhook: No Email",
+        details: `Payload: ${JSON.stringify(payload)}`,
+      });
+      return NextResponse.json(
+        { error: "No email in application" },
+        { status: 400 }
+      );
+    }
+
+    // Normalize event name to handle different formats
+    // Finmo might send: "Application started", "application.started", or "application_started"
+    const normalizedEvent = rawEvent.toLowerCase().replace(/[\s_]/g, ".");
+
+    console.log(`[Finmo Webhook] Event: ${rawEvent} → Normalized: ${normalizedEvent}`);
+    console.log(`[Finmo Webhook] Email: ${application.email}`);
 
     // Find lead by email
     const lead = await prisma.lead.findUnique({
@@ -77,19 +106,36 @@ export async function POST(request: NextRequest) {
 
     if (!lead) {
       console.error(`[Finmo Webhook] Lead not found for email: ${application.email}`);
+      await sendSlackNotification({
+        type: "error",
+        message: "Finmo Webhook: Lead Not Found",
+        details: `Email: ${application.email}\nEvent: ${rawEvent}\nSearched in database but no match found.`,
+      });
       return NextResponse.json(
         { error: "Lead not found" },
         { status: 404 }
       );
     }
 
-    // Handle different event types
-    if (event === "application.started") {
+    console.log(`[Finmo Webhook] Found lead: ${lead.firstName} ${lead.lastName} (ID: ${lead.id})`);
+
+    // Handle different event types with flexible matching
+    if (normalizedEvent.includes("application.started") || normalizedEvent === "application.started") {
+      console.log("[Finmo Webhook] Handling APPLICATION STARTED event");
       await handleApplicationStarted(lead.id, application);
-    } else if (event === "application.completed") {
+    } else if (normalizedEvent.includes("application.submitted") || normalizedEvent.includes("application.completed")) {
+      console.log("[Finmo Webhook] Handling APPLICATION COMPLETED event");
       await handleApplicationCompleted(lead.id, application);
+    } else {
+      console.warn(`[Finmo Webhook] Unknown event type: ${rawEvent} (normalized: ${normalizedEvent})`);
+      await sendSlackNotification({
+        type: "error",
+        message: "Finmo Webhook: Unknown Event",
+        details: `Event: ${rawEvent}\nNormalized: ${normalizedEvent}\nLead: ${lead.firstName} ${lead.lastName}`,
+      });
     }
 
+    console.log("[Finmo Webhook] ========== WEBHOOK PROCESSED SUCCESSFULLY ==========");
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("[Finmo Webhook] Error:", error);
