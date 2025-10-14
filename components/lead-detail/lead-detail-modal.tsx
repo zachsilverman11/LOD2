@@ -223,11 +223,23 @@ export function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
               <h3 className="text-sm font-semibold text-[#625FFF]">💬 Manual Text Message</h3>
               <button
                 onClick={() => setShowManualSms(!showManualSms)}
-                className="text-xs px-3 py-1 bg-[#625FFF] text-white rounded hover:bg-[#4E4BCC] transition-colors"
+                disabled={!lead.consentSms}
+                className={`text-xs px-3 py-1 rounded transition-colors ${
+                  lead.consentSms
+                    ? 'bg-[#625FFF] text-white hover:bg-[#4E4BCC]'
+                    : 'bg-[#E4DDD3] text-[#55514D] cursor-not-allowed'
+                }`}
+                title={!lead.consentSms ? "Lead has opted out of SMS" : ""}
               >
                 {showManualSms ? "Cancel" : "Send Manual SMS"}
               </button>
             </div>
+
+            {!lead.consentSms && (
+              <p className="text-xs text-[#B34040] italic mb-2">
+                ⚠️ This lead has opted out of SMS communication
+              </p>
+            )}
 
             {showManualSms && (
               <div className="border border-[#625FFF]/30 rounded-lg p-4 bg-[#FBF3E7]/30">
