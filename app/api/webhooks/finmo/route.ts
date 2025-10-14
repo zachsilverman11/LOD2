@@ -90,16 +90,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const rawEvent = payload.event || payload.type || "unknown";
-    const application = payload.application || payload.data || payload.deal || payload;
+    const rawEvent = payload.event || payload.type || "Application submitted by borrower";
 
-    // Try to find email in various possible locations
-    const email = application?.email ||
-                  payload.email ||
-                  application?.borrower?.email ||
-                  application?.user?.email ||
-                  application?.contact?.email ||
-                  payload.deal?.email;
+    // Finmo sends different structure than expected
+    // Email is at mainBorrower.email or borrowersArray[0].email
+    const email = payload.mainBorrower?.email ||
+                  payload.borrowersArray?.[0]?.email ||
+                  payload.borrowers?.["1"]?.email ||
+                  payload.application?.email ||
+                  payload.email;
 
     // FOR TESTING: Accept webhooks without email and just log them
     if (!email) {
@@ -121,11 +120,7 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Finmo Webhook] Found email: ${email}`);
 
-    // Normalize event name to handle different formats
-    // Finmo might send: "Application started", "application.started", or "application_started"
-    const normalizedEvent = rawEvent.toLowerCase().replace(/[\s_]/g, ".");
-
-    console.log(`[Finmo Webhook] Event: ${rawEvent} → Normalized: ${normalizedEvent}`);
+    console.log(`[Finmo Webhook] Event: ${rawEvent}`);
     console.log(`[Finmo Webhook] Email: ${email}`);
 
     // Find lead by email
@@ -148,19 +143,22 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Finmo Webhook] Found lead: ${lead.firstName} ${lead.lastName} (ID: ${lead.id})`);
 
-    // Handle different event types with flexible matching
-    if (normalizedEvent.includes("application.started") || normalizedEvent === "application.started") {
+    // Map Finmo events to our handling functions
+    // Finmo uses descriptive event names like "Application started", "Application submitted by borrower"
+    const eventLower = rawEvent.toLowerCase();
+
+    if (eventLower.includes("started")) {
       console.log("[Finmo Webhook] Handling APPLICATION STARTED event");
-      await handleApplicationStarted(lead.id, application);
-    } else if (normalizedEvent.includes("application.submitted") || normalizedEvent.includes("application.completed")) {
+      await handleApplicationStarted(lead.id, payload);
+    } else if (eventLower.includes("submitted") || eventLower.includes("completed")) {
       console.log("[Finmo Webhook] Handling APPLICATION COMPLETED event");
-      await handleApplicationCompleted(lead.id, application);
+      await handleApplicationCompleted(lead.id, payload);
     } else {
-      console.warn(`[Finmo Webhook] Unknown event type: ${rawEvent} (normalized: ${normalizedEvent})`);
+      console.warn(`[Finmo Webhook] Unknown event type: ${rawEvent}`);
       await sendSlackNotification({
         type: "error",
         message: "Finmo Webhook: Unknown Event",
-        details: `Event: ${rawEvent}\nNormalized: ${normalizedEvent}\nLead: ${lead.firstName} ${lead.lastName}`,
+        details: `Event: ${rawEvent}\nLead: ${lead.firstName} ${lead.lastName}\nEmail: ${email}`,
       });
     }
 
@@ -183,13 +181,13 @@ export async function POST(request: NextRequest) {
 /**
  * Handle application.started event
  */
-async function handleApplicationStarted(leadId: string, application: any) {
+async function handleApplicationStarted(leadId: string, payload: any) {
   try {
     // Update lead with application started timestamp and status
     await prisma.lead.update({
       where: { id: leadId },
       data: {
-        applicationStartedAt: new Date(application.createdAt),
+        applicationStartedAt: new Date(),
         status: LeadStatus.APPLICATION_STARTED,
         updatedAt: new Date(),
       },
@@ -204,7 +202,8 @@ async function handleApplicationStarted(leadId: string, application: any) {
         subject: "Application Started",
         content: "Lead started mortgage application via Finmo",
         metadata: {
-          finmoApplicationId: application.id,
+          finmoDealId: payload.finmoDealId || payload.dealId,
+          finmoId: payload.id,
           event: "application.started",
         },
       },
@@ -243,13 +242,13 @@ async function handleApplicationStarted(leadId: string, application: any) {
 /**
  * Handle application.completed event
  */
-async function handleApplicationCompleted(leadId: string, application: any) {
+async function handleApplicationCompleted(leadId: string, payload: any) {
   try {
     // Update lead with application completed timestamp and CONVERTED status
     await prisma.lead.update({
       where: { id: leadId },
       data: {
-        applicationCompletedAt: new Date(application.updatedAt),
+        applicationCompletedAt: new Date(),
         status: LeadStatus.CONVERTED,
         convertedAt: new Date(),
         updatedAt: new Date(),
@@ -265,7 +264,8 @@ async function handleApplicationCompleted(leadId: string, application: any) {
         subject: "Application Completed",
         content: "Lead completed and submitted mortgage application via Finmo",
         metadata: {
-          finmoApplicationId: application.id,
+          finmoDealId: payload.finmoDealId || payload.dealId,
+          finmoId: payload.id,
           event: "application.completed",
         },
       },
