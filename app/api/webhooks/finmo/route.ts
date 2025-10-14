@@ -73,18 +73,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const payload: any = JSON.parse(rawBody);
-    console.log("[Finmo Webhook] Parsed Payload:", JSON.stringify(payload, null, 2));
-
-    const rawEvent = payload.event;
-    const application = payload.application;
-
-    if (!application?.email) {
-      console.error("[Finmo Webhook] No email in application data");
+    let payload: any;
+    try {
+      payload = JSON.parse(rawBody);
+      console.log("[Finmo Webhook] Parsed Payload:", JSON.stringify(payload, null, 2));
+    } catch (parseError) {
+      console.error("[Finmo Webhook] JSON Parse Error:", parseError);
       await sendSlackNotification({
         type: "error",
-        message: "Finmo Webhook: No Email",
-        details: `Payload: ${JSON.stringify(payload)}`,
+        message: "Finmo Webhook: JSON Parse Error",
+        details: `Raw Body: ${rawBody}\nError: ${parseError}`,
+      });
+      return NextResponse.json(
+        { error: "Invalid JSON" },
+        { status: 400 }
+      );
+    }
+
+    const rawEvent = payload.event;
+    const application = payload.application || payload.data || payload;
+
+    // Try to find email in various possible locations
+    const email = application?.email || payload.email || application?.borrower?.email;
+
+    if (!email) {
+      console.error("[Finmo Webhook] No email found in payload");
+      await sendSlackNotification({
+        type: "error",
+        message: "Finmo Webhook: No Email Found",
+        details: `Full Payload: ${JSON.stringify(payload, null, 2)}`,
       });
       return NextResponse.json(
         { error: "No email in application" },
@@ -92,24 +109,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    console.log(`[Finmo Webhook] Found email: ${email}`);
+
     // Normalize event name to handle different formats
     // Finmo might send: "Application started", "application.started", or "application_started"
     const normalizedEvent = rawEvent.toLowerCase().replace(/[\s_]/g, ".");
 
     console.log(`[Finmo Webhook] Event: ${rawEvent} → Normalized: ${normalizedEvent}`);
-    console.log(`[Finmo Webhook] Email: ${application.email}`);
+    console.log(`[Finmo Webhook] Email: ${email}`);
 
     // Find lead by email
     const lead = await prisma.lead.findUnique({
-      where: { email: application.email.toLowerCase() },
+      where: { email: email.toLowerCase() },
     });
 
     if (!lead) {
-      console.error(`[Finmo Webhook] Lead not found for email: ${application.email}`);
+      console.error(`[Finmo Webhook] Lead not found for email: ${email}`);
       await sendSlackNotification({
         type: "error",
         message: "Finmo Webhook: Lead Not Found",
-        details: `Email: ${application.email}\nEvent: ${rawEvent}\nSearched in database but no match found.`,
+        details: `Email: ${email}\nEvent: ${rawEvent}\nSearched in database but no match found.`,
       });
       return NextResponse.json(
         { error: "Lead not found" },
