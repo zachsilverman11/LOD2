@@ -5,6 +5,111 @@ import { format } from "date-fns";
 import { useState } from "react";
 import CallSummaryModal from "./call-summary-modal";
 
+// Helper function to format source names
+const formatSource = (source: string): string => {
+  if (!source) return "Unknown";
+
+  // Handle common sources
+  const sourceMap: Record<string, string> = {
+    "leads_on_demand": "Leads On Demand",
+    "facebook": "Facebook",
+    "google": "Google Ads",
+    "referral": "Referral",
+    "organic": "Organic Search",
+    "direct": "Direct",
+  };
+
+  return sourceMap[source.toLowerCase()] || source
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};
+
+// Helper function to format field names
+const formatFieldName = (key: string): string => {
+  // Special field name mappings
+  const fieldMap: Record<string, string> = {
+    "lead_type": "Loan Type",
+    "prop_type": "Property Type",
+    "home_value": "Home Value",
+    "down_payment": "Down Payment",
+    "ad_source": "Ad Source",
+    "capture_time": "Submitted",
+    "motivation_level": "Timeline",
+    "first_name": "First Name",
+    "last_name": "Last Name",
+    "rent_check": "Has Rent Income",
+    "loanAmount": "Loan Amount",
+    "purchasePrice": "Purchase Price",
+    "downPayment": "Down Payment",
+    "creditScore": "Credit Score",
+    "propertyType": "Property Type",
+    "loanType": "Loan Type",
+    "employmentStatus": "Employment Status",
+  };
+
+  // Check if we have a custom mapping
+  const lowerKey = key.toLowerCase();
+  if (fieldMap[lowerKey]) return fieldMap[lowerKey];
+
+  // Otherwise, format the key
+  return key
+    .replace(/_/g, ' ') // Replace underscores with spaces
+    .replace(/([A-Z])/g, ' $1') // Add space before capital letters
+    .trim()
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+};
+
+// Helper function to format field values
+const formatFieldValue = (key: string, value: any): string => {
+  if (value === null || value === undefined) return "—";
+
+  const lowerKey = key.toLowerCase();
+
+  // Currency fields
+  if (lowerKey.includes('value') || lowerKey.includes('amount') || lowerKey.includes('payment') || lowerKey.includes('price')) {
+    const num = parseFloat(String(value).replace(/[^0-9.-]/g, ''));
+    if (!isNaN(num)) {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        maximumFractionDigits: 0,
+      }).format(num);
+    }
+  }
+
+  // Date/time fields
+  if (lowerKey.includes('time') || lowerKey.includes('date')) {
+    try {
+      const date = new Date(value);
+      if (!isNaN(date.getTime())) {
+        return format(date, "MMM d, yyyy 'at' h:mm a");
+      }
+    } catch (e) {
+      // Not a valid date, continue
+    }
+  }
+
+  // Boolean fields
+  if (typeof value === 'boolean') {
+    return value ? 'Yes' : 'No';
+  }
+
+  // Handle "Yes"/"No" strings for rent_check
+  if (lowerKey.includes('rent') && (value === 'Yes' || value === 'No')) {
+    return value;
+  }
+
+  // Object/Array
+  if (typeof value === 'object') {
+    return JSON.stringify(value);
+  }
+
+  return String(value);
+};
+
 interface LeadDetailModalProps {
   lead: LeadWithRelations | null;
   onClose: () => void;
@@ -297,7 +402,7 @@ export function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
               <p><strong className="text-[#1C1B1A]">Email:</strong> {lead.email}</p>
               {lead.phone && <p><strong className="text-[#1C1B1A]">Phone:</strong> {lead.phone}</p>}
               <p><strong className="text-[#1C1B1A]">Status:</strong> <span className="px-2 py-1 bg-[#625FFF]/10 text-[#625FFF] rounded border border-[#625FFF]/30">{lead.status}</span></p>
-              {lead.source && <p><strong className="text-[#1C1B1A]">Source:</strong> {lead.source}</p>}
+              {lead.source && <p><strong className="text-[#1C1B1A]">Source:</strong> {formatSource(lead.source)}</p>}
             </div>
           </div>
 
@@ -349,14 +454,14 @@ export function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
               <div className="bg-[#FBF3E7]/50 border border-[#E4DDD3] rounded-lg p-4">
                 <div className="grid grid-cols-2 gap-4">
                   {Object.entries(lead.rawData as Record<string, any>)
-                    .filter(([key]) => !['name', 'email', 'phone', 'consent'].includes(key))
+                    .filter(([key]) => !['name', 'email', 'phone', 'consent', 'lastCallOutcome', 'callOutcome'].includes(key))
                     .map(([key, value]) => (
                       <div key={key} className="text-sm">
-                        <span className="font-medium text-[#1C1B1A] capitalize">
-                          {key.replace(/([A-Z])/g, ' $1').trim()}:
+                        <span className="font-medium text-[#1C1B1A]">
+                          {formatFieldName(key)}:
                         </span>
                         <span className="text-[#55514D] ml-2">
-                          {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                          {formatFieldValue(key, value)}
                         </span>
                       </div>
                     ))}
