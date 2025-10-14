@@ -46,6 +46,26 @@ export async function POST(
       },
     });
 
+    // Save call outcome to lead.rawData so Holly has full context
+    const currentRawData = (lead.rawData as any) || {};
+    await prisma.lead.update({
+      where: { id: leadId },
+      data: {
+        rawData: {
+          ...currentRawData,
+          lastCallOutcome: {
+            id: callOutcome.id,
+            advisorName,
+            reached,
+            outcome,
+            notes,
+            leadQuality,
+            timestamp: new Date().toISOString(),
+          },
+        },
+      },
+    });
+
     // Log activity
     await prisma.leadActivity.create({
       data: {
@@ -151,8 +171,14 @@ Email Body: More detailed with HTML formatting, include the link prominently`;
         break;
 
       case "FOLLOW_UP_SOON":
-        // Keep current status, Holly will pause for 48h then resume
-        actionTaken = "Holly will pause automation for 48h, then resume nurturing.";
+        // Move to NURTURING - they need time to think
+        newStatus = "NURTURING";
+        actionTaken = "Moved to NURTURING. Holly will pause automation for 48h, then resume nurturing.";
+
+        await prisma.lead.update({
+          where: { id: leadId },
+          data: { status: "NURTURING" },
+        });
         break;
 
       case "NOT_INTERESTED":
@@ -167,13 +193,32 @@ Email Body: More detailed with HTML formatting, include the link prominently`;
         break;
 
       case "WRONG_NUMBER":
-        // Flag for review
-        actionTaken = "Flagged for contact info review. Holly will pause SMS.";
+        // Flag for review, move to LOST
+        newStatus = "LOST";
+        actionTaken = "Flagged for contact info review. Moved to LOST.";
+
+        await prisma.lead.update({
+          where: { id: leadId },
+          data: { status: "LOST" },
+        });
         break;
 
       case "NO_ANSWER":
-        // Continue normal automation
+        // Keep in current status, continue normal automation
         actionTaken = "Holly will continue normal nurturing schedule.";
+        break;
+
+      default:
+        // For any other outcome (or successful calls without specific outcome), move to CALL_COMPLETED
+        if (reached) {
+          newStatus = "CALL_COMPLETED";
+          actionTaken = "Moved to CALL_COMPLETED. Holly will follow up based on call notes.";
+
+          await prisma.lead.update({
+            where: { id: leadId },
+            data: { status: "CALL_COMPLETED" },
+          });
+        }
         break;
     }
 

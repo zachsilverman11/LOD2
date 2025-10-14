@@ -270,116 +270,28 @@ Messages Received (Them): ${context.pipelineStatus.inboundCount}
 Total Conversation: ${context.pipelineStatus.totalMessages} messages
 Has Appointment: ${context.appointments.length > 0 ? "Yes" : "No"}
 
-${data.callOutcome ? `
+${data.lastCallOutcome ? `
 # 📞 POST-CALL CONTEXT (CRITICAL - READ CAREFULLY)
 
 ⚠️ **DISCOVERY CALL COMPLETED** ⚠️
 
 This lead just completed a discovery call with one of our advisors. Here's what happened:
 
-**Call Outcome:** ${data.callOutcome.outcome.toUpperCase().replace("_", " ")}
-**Timeline:** ${data.callOutcome.timeline || "Not specified"}
-**Next Step:** ${data.callOutcome.nextStep?.replace("_", " ") || "Not specified"}
-${data.callOutcome.programsDiscussed ? `**Programs Discussed:** ${data.callOutcome.programsDiscussed.join(", ")}` : ""}
-${data.callOutcome.preferredProgram ? `**Lead's Preferred Program:** ${data.callOutcome.preferredProgram}` : ""}
-${data.callOutcome.notes ? `**Advisor Notes:** ${data.callOutcome.notes}` : ""}
+**Advisor:** ${data.lastCallOutcome.advisorName}
+**Call Reached:** ${data.lastCallOutcome.reached ? "Yes" : "No (voicemail/no answer)"}
+**Call Outcome:** ${data.lastCallOutcome.outcome.replace(/_/g, " ")}
+**Lead Quality:** ${data.lastCallOutcome.leadQuality || "Not assessed"}
+**Call Time:** ${data.lastCallOutcome.timestamp ? new Date(data.lastCallOutcome.timestamp).toLocaleString() : "Recently"}
+${data.lastCallOutcome.notes ? `**Advisor Notes:** ${data.lastCallOutcome.notes}` : ""}
 
-🎯 **YOUR POST-CALL OBJECTIVE BASED ON OUTCOME:**
+🚨 **IMPORTANT:** Use these notes to personalize your next message and understand what the lead needs!
 
-${data.callOutcome.outcome === "hot_lead" ? `
-✅ **HOT LEAD - SEND APPLICATION**
+🎯 **HOW TO FOLLOW UP:**
+${data.lastCallOutcome.notes ?
+`Use the advisor's notes above to personalize your follow-up. Reference specific things discussed to show you're paying attention.` :
+`Ask the lead how the call went and if they have any questions.`}
 
-This lead is ready to move forward! Your job:
-1. Express excitement about their call with the advisor
-2. Reference what was discussed (use programs/notes above for context)
-3. Send them the application link: ${process.env.APPLICATION_URL}
-4. Make it easy and quick - "Should take about 10 minutes"
-5. Offer to help with any questions
-6. Follow up if they don't start the application within 24-48h
-
-**Example message:**
-"Hey [Name]! So glad you and [Advisor] had a great call! Based on what you discussed about [reference specific program/situation], here's your application link to get started: ${process.env.APPLICATION_URL}
-
-Should take about 10 minutes. I'll check in tomorrow to see if you have any questions!"
-
-**Follow-up strategy:**
-- 24h: "Did you get a chance to start the application? Any questions?"
-- 48h: "Quick check-in - want to make sure you have everything you need"
-- 72h: Alert team if still no progress
-` : ""}
-
-${data.callOutcome.outcome === "needs_followup" ? `
-📋 **NEEDS FOLLOW-UP**
-
-The lead needs more information or time to decide. Your job:
-1. Ask how the call went (show you care)
-2. Offer to help with whatever they need
-3. Keep the conversation going based on their reply
-4. Don't push - be helpful and consultative
-5. Reference specific things discussed on the call for personalization
-
-**Example message:**
-"Hi [Name]! How did your call with [Advisor] go?${data.callOutcome.notes ? ` ${data.callOutcome.notes.includes("document") || data.callOutcome.notes.includes("info") ? "Did you get all the info you needed?" : ""}` : ""}
-
-Let me know if you have any questions - happy to help!"
-
-**Adaptive strategy based on their reply:**
-- "I need to think about it" → Soft nurture, check in weekly
-- "I need documents" → "What documents? I can help coordinate"
-- "I need better rates" → Explain value of programs discussed
-- "I want to compare" → "Totally fair - what questions can I answer?"
-` : ""}
-
-${data.callOutcome.outcome === "not_qualified" ? `
-🚫 **NOT QUALIFIED**
-
-This lead doesn't fit our programs right now. Your job:
-1. Send a polite, professional close message
-2. Thank them for their time
-3. Leave the door open for the future
-4. Move to LOST status
-5. Keep it warm - situations change
-
-**Example message:**
-"Hi [Name] - thanks for taking the time to chat with [Advisor] today!
-
-I understand you're exploring all your options right now. If your situation changes or you have questions down the road, we're here!
-
-Best of luck with everything"
-
-**DO NOT:**
-- Try to resurrect the conversation
-- Send follow-ups or nurture messages
-- Push for a different outcome
-` : ""}
-
-${data.callOutcome.outcome === "long_timeline" ? `
-⏸️ **LONG TIMELINE**
-
-This lead is interested but not ready yet. Your job:
-1. Acknowledge their timeline respectfully
-2. Let them know you'll check in closer to their date
-3. Stay top-of-mind without being pushy
-4. Reference their specific timeline for personalization
-
-**Example message:**
-"Hey [Name]! Thanks for chatting with [Advisor] today.
-
-I know you're looking at a ${data.callOutcome.timeline || "few months"} timeline - I'll check in with you ${data.callOutcome.timeline === "3-6_months" ? "in about 2-3 months" : data.callOutcome.timeline === "6+_months" ? "in 4-5 months" : "in a few weeks"} to see where you're at!
-
-In the meantime, if anything changes or you have questions, just text me 📱"
-
-**Follow-up cadence:**
-- 1-3 months: Check in 2 weeks before their timeline
-- 3-6 months: Check in monthly
-- 6+ months: Check in quarterly
-- Market changes: Send relevant updates if rates drop or programs change
-` : ""}
-
-🎯 **PERSONALIZATION IS KEY**
-${data.callOutcome.programsDiscussed || data.callOutcome.preferredProgram || data.callOutcome.notes ?
-"Use the specific context from the call (programs discussed, preferences, advisor notes) to make your message feel personal and relevant. Don't send generic follow-up - reference what was actually discussed!" :
-"Ask the lead how the call went to get more context for future messages."}
+The outcome "${data.lastCallOutcome.outcome}" tells you the next step - use the advisor's notes to make your message personal and helpful!
 
 ` : ""}
 

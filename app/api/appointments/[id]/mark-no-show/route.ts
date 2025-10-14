@@ -37,10 +37,10 @@ export async function POST(
       data: { status: "no_show" },
     });
 
-    // Move lead back to ENGAGED (they showed interest by booking, just didn't show)
+    // Move lead to NURTURING (they showed interest by booking, but didn't show - need gentle nurture)
     await prisma.lead.update({
       where: { id: appointment.leadId },
-      data: { status: LeadStatus.ENGAGED },
+      data: { status: LeadStatus.NURTURING },
     });
 
     // Cancel any queued post-call follow-up messages for this lead
@@ -72,11 +72,11 @@ export async function POST(
       type: "lead_updated",
       leadName: `${appointment.lead.firstName} ${appointment.lead.lastName}`,
       leadId: appointment.lead.id,
-      details: `Marked as no-show for ${appointment.scheduledAt.toLocaleString()}. Moved back to ENGAGED.`,
+      details: `Marked as no-show for ${appointment.scheduledAt.toLocaleString()}. Moved to NURTURING.`,
     });
 
     // Don't send Holly message for no-shows - advisor will handle re-booking
-    console.log(`[Appointments] No-show marked - advisor will follow up to reschedule`);
+    console.log(`[Appointments] No-show marked - moved to NURTURING for gentle follow-up`);
 
     return NextResponse.json({
       success: true,
@@ -87,7 +87,7 @@ export async function POST(
       },
       lead: {
         id: appointment.lead.id,
-        status: LeadStatus.ENGAGED,
+        status: LeadStatus.NURTURING,
       },
     });
   } catch (error) {
