@@ -89,45 +89,72 @@ export async function POST(
       case "READY_FOR_APP":
         // Move to CALL_COMPLETED (they're ready for app, skip formal discovery)
         newStatus = "CALL_COMPLETED";
-        actionTaken = "Moved to CALL_COMPLETED. Holly sending Finmo application link now...";
+        actionTaken = "Moved to CALL_COMPLETED. Holly sending application link now...";
 
         await prisma.lead.update({
           where: { id: leadId },
           data: { status: "CALL_COMPLETED" },
         });
 
-        // 🚀 SEND FINMO LINK IMMEDIATELY (within 5 minutes) via SMS + EMAIL
+        // 🚀 SEND APPLICATION LINK IMMEDIATELY via SMS + EMAIL
         try {
-          console.log(`[Call Outcome] Triggering immediate Finmo link for lead ${leadId}`);
+          console.log(`[Call Outcome] Triggering immediate application link for lead ${leadId}`);
 
-          const finmoContext = `The advisor just completed a discovery call with this lead and marked them as READY FOR APPLICATION.
+          const applicationContext = `The advisor ${advisorName} just completed a discovery call with this lead and marked them as READY FOR APPLICATION.
 
-Your job is to send them the Finmo application link RIGHT NOW with a brief, encouraging message.
+Your job is to send them the secure mortgage application link RIGHT NOW with a helpful, encouraging message.
+
+IMPORTANT CONTEXT:
+- Lead name: ${lead.firstName}
+- Advisor who just spoke with them: ${advisorName}
+- Application portal URL: ${process.env.MORTGAGE_APPLICATION_URL || "https://stressfree.mtg-app.com/"}
 
 The message should:
-- Acknowledge the call just happened with ${advisorName}
-- Say you're excited to get their application started
-- Include the Finmo link: ${process.env.FINMO_APPLICATION_URL || "https://apply.finmo.ca/inspired-mortgage"}
-- Be SHORT and action-oriented (under 160 chars for SMS)
+- Acknowledge the great call with ${advisorName}
+- Express genuine excitement about helping them
+- Include the secure application portal link
+- Mention it takes about 15-20 minutes to complete
+- List what they'll need ready: income docs, ID, property details
+- Reassure them you're available if they get stuck
+- Sound warm and human, NOT robotic
 
 🚨 CRITICAL: Use the send_both tool to send via SMS + Email for maximum delivery!
 
-SMS: Keep it brief and action-oriented (under 160 chars)
-Email Subject: Something like "Ready to Apply - Your Finmo Link Inside"
-Email Body: More detailed with HTML formatting, include the link prominently`;
+SMS GUIDELINES (under 160 chars):
+- Keep it brief and friendly
+- Include the link
+- Example: "Hi ${lead.firstName}! Great call with ${advisorName}. Ready to start your application? Takes 15 mins: [link]. Questions? Just text!"
 
-          // Generate AI message with Finmo link
-          const decision = await handleConversation(leadId, undefined, finmoContext);
+EMAIL GUIDELINES:
+Subject: Keep it personal and clear (e.g., "Let's Get Your Mortgage Application Started, ${lead.firstName}!")
+
+Body should include:
+- Warm greeting referencing the call
+- Clear next step: "Click below to access your secure application portal"
+- Time estimate: "Takes about 15-20 minutes"
+- What to have ready:
+  • Recent pay stubs or income verification
+  • Government-issued ID
+  • Property details (address, purchase price/value)
+  • Down payment information (if applicable)
+- Clickable link prominently displayed
+- Reassurance: "I'm here if you have any questions - just reply!"
+- Sign as Holly from Inspired Mortgage
+
+DO NOT mention "Finmo" or any technical platform names - customers don't need to know the backend.`;
+
+          // Generate AI message with application link
+          const decision = await handleConversation(leadId, undefined, applicationContext);
 
           // Send immediately
           await executeDecision(leadId, decision);
 
-          actionTaken = "Moved to CALL_COMPLETED. Holly sent Finmo application link! ✅";
+          actionTaken = "Moved to CALL_COMPLETED. Holly sent application link! ✅";
 
-          console.log(`[Call Outcome] ✅ Finmo link sent successfully to lead ${leadId}`);
+          console.log(`[Call Outcome] ✅ Application link sent successfully to lead ${leadId}`);
         } catch (error) {
-          console.error(`[Call Outcome] Error sending Finmo link:`, error);
-          actionTaken = "Moved to CALL_COMPLETED. Holly will send Finmo link on next automation run.";
+          console.error(`[Call Outcome] Error sending application link:`, error);
+          actionTaken = "Moved to CALL_COMPLETED. Holly will send application link on next automation run.";
         }
         break;
 
