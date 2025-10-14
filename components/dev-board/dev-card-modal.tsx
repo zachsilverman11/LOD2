@@ -86,6 +86,26 @@ export function DevCardModal({ card, onClose }: DevCardModalProps) {
             </div>
           )}
 
+          {/* Screenshot */}
+          {card.screenshotUrl && (
+            <div>
+              <h3 className="text-sm font-semibold text-[#55514D] mb-2">Screenshot</h3>
+              <a
+                href={card.screenshotUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block"
+              >
+                <img
+                  src={card.screenshotUrl}
+                  alt="Card screenshot"
+                  className="max-w-full rounded-lg border border-[#E4DDD3] hover:border-[#625FFF] cursor-pointer transition-colors"
+                />
+              </a>
+              <p className="text-xs text-[#55514D] mt-1">Click to view full size</p>
+            </div>
+          )}
+
           {/* AI Metadata */}
           {metadata && (
             <div className="bg-[#F6D7FF]/20 p-4 rounded-lg border border-[#F6D7FF]">

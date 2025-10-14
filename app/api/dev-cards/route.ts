@@ -28,7 +28,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { title, description, type, priority, createdBy, metadata } = body;
+    const { title, description, type, priority, createdBy, metadata, screenshotUrl } = body;
 
     if (!title || !type || !createdBy) {
       return NextResponse.json(
@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
       data: {
         title,
         description,
+        screenshotUrl: screenshotUrl || undefined,
         type,
         priority: priority || "MEDIUM",
         createdBy,

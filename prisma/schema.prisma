@@ -282,18 +282,19 @@ enum ActivityType {
 }
 
 model DevCard {
-  id          String         @id @default(cuid())
-  title       String
-  description String?
-  type        DevCardType
-  status      DevCardStatus  @default(NEW)
-  priority    DevCardPriority @default(MEDIUM)
-  createdBy   String         // User name or "HOLLY_AI"
-  metadata    Json?          // AI-detected issues, evidence, suggestions
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  deployedAt  DateTime?      // When moved to DEPLOYED
-  comments    DevCardComment[]
+  id            String         @id @default(cuid())
+  title         String
+  description   String?
+  screenshotUrl String?        // Base64 encoded screenshot
+  type          DevCardType
+  status        DevCardStatus  @default(NEW)
+  priority      DevCardPriority @default(MEDIUM)
+  createdBy     String         // User name or "HOLLY_AI"
+  metadata      Json?          // AI-detected issues, evidence, suggestions
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  deployedAt    DateTime?      // When moved to DEPLOYED
+  comments      DevCardComment[]
 
   @@index([status])
   @@index([type])

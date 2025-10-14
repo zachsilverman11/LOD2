@@ -17,6 +17,7 @@ export default function DevBoardPage() {
     type: "FEATURE_REQUEST" as DevCardType,
     priority: "MEDIUM" as DevCardPriority,
     createdBy: "",
+    screenshotUrl: "" as string,
   });
 
   const handleCreateCard = async (e: React.FormEvent) => {
@@ -38,6 +39,7 @@ export default function DevBoardPage() {
           type: "FEATURE_REQUEST",
           priority: "MEDIUM",
           createdBy: "",
+          screenshotUrl: "",
         });
         setShowNewCardForm(false);
         window.location.reload();
@@ -106,6 +108,35 @@ export default function DevBoardPage() {
                     className="w-full px-3 py-2 border border-[#E4DDD3] rounded-md focus:outline-none focus:border-[#625FFF] text-[#1C1B1A]"
                     placeholder="Detailed description..."
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[#55514D] mb-1">
+                    Screenshot (optional)
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        if (file.size > 5 * 1024 * 1024) {
+                          alert('File too large. Max size is 5MB.');
+                          e.target.value = '';
+                          return;
+                        }
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          setFormData({ ...formData, screenshotUrl: reader.result as string });
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-[#E4DDD3] rounded-md focus:outline-none focus:border-[#625FFF] text-[#1C1B1A]"
+                  />
+                  {formData.screenshotUrl && (
+                    <p className="text-xs text-[#55514D] mt-1">✓ Screenshot attached</p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-3 gap-4">
