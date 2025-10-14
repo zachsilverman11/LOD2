@@ -90,23 +90,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const rawEvent = payload.event;
-    const application = payload.application || payload.data || payload;
+    const rawEvent = payload.event || payload.type || "unknown";
+    const application = payload.application || payload.data || payload.deal || payload;
 
     // Try to find email in various possible locations
-    const email = application?.email || payload.email || application?.borrower?.email;
+    const email = application?.email ||
+                  payload.email ||
+                  application?.borrower?.email ||
+                  application?.user?.email ||
+                  application?.contact?.email ||
+                  payload.deal?.email;
 
+    // FOR TESTING: Accept webhooks without email and just log them
     if (!email) {
-      console.error("[Finmo Webhook] No email found in payload");
+      console.warn("[Finmo Webhook] ⚠️ No email found - logging payload for debugging");
       await sendSlackNotification({
-        type: "error",
-        message: "Finmo Webhook: No Email Found",
-        details: `Full Payload: ${JSON.stringify(payload, null, 2)}`,
+        type: "lead_updated",
+        leadName: "Finmo Test Webhook",
+        leadId: "test",
+        details: `📋 FINMO WEBHOOK TEST PAYLOAD:\n\`\`\`json\n${JSON.stringify(payload, null, 2)}\n\`\`\`\n\nEvent: ${rawEvent}\n\nPlease check this payload structure to see where the email field is located.`,
       });
-      return NextResponse.json(
-        { error: "No email in application" },
-        { status: 400 }
-      );
+
+      // Return success so Finmo doesn't think webhook failed
+      // This allows us to see what they're sending
+      return NextResponse.json({
+        success: true,
+        note: "Test webhook received - no email found but logged for debugging"
+      });
     }
 
     console.log(`[Finmo Webhook] Found email: ${email}`);
