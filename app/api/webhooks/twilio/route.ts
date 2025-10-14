@@ -100,13 +100,9 @@ export async function POST(request: NextRequest) {
         // Execute the decision
         await executeDecision(lead.id, decision);
 
-        // Update lead stage if they replied (NEW -> ENGAGED)
-        if (lead.status === "NEW" || lead.status === "CONTACTED") {
-          await prisma.lead.update({
-            where: { id: lead.id },
-            data: { status: "ENGAGED" },
-          });
-        }
+        // NOTE: Stage progression (CONTACTED -> ENGAGED/NURTURING/LOST) is now handled
+        // by Holly via the move_stage tool based on response sentiment. She decides if
+        // the reply is positive (ENGAGED), hesitant (NURTURING), or negative (LOST).
 
         console.log(`[AI] ✅ Response handled: ${decision.action}`);
       } catch (error) {
