@@ -60,7 +60,7 @@ export default function DevBoardPage() {
               <h1 className="text-4xl font-extrabold text-[#1C1B1A]">
                 <span className="italic text-[#625FFF]">development</span> <span className="font-bold">board.</span>
               </h1>
-              <p className="text-[#55514D] mt-2 text-lg">Track features, bugs, and improvements</p>
+              <p className="text-[#55514D] mt-2 text-lg">Track features, bugs, and improvements with screenshots</p>
             </div>
             <div className="flex items-center gap-3">
               <button
