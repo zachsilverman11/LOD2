@@ -742,17 +742,23 @@ async function processSmartFollowUps() {
 
           console.log(`[Automation] 🚨 Sent hot lead alert for ${lead.id} - 24h no response`);
         }
-      } else if (daysSinceContact === 3) {
-        // Day 4: Mid-week touch (skip day 3 to avoid spam)
+      } else if (daysSinceContact === 2) {
+        // Day 3: Keep momentum going
+        if (outboundCount <= 2) {
+          shouldFollowUp = true;
+          followUpReason = "Day 3 follow-up";
+        }
+      } else if (daysSinceContact === 3 || daysSinceContact === 4) {
+        // Day 4-5: Mid-week persistence (critical hot lead period)
         if (outboundCount <= 3) {
           shouldFollowUp = true;
-          followUpReason = "Day 4 mid-week";
+          followUpReason = `Day ${daysSinceContact + 1} mid-week`;
         }
-      } else if (daysSinceContact === 6) {
-        // Day 7: End of first week
+      } else if (daysSinceContact === 5 || daysSinceContact === 6) {
+        // Day 6-7: End of first week push
         if (outboundCount <= 4) {
           shouldFollowUp = true;
-          followUpReason = "Day 7 week-end";
+          followUpReason = `Day ${daysSinceContact + 1} week-end`;
         }
       }
       // 📅 WEEK 2 (Days 8-14): Every 2-3 days
