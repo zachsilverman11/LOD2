@@ -71,13 +71,23 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Finmo - Submitted] Found lead: ${lead.firstName} ${lead.lastName} (ID: ${lead.id})`);
 
-    // Update lead to CONVERTED
+    // Create Pipedrive deal first to get the deal ID
+    let pipedriveDealId = null;
+    try {
+      pipedriveDealId = await createPipedriveDeal(lead.id, payload);
+    } catch (error) {
+      console.error("[Finmo - Submitted] Error creating Pipedrive deal:", error);
+      // Continue even if Pipedrive fails - don't block conversion
+    }
+
+    // Update lead to CONVERTED with Pipedrive deal ID
     await prisma.lead.update({
       where: { id: lead.id },
       data: {
         applicationCompletedAt: new Date(),
         status: LeadStatus.CONVERTED,
         convertedAt: new Date(),
+        pipedriveDealId: pipedriveDealId,
         updatedAt: new Date(),
       },
     });
@@ -94,6 +104,7 @@ export async function POST(request: NextRequest) {
           finmoDealId: payload.finmoDealId || payload.dealId,
           finmoId: payload.id,
           event: "application.completed",
+          pipedriveDealId: pipedriveDealId,
         },
       },
     });
@@ -103,15 +114,8 @@ export async function POST(request: NextRequest) {
       type: "lead_updated",
       leadName: `${lead.firstName} ${lead.lastName}`,
       leadId: lead.id,
-      details: "🚀 COMPLETED mortgage application! CONVERTED!",
+      details: `🚀 COMPLETED mortgage application! CONVERTED!${pipedriveDealId ? ` | Pipedrive deal: ${pipedriveDealId}` : ''}`,
     });
-
-    // Create Pipedrive deal
-    try {
-      await createPipedriveDeal(lead.id, payload);
-    } catch (error) {
-      console.error("[Finmo - Submitted] Error creating Pipedrive deal:", error);
-    }
 
     // Holly sends congratulations message
     try {
@@ -148,7 +152,7 @@ async function createPipedriveDeal(leadId: string, finmoPayload: any) {
 
   if (!PIPEDRIVE_API_TOKEN) {
     console.log("[Pipedrive] API token not configured, skipping deal creation");
-    return;
+    return null;
   }
 
   const API_BASE = `https://${PIPEDRIVE_COMPANY_DOMAIN}.pipedrive.com`;
@@ -304,6 +308,9 @@ ${smsHistory || "No SMS conversations recorded"}
       leadId: lead.id,
       details: `💼 Pipedrive deal created: ${dealTitle}`,
     });
+
+    // Return the Pipedrive deal ID
+    return dealData.data.id.toString();
   } catch (error) {
     console.error("[Pipedrive] Error creating deal:", error);
     throw error;

@@ -27,6 +27,7 @@ model Lead {
   convertedAt            DateTime?
   applicationStartedAt   DateTime?          // When lead started mortgage application
   applicationCompletedAt DateTime?          // When lead completed/submitted application
+  pipedriveDealId        String?            // Pipedrive deal ID after conversion
   appointments           Appointment[]
   communications         Communication[]
   activities             LeadActivity[]

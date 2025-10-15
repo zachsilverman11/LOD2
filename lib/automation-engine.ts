@@ -621,18 +621,16 @@ async function processSmartFollowUps() {
 
           switch (recentCallOutcome.outcome) {
             case "READY_FOR_APP":
-              // Send Finmo link if they're in CALL_COMPLETED status
-              if (lead.status === "CALL_COMPLETED") {
-                // TODO: Send Finmo application link via Holly
-                console.log(`[Automation] Lead ${lead.id} is READY_FOR_APP - should send Finmo link`);
-              }
-              continue; // Skip normal automation
+              // Application link already sent by call-outcome route
+              // Allow normal automation to continue for encouragement/nudges
+              console.log(`[Automation] Lead ${lead.id} is READY_FOR_APP - call-outcome route handled link, allowing normal follow-ups`);
+              break; // Fall through to normal automation
 
             case "BOOK_DISCOVERY":
-              // Send Cal.com link once
-              // TODO: Send Cal.com booking link via Holly
-              console.log(`[Automation] Lead ${lead.id} needs BOOK_DISCOVERY - should send Cal.com link`);
-              continue; // Skip normal automation
+              // Booking link already sent by Holly in normal conversation flow
+              // Allow normal automation to continue for follow-ups
+              console.log(`[Automation] Lead ${lead.id} needs BOOK_DISCOVERY - allowing normal follow-ups`);
+              break; // Fall through to normal automation
 
             case "FOLLOW_UP_SOON":
               // Only resume automation after 48h
@@ -641,6 +639,7 @@ async function processSmartFollowUps() {
                 continue;
               }
               // After 48h, fall through to normal automation with context from notes
+              console.log(`[Automation] Lead ${lead.id} - 48h waiting period passed, resuming automation with advisor context`);
               break;
 
             case "NOT_INTERESTED":
