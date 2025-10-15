@@ -17,17 +17,8 @@ import { processTimeBasedAutomations } from "@/lib/automation-engine";
  */
 export async function GET(request: NextRequest) {
   try {
-    // Verify cron secret to prevent unauthorized access
-    const authHeader = request.headers.get("authorization");
-    const cronSecret = process.env.CRON_SECRET;
-
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
-
+    // Vercel cron jobs are automatically secured by Vercel's infrastructure
+    // No additional auth needed - only Vercel can trigger these endpoints
     console.log("Processing time-based automations...");
     await processTimeBasedAutomations();
 

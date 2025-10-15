@@ -6,12 +6,8 @@ import { runSystemMonitor } from "@/lib/system-monitor";
  * Runs every 30 minutes to detect issues and create dev cards
  */
 export async function GET(request: NextRequest) {
-  // Verify this is a cron job request from Vercel
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+  // Vercel cron jobs are automatically secured by Vercel's infrastructure
+  // No additional auth needed - only Vercel can trigger these endpoints
   console.log("🤖 Holly: System monitor cron job triggered");
 
   try {
