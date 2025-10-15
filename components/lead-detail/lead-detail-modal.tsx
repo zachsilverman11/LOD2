@@ -376,12 +376,19 @@ export function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
                     onChange={(e) => setManualSmsText(e.target.value)}
                     rows={4}
                     maxLength={1600}
-                    placeholder="Type your message to the customer..."
+                    placeholder="Type your message to the customer... (URLs are automatically clickable)"
                     className="w-full px-3 py-2 border border-[#E4DDD3] rounded text-sm focus:outline-none focus:border-[#625FFF] text-[#1C1B1A]"
                   />
-                  <p className="text-xs text-[#55514D] mt-1">
-                    {manualSmsText.length}/1600 characters
-                  </p>
+                  <div className="flex justify-between items-start mt-1">
+                    <p className="text-xs text-[#55514D]">
+                      {manualSmsText.length}/1600 characters
+                      {manualSmsText.match(/https?:\/\/[^\s]+/g) && (
+                        <span className="ml-2 text-[#625FFF]">
+                          🔗 Link detected - will be clickable on recipient's phone
+                        </span>
+                      )}
+                    </p>
+                  </div>
                 </div>
 
                 <button
