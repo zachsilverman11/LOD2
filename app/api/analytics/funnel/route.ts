@@ -155,7 +155,7 @@ export async function GET() {
           contactRateTarget: 80,
           engagementRateTarget: 60,
           bookingRateTarget: 40,
-          conversionRateTarget: 20,
+          conversionRateTarget: 25,
           dealsWonRateTarget: 70,
         },
       });

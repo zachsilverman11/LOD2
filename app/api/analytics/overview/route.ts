@@ -116,10 +116,62 @@ export async function GET() {
       count: s._count.id,
     }));
 
+    // Get leads with call outcomes (advisor actually spoke with them)
+    const leadsWithCallOutcomes = await prisma.lead.count({
+      where: {
+        callOutcomes: {
+          some: {
+            reached: true,
+          },
+        },
+      },
+    });
+
+    // Get APPLICATION_STARTED count
+    const appsStartedCount = await prisma.lead.count({
+      where: {
+        applicationStartedAt: {
+          not: null,
+        },
+      },
+    });
+
+    // Get DEALS_WON count
+    const dealsWonCount = leadsByStatus.find((s) => s.status === "DEALS_WON")?._count.id || 0;
+
+    // Calculate Engaged to Book rate (of leads who replied, % who booked a call)
+    const leadsWhoBooked = await prisma.lead.count({
+      where: {
+        AND: [
+          {
+            communications: {
+              some: {
+                direction: "INBOUND",
+              },
+            },
+          },
+          {
+            appointments: {
+              some: {},
+            },
+          },
+        ],
+      },
+    });
+    const engagedToBookRate = leadsWithInbound > 0 ? (leadsWhoBooked / leadsWithInbound) * 100 : 0;
+
     // Calculate key KPIs
     const leadToCallRate = totalLeads > 0 ? (callsScheduled / totalLeads) * 100 : 0;
-    const leadToAppRate = totalLeads > 0 ? (convertedCount / totalLeads) * 100 : 0;
-    const callToAppRate = callsCompleted > 0 ? (convertedCount / callsCompleted) * 100 : 0;
+    const leadToAppRate = totalLeads > 0 ? (appsStartedCount / totalLeads) * 100 : 0;
+
+    // FIXED: Call to App uses leads with CallOutcome and APPLICATION_STARTED
+    const callToAppRate = leadsWithCallOutcomes > 0 ? (appsStartedCount / leadsWithCallOutcomes) * 100 : 0;
+
+    // NEW: App to Close rate (of apps started, % that converted)
+    const appToCloseRate = appsStartedCount > 0 ? (convertedCount / appsStartedCount) * 100 : 0;
+
+    // NEW: Lead to Won rate (of total leads, % that won deals)
+    const leadToWonRate = totalLeads > 0 ? (dealsWonCount / totalLeads) * 100 : 0;
 
     // Calculate Active Pipeline Value (only active leads, not LOST/CONVERTED/DEALS_WON)
     const activePipelineValue = activeLeads.reduce((sum, lead) => {
@@ -192,6 +244,13 @@ export async function GET() {
         leadToCallRate: parseFloat(leadToCallRate.toFixed(2)),
         leadToAppRate: parseFloat(leadToAppRate.toFixed(2)),
         callToAppRate: parseFloat(callToAppRate.toFixed(2)),
+        // NEW METRICS
+        engagedToBookRate: parseFloat(engagedToBookRate.toFixed(2)),
+        appToCloseRate: parseFloat(appToCloseRate.toFixed(2)),
+        leadToWonRate: parseFloat(leadToWonRate.toFixed(2)),
+        dealsWonCount,
+        appsStartedCount,
+        leadsWithCallOutcomes,
       },
     });
   } catch (error) {

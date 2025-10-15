@@ -34,6 +34,7 @@ export async function GET(request: NextRequest) {
       include: {
         appointments: true,
         communications: true,
+        callOutcomes: true,
       },
     });
 
@@ -69,9 +70,10 @@ export async function GET(request: NextRequest) {
       : 0;
 
     // 3. CALL-TO-APP RATE
-    // Of leads with completed appointments, % who started application
+    // Of leads with call outcomes (advisor spoke with them), % who started application
+    // CRITICAL FIX: Use CallOutcome records where reached=true, not appointment status
     const leadsWithCompletedCalls = leads.filter((lead) =>
-      lead.appointments.some((appt) => appt.status === "completed")
+      lead.callOutcomes && lead.callOutcomes.some((outcome) => outcome.reached === true)
     );
 
     const leadsWhoStartedApp = leadsWithCompletedCalls.filter(
@@ -84,6 +86,7 @@ export async function GET(request: NextRequest) {
 
     // 4. COHORT PERFORMANCE
     // Group leads by creation month and track conversion rates
+    // CRITICAL FIX: Use CallOutcome records for completed calls, not appointment status
     const cohortMap = new Map<string, { total: number; converted: number; called: number; }>();
 
     leads.forEach((lead) => {
@@ -100,7 +103,8 @@ export async function GET(request: NextRequest) {
         cohort.converted += 1;
       }
 
-      if (lead.appointments.some((appt) => appt.status === "completed")) {
+      // FIXED: Use CallOutcome with reached=true instead of appointment.status
+      if (lead.callOutcomes && lead.callOutcomes.some((outcome) => outcome.reached === true)) {
         cohort.called += 1;
       }
     });
@@ -143,8 +147,8 @@ export async function GET(request: NextRequest) {
       metrics: {
         directBookingRate: {
           value: Math.round(directBookingRate * 10) / 10,
-          target: 30,
-          status: directBookingRate >= 30 ? "good" : "needs-improvement",
+          target: 25,
+          status: directBookingRate >= 25 ? "good" : "needs-improvement",
           count: directBookings.length,
           total: leads.length,
         },
