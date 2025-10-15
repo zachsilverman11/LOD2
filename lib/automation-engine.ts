@@ -892,11 +892,17 @@ async function processPostCallConfirmations() {
         data: { status: "completed" },
       });
 
-      // Move lead to CALL_COMPLETED
-      await prisma.lead.update({
-        where: { id: appointment.lead.id },
-        data: { status: "CALL_COMPLETED" },
-      });
+      // CRITICAL FIX: Only move lead to CALL_COMPLETED if they haven't progressed further
+      // Don't overwrite CONVERTED, LOST, DEALS_WON, APPLICATION_STARTED, or NURTURING
+      const finalStatuses = ["CONVERTED", "LOST", "DEALS_WON", "APPLICATION_STARTED", "NURTURING"];
+      if (!finalStatuses.includes(appointment.lead.status)) {
+        await prisma.lead.update({
+          where: { id: appointment.lead.id },
+          data: { status: "CALL_COMPLETED" },
+        });
+      } else {
+        console.log(`[Automation] Skipping status update for ${appointment.lead.id} - already in ${appointment.lead.status}`);
+      }
 
       // Queue post-call follow-up message for 1 hour later (gives team time to mark no-show)
       const scheduledFor = new Date();
