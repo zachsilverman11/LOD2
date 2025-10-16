@@ -3,6 +3,7 @@ import { prisma } from "./db";
 import { sendSms } from "./sms";
 import { sendEmail } from "./email";
 import { sendErrorAlert } from "./slack";
+import { quickDelay } from "./human-delay";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -1393,6 +1394,9 @@ export async function executeDecision(
               metadata: { aiReasoning: decision.reasoning, multiChannel: true },
             },
           });
+
+          // Add small delay between SMS and email (simulate switching apps)
+          await quickDelay();
 
           // Send email second (if email exists)
           if (lead.email) {

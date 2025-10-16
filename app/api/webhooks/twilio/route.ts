@@ -4,6 +4,7 @@ import { normalizePhoneNumber } from "@/lib/sms";
 import { ActivityType, CommunicationChannel } from "@/app/generated/prisma";
 import { handleConversation, executeDecision } from "@/lib/ai-conversation-enhanced";
 import { sendErrorAlert } from "@/lib/slack";
+import { humanDelay } from "@/lib/human-delay";
 
 /**
  * Handle incoming SMS messages from Twilio
@@ -96,6 +97,9 @@ export async function POST(request: NextRequest) {
 
         // Generate AI response
         const decision = await handleConversation(lead.id, body);
+
+        // Add human-like delay before responding (makes Holly appear more natural)
+        await humanDelay(body, decision.message);
 
         // Execute the decision
         await executeDecision(lead.id, decision);
