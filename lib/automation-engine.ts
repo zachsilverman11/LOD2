@@ -756,9 +756,16 @@ async function processSmartFollowUps() {
         }
       } else if (daysSinceContact === 5 || daysSinceContact === 6) {
         // Day 6-7: End of first week push
-        if (outboundCount <= 4) {
+        // If they've replied, be more persistent (check last reply date, not just message count)
+        const lastInbound = lead.communications.find(c => c.direction === "INBOUND");
+        const daysSinceReply = lastInbound
+          ? Math.floor((now.getTime() - lastInbound.createdAt.getTime()) / 86400000)
+          : 999;
+
+        // Follow up if: (1) Under message limit OR (2) They replied and it's been 3+ days
+        if (outboundCount <= 4 || (hasReplied && daysSinceReply >= 3)) {
           shouldFollowUp = true;
-          followUpReason = `Day ${daysSinceContact + 1} week-end`;
+          followUpReason = `Day ${daysSinceContact + 1} week-end${hasReplied && outboundCount > 4 ? " (engaged lead)" : ""}`;
         }
       }
       // 📅 WEEK 2 (Days 8-14): Every 2-3 days
@@ -766,9 +773,17 @@ async function processSmartFollowUps() {
         const daysSinceLastMessage = Math.floor(
           (now.getTime() - (lead.lastContactedAt?.getTime() || 0)) / 86400000
         );
-        if (daysSinceLastMessage >= 2) {
+
+        // For engaged leads (who have replied), be more persistent
+        const lastInbound = lead.communications.find(c => c.direction === "INBOUND");
+        const daysSinceReply = lastInbound
+          ? Math.floor((now.getTime() - lastInbound.createdAt.getTime()) / 86400000)
+          : 999;
+
+        // Follow up if it's been 2+ days OR if engaged lead hasn't replied in 4+ days
+        if (daysSinceLastMessage >= 2 || (hasReplied && daysSinceReply >= 4)) {
           shouldFollowUp = true;
-          followUpReason = "Week 2 follow-up";
+          followUpReason = hasReplied ? "Week 2 follow-up (engaged)" : "Week 2 follow-up";
         }
       }
       // 📅 WEEK 3-4 (Days 15-30): Every 4 days
