@@ -23,6 +23,7 @@ export function KanbanBoard({ onLeadClick }: KanbanBoardProps) {
   const [leads, setLeads] = useState<LeadWithRelations[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -63,8 +64,9 @@ export function KanbanBoard({ onLeadClick }: KanbanBoardProps) {
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
 
+    setActiveId(null);
+
     if (!over) {
-      setActiveId(null);
       return;
     }
 
@@ -73,9 +75,10 @@ export function KanbanBoard({ onLeadClick }: KanbanBoardProps) {
 
     const lead = leads.find((l) => l.id === leadId);
     if (!lead || lead.status === newStatus) {
-      setActiveId(null);
       return;
     }
+
+    const oldStatus = lead.status;
 
     // Optimistic update
     setLeads((prev) =>
@@ -84,20 +87,44 @@ export function KanbanBoard({ onLeadClick }: KanbanBoardProps) {
 
     // Update on server
     try {
-      await fetch(`/api/leads/${leadId}`, {
+      const response = await fetch(`/api/leads/${leadId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
       });
+
+      if (!response.ok) {
+        throw new Error('Failed to update lead status');
+      }
+
+      // Success notification
+      setNotification({
+        type: 'success',
+        message: `${lead.firstName} ${lead.lastName} moved to ${getPipelineStageLabel(newStatus)}`
+      });
+
+      setTimeout(() => setNotification(null), 3000);
     } catch (error) {
       console.error("Error updating lead:", error);
+
       // Revert on error
       setLeads((prev) =>
-        prev.map((l) => (l.id === leadId ? lead : l))
+        prev.map((l) => (l.id === leadId ? { ...l, status: oldStatus } : l))
       );
-    }
 
-    setActiveId(null);
+      // Error notification
+      setNotification({
+        type: 'error',
+        message: 'Failed to update lead. Please try again.'
+      });
+
+      setTimeout(() => setNotification(null), 5000);
+    }
+  };
+
+  const getPipelineStageLabel = (status: LeadStatus): string => {
+    const stage = PIPELINE_STAGES.find(s => s.id === status);
+    return stage?.label || status;
   };
 
   const getLeadsByStatus = (status: LeadStatus) => {
@@ -121,6 +148,28 @@ export function KanbanBoard({ onLeadClick }: KanbanBoardProps) {
       onDragEnd={handleDragEnd}
     >
       <div className="relative">
+        {/* Notification Toast */}
+        {notification && (
+          <div className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg border-2 transition-all ${
+            notification.type === 'success'
+              ? 'bg-green-50 border-green-500 text-green-800'
+              : 'bg-red-50 border-red-500 text-red-800'
+          }`}>
+            <div className="flex items-center gap-2">
+              {notification.type === 'success' ? (
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              )}
+              <span className="font-medium">{notification.message}</span>
+            </div>
+          </div>
+        )}
+
         <div className="flex gap-4 overflow-x-auto pb-4 scroll-smooth">
           {PIPELINE_STAGES.map((stage) => (
             <KanbanColumn

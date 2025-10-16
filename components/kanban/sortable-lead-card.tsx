@@ -23,13 +23,15 @@ export function SortableLeadCard({ lead, onClick }: SortableLeadCardProps) {
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
+    opacity: isDragging ? 0.3 : 1,
+    cursor: isDragging ? 'grabbing' : 'grab',
   };
 
   return (
     <div
       ref={setNodeRef}
       style={style}
+      className={isDragging ? 'z-50 rotate-3 scale-105' : ''}
       {...attributes}
       {...listeners}
     >
