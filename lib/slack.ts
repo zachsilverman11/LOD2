@@ -1,4 +1,5 @@
 const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL || "";
+const DASHBOARD_URL = process.env.NEXT_PUBLIC_APP_URL || "https://lod2.vercel.app";
 
 interface SlackNotification {
   type: "new_lead" | "no_response" | "lead_rotting" | "hot_lead_going_cold" | "call_booked" | "call_missed" | "converted";
@@ -101,7 +102,7 @@ export async function sendSlackNotification(notification: SlackNotification) {
             elements: [
               {
                 type: "mrkdwn",
-                text: `<https://lod2-5e814kgl0-zach-silvermans-projects.vercel.app/dashboard|View Dashboard> • Lead ID: \`${leadId}\``,
+                text: `<${DASHBOARD_URL}/dashboard|View Dashboard> • Lead ID: \`${leadId}\``,
               },
             ],
           },
@@ -261,7 +262,7 @@ export async function sendErrorAlert({ error, context }: ErrorAlert) {
             elements: [
               {
                 type: "mrkdwn",
-                text: `<https://lod2-5e814kgl0-zach-silvermans-projects.vercel.app/dashboard|View Dashboard> • ${new Date().toISOString()}`,
+                text: `<${DASHBOARD_URL}/dashboard|View Dashboard> • ${new Date().toISOString()}`,
               },
             ],
           },
