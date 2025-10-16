@@ -100,17 +100,46 @@ export async function POST(
         try {
           console.log(`[Call Outcome] Triggering immediate application link for lead ${leadId}`);
 
-          const applicationContext = `The advisor ${advisorName} just completed a discovery call with this lead and marked them as READY FOR APPLICATION.
+          // 🛡️ DEDUPLICATION CHECK: Don't send if we already sent app link recently (within 15 min)
+          const appUrl = process.env.MORTGAGE_APPLICATION_URL || "stressfree.mtg-app.com";
+          const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
 
-Your job is to send them the secure mortgage application link RIGHT NOW with a helpful, encouraging message.
+          const recentAppLink = await prisma.communication.findFirst({
+            where: {
+              leadId,
+              direction: "OUTBOUND",
+              content: { contains: appUrl },
+              createdAt: { gte: fifteenMinutesAgo },
+            },
+            orderBy: { createdAt: "desc" },
+          });
+
+          if (recentAppLink) {
+            const minutesAgo = Math.floor((Date.now() - recentAppLink.createdAt.getTime()) / 60000);
+            console.log(`[Call Outcome] ⚠️  Application link already sent ${minutesAgo} minutes ago, skipping duplicate`);
+            actionTaken = `Moved to CALL_COMPLETED. Holly already sent application link ${minutesAgo} min ago.`;
+          } else {
+            // No recent app link, safe to send
+            const applicationContext = `The advisor ${advisorName} just completed a discovery call with this lead and marked them as READY FOR APPLICATION.
+
+🎯 CALL OUTCOME DETAILS (USE THIS CONTEXT!):
+- Outcome: ${outcome}
+- Lead Quality: ${leadQuality || "Not specified"}
+- Reached: ${reached ? "Yes" : "No"}
+
+📝 ADVISOR'S CALL NOTES (CRITICAL - READ CAREFULLY):
+"${notes || "No notes provided"}"
+
+Your job is to send them the secure mortgage application link RIGHT NOW with a helpful, encouraging message that REFERENCES THE CALL NOTES.
 
 IMPORTANT CONTEXT:
 - Lead name: ${lead.firstName}
 - Advisor who just spoke with them: ${advisorName}
-- Application portal URL: ${process.env.MORTGAGE_APPLICATION_URL || "https://stressfree.mtg-app.com/"}
+- Application portal URL: ${appUrl}
 
 The message should:
-- Acknowledge the great call with ${advisorName}
+- Acknowledge the call with ${advisorName} (but don't just say "great call" - be specific!)
+- Reference something specific from the call notes above (e.g., their situation, what was discussed, why they're ready)
 - Express genuine excitement about helping them
 - Include the secure application portal link
 - Mention it takes about 15-20 minutes to complete
@@ -118,18 +147,29 @@ The message should:
 - Reassure them you're available if they get stuck
 - Sound warm and human, NOT robotic
 
-🚨 CRITICAL: Use the send_both tool to send via SMS + Email for maximum delivery!
+🚨 CRITICAL RULES:
+1. DO NOT use generic phrases like "Great call with ${advisorName}"
+2. DO reference specific details from the call notes (renewal date, property plans, rate type, concerns, timeline, etc.)
+3. DO acknowledge any concerns or next steps the advisor mentioned
+4. Use the send_both tool to send via SMS + Email for maximum delivery!
+
+EXAMPLE GOOD MESSAGE (if notes mention "December renewal, variable rate, no bank penalties"):
+"Hi ${lead.firstName}! ${advisorName} mentioned you're looking at a variable rate for your December renewal - the no bank penalties program is perfect for your situation! Ready to start your application? Takes 15 mins: [link]. Questions? Just text!"
+
+EXAMPLE BAD MESSAGE:
+"Hi ${lead.firstName}! Great call with ${advisorName}. Ready for your application? [link]" ❌ TOO GENERIC
 
 SMS GUIDELINES (under 160 chars):
-- Keep it brief and friendly
+- Keep it brief and friendly but specific
+- Reference something from call notes
 - Include the link
-- Example: "Hi ${lead.firstName}! Great call with ${advisorName}. Ready to start your application? Takes 15 mins: [link]. Questions? Just text!"
+- Be conversational
 
 EMAIL GUIDELINES:
 Subject: Keep it personal and clear (e.g., "Let's Get Your Mortgage Application Started, ${lead.firstName}!")
 
 Body should include:
-- Warm greeting referencing the call
+- Warm greeting referencing specifics from the call (not just "great call")
 - Clear next step: "Click below to access your secure application portal"
 - Time estimate: "Takes about 15-20 minutes"
 - What to have ready:
@@ -143,15 +183,16 @@ Body should include:
 
 DO NOT mention "Finmo" or any technical platform names - customers don't need to know the backend.`;
 
-          // Generate AI message with application link
-          const decision = await handleConversation(leadId, undefined, applicationContext);
+            // Generate AI message with application link
+            const decision = await handleConversation(leadId, undefined, applicationContext);
 
-          // Send immediately
-          await executeDecision(leadId, decision);
+            // Send immediately
+            await executeDecision(leadId, decision);
 
-          actionTaken = "Moved to CALL_COMPLETED. Holly sent application link! ✅";
+            actionTaken = "Moved to CALL_COMPLETED. Holly sent application link! ✅";
 
-          console.log(`[Call Outcome] ✅ Application link sent successfully to lead ${leadId}`);
+            console.log(`[Call Outcome] ✅ Application link sent successfully to lead ${leadId}`);
+          }
         } catch (error) {
           console.error(`[Call Outcome] Error sending application link:`, error);
           actionTaken = "Moved to CALL_COMPLETED. Holly will send application link on next automation run.";
