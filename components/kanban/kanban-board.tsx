@@ -120,17 +120,21 @@ export function KanbanBoard({ onLeadClick }: KanbanBoardProps) {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="flex gap-4 overflow-x-auto pb-4">
-        {PIPELINE_STAGES.map((stage) => (
-          <KanbanColumn
-            key={stage.id}
-            status={stage.id}
-            label={stage.label}
-            color={stage.color}
-            leads={getLeadsByStatus(stage.id)}
-            onLeadClick={onLeadClick}
-          />
-        ))}
+      <div className="relative">
+        <div className="flex gap-4 overflow-x-auto pb-4 scroll-smooth">
+          {PIPELINE_STAGES.map((stage) => (
+            <KanbanColumn
+              key={stage.id}
+              status={stage.id}
+              label={stage.label}
+              color={stage.color}
+              leads={getLeadsByStatus(stage.id)}
+              onLeadClick={onLeadClick}
+            />
+          ))}
+        </div>
+        {/* Scroll indicator shadow on right edge */}
+        <div className="absolute right-0 top-0 bottom-4 w-20 bg-gradient-to-l from-[#FBF3E7] via-[#FBF3E7]/60 to-transparent pointer-events-none" />
       </div>
       <DragOverlay>
         {activeLead ? <LeadCard lead={activeLead} onClick={() => {}} /> : null}

@@ -507,7 +507,7 @@ export function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
                   value={newNote}
                   onChange={(e) => setNewNote(e.target.value)}
                   placeholder="Add a note about this lead..."
-                  className="w-full px-3 py-2 border border-[#E4DDD3] rounded focus:outline-none focus:ring-2 focus:ring-[#625FFF] focus:border-transparent resize-none"
+                  className="w-full px-3 py-2 border border-[#E4DDD3] rounded focus:outline-none focus:ring-2 focus:ring-[#625FFF] focus:border-transparent resize-none text-[#1C1B1A]"
                   rows={3}
                 />
                 <button
