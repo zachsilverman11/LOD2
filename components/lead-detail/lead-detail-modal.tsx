@@ -83,7 +83,19 @@ const formatFieldValue = (key: string, value: any): string => {
   // Date/time fields
   if (lowerKey.includes('time') || lowerKey.includes('date')) {
     try {
-      const date = new Date(value);
+      let dateValue = value;
+
+      // Handle DD/MM/YYYY format from Leads on Demand (e.g., "12/10/2025 02:44 PM")
+      // Convert to MM/DD/YYYY format for JS Date parser
+      const ddmmyyyyPattern = /^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(.+)$/;
+      const match = String(value).match(ddmmyyyyPattern);
+      if (match) {
+        const [, day, month, year, time] = match;
+        // Convert DD/MM/YYYY to MM/DD/YYYY
+        dateValue = `${month}/${day}/${year} ${time}`;
+      }
+
+      const date = new Date(dateValue);
       if (!isNaN(date.getTime())) {
         return format(date, "MMM d, yyyy 'at' h:mm a");
       }
