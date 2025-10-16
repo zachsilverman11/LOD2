@@ -87,13 +87,13 @@ export async function GET(request: NextRequest) {
     // 4. COHORT PERFORMANCE
     // Group leads by creation month and track conversion rates
     // CRITICAL FIX: Use CallOutcome records for completed calls, not appointment status
-    const cohortMap = new Map<string, { total: number; converted: number; called: number; }>();
+    const cohortMap = new Map<string, { total: number; converted: number; called: number; dealsWon: number; }>();
 
     leads.forEach((lead) => {
       const monthKey = `${lead.createdAt.getFullYear()}-${String(lead.createdAt.getMonth() + 1).padStart(2, "0")}`;
 
       if (!cohortMap.has(monthKey)) {
-        cohortMap.set(monthKey, { total: 0, converted: 0, called: 0 });
+        cohortMap.set(monthKey, { total: 0, converted: 0, called: 0, dealsWon: 0 });
       }
 
       const cohort = cohortMap.get(monthKey)!;
@@ -101,6 +101,11 @@ export async function GET(request: NextRequest) {
 
       if (lead.status === "CONVERTED" || lead.applicationCompletedAt) {
         cohort.converted += 1;
+      }
+
+      // Track deals won by origin cohort (even if won in a later month)
+      if (lead.status === "DEALS_WON") {
+        cohort.dealsWon += 1;
       }
 
       // FIXED: Use CallOutcome with reached=true instead of appointment.status
@@ -115,8 +120,10 @@ export async function GET(request: NextRequest) {
         totalLeads: data.total,
         completedCalls: data.called,
         conversions: data.converted,
+        dealsWon: data.dealsWon,
         callRate: data.total > 0 ? (data.called / data.total) * 100 : 0,
         conversionRate: data.total > 0 ? (data.converted / data.total) * 100 : 0,
+        dealsWonRate: data.converted > 0 ? (data.dealsWon / data.converted) * 100 : 0,
       }))
       .sort((a, b) => a.month.localeCompare(b.month));
 

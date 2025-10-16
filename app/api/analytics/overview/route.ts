@@ -45,18 +45,23 @@ export async function GET() {
     // Calculate conversion rate
     const conversionRate = totalLeads > 0 ? (convertedCount / totalLeads) * 100 : 0;
 
-    // Get calls scheduled (CALL_SCHEDULED + CALL_COMPLETED + CONVERTED)
-    const callsScheduled =
-      (leadsByStatus.find((s) => s.status === "CALL_SCHEDULED")?._count.id || 0) +
-      (leadsByStatus.find((s) => s.status === "CALL_COMPLETED")?._count.id || 0) +
-      convertedCount;
+    // FIXED: Get actual scheduled calls from appointments (not status-based)
+    const callsScheduled = await prisma.appointment.count({
+      where: {
+        status: {
+          in: ["scheduled", "completed", "no_show"],
+        },
+      },
+    });
 
-    // Get calls completed (CALL_COMPLETED + CONVERTED)
-    const callsCompleted =
-      (leadsByStatus.find((s) => s.status === "CALL_COMPLETED")?._count.id || 0) +
-      convertedCount;
+    // FIXED: Get actual completed calls from CallOutcome records where reached=true
+    const callsCompleted = await prisma.callOutcome.count({
+      where: {
+        reached: true,
+      },
+    });
 
-    // Calculate show-up rate
+    // Calculate show-up rate (actual calls completed vs scheduled)
     const showUpRate = callsScheduled > 0 ? (callsCompleted / callsScheduled) * 100 : 0;
 
     // Get total appointments

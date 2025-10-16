@@ -79,8 +79,10 @@ interface WeeklyMetrics {
       totalLeads: number;
       completedCalls: number;
       conversions: number;
+      dealsWon: number;
       callRate: number;
       conversionRate: number;
+      dealsWonRate: number;
     }>;
   };
   funnel: {
@@ -316,6 +318,8 @@ export default function AnalyticsPage() {
                         <th className="text-left py-3 px-4 text-sm font-semibold text-[#55514D]">Call Rate</th>
                         <th className="text-left py-3 px-4 text-sm font-semibold text-[#55514D]">Conversions</th>
                         <th className="text-left py-3 px-4 text-sm font-semibold text-[#55514D]">Conversion Rate</th>
+                        <th className="text-left py-3 px-4 text-sm font-semibold text-[#55514D]">Deals Won</th>
+                        <th className="text-left py-3 px-4 text-sm font-semibold text-[#55514D]">Won Rate</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -327,6 +331,8 @@ export default function AnalyticsPage() {
                           <td className="py-3 px-4 text-sm font-semibold text-[#625FFF]">{cohort.callRate.toFixed(1)}%</td>
                           <td className="py-3 px-4 text-sm text-[#55514D]">{cohort.conversions}</td>
                           <td className="py-3 px-4 text-sm font-semibold text-[#625FFF]">{cohort.conversionRate.toFixed(1)}%</td>
+                          <td className="py-3 px-4 text-sm text-[#2E7D32] font-semibold">{cohort.dealsWon}</td>
+                          <td className="py-3 px-4 text-sm font-semibold text-[#2E7D32]">{cohort.dealsWonRate.toFixed(1)}%</td>
                         </tr>
                       ))}
                     </tbody>
@@ -337,21 +343,21 @@ export default function AnalyticsPage() {
           </div>
         )}
 
-        {/* 4 Core KPIs */}
+        {/* 5 Core Performance Metrics */}
         <div className="mb-6">
           <h2 className="text-2xl font-bold text-[#1C1B1A] mb-2">Core Performance Metrics</h2>
           <p className="text-sm text-[#55514D]">Key indicators of system health and conversion effectiveness</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
           {/* KPI 1: Lead-to-Call Rate */}
           <div className={`backdrop-blur-sm rounded-xl shadow-sm border-2 p-6 ${getMetricBg(overview?.leadToCallRate || 0, 18)}`}>
-            <div className="text-sm text-[#55514D] font-medium mb-2">Lead-to-Call Rate</div>
+            <div className="text-sm text-[#55514D] font-medium mb-2">Lead-to-Call</div>
             <div className={`text-4xl font-bold ${getMetricColor(overview?.leadToCallRate || 0, 18)}`}>
               {overview?.leadToCallRate || 0}%
             </div>
             <div className="text-xs text-[#55514D] mt-2">
-              Target: 18% • {overview?.callsScheduled || 0} of {overview?.totalLeads || 0} leads
+              Target: 18% • {overview?.callsScheduled || 0} of {overview?.totalLeads || 0}
             </div>
           </div>
 
@@ -362,29 +368,40 @@ export default function AnalyticsPage() {
               {overview?.responseRate || 0}%
             </div>
             <div className="text-xs text-[#55514D] mt-2">
-              Target: 35% • Leads who replied to Holly
+              Target: 35% • Replied to Holly
             </div>
           </div>
 
-          {/* KPI 3: Show-Up Rate */}
-          <div className={`backdrop-blur-sm rounded-xl shadow-sm border-2 p-6 ${getMetricBg(overview?.showUpRate || 0, 75)}`}>
-            <div className="text-sm text-[#55514D] font-medium mb-2">Show-Up Rate</div>
-            <div className={`text-4xl font-bold ${getMetricColor(overview?.showUpRate || 0, 75)}`}>
-              {overview?.showUpRate || 0}%
+          {/* KPI 3: Call-to-App Rate */}
+          <div className={`backdrop-blur-sm rounded-xl shadow-sm border-2 p-6 ${getMetricBg(overview?.callToAppRate || 0, 45)}`}>
+            <div className="text-sm text-[#55514D] font-medium mb-2">Call-to-App</div>
+            <div className={`text-4xl font-bold ${getMetricColor(overview?.callToAppRate || 0, 45)}`}>
+              {overview?.callToAppRate || 0}%
             </div>
             <div className="text-xs text-[#55514D] mt-2">
-              Target: 75% • {overview?.callsCompleted || 0} of {overview?.callsScheduled || 0} calls
+              Target: 45% • Apps from calls
             </div>
           </div>
 
-          {/* KPI 4: Lead-to-App Rate */}
-          <div className={`backdrop-blur-sm rounded-xl shadow-sm border-2 p-6 ${getMetricBg(overview?.leadToAppRate || 0, 6)}`}>
-            <div className="text-sm text-[#55514D] font-medium mb-2">Lead-to-App Rate</div>
-            <div className={`text-4xl font-bold ${getMetricColor(overview?.leadToAppRate || 0, 6)}`}>
-              {overview?.leadToAppRate || 0}%
+          {/* KPI 4: Direct Booking Rate */}
+          <div className={`backdrop-blur-sm rounded-xl shadow-sm border-2 p-6 ${weeklyMetrics ? getMetricBg(weeklyMetrics.metrics.directBookingRate.value, weeklyMetrics.metrics.directBookingRate.target) : 'bg-white/90 border-[#E4DDD3]'}`}>
+            <div className="text-sm text-[#55514D] font-medium mb-2">Direct Booking</div>
+            <div className={`text-4xl font-bold ${weeklyMetrics ? getMetricColor(weeklyMetrics.metrics.directBookingRate.value, weeklyMetrics.metrics.directBookingRate.target) : 'text-[#1C1B1A]'}`}>
+              {weeklyMetrics?.metrics.directBookingRate.value || 0}%
             </div>
             <div className="text-xs text-[#55514D] mt-2">
-              Target: 6% • {overview?.convertedCount || 0} applications
+              Target: {weeklyMetrics?.metrics.directBookingRate.target || 25}% • LOD bookings
+            </div>
+          </div>
+
+          {/* KPI 5: Holly Booking Rate */}
+          <div className={`backdrop-blur-sm rounded-xl shadow-sm border-2 p-6 ${weeklyMetrics ? getMetricBg(weeklyMetrics.metrics.hollyResponseRate.value, weeklyMetrics.metrics.hollyResponseRate.target) : 'bg-white/90 border-[#E4DDD3]'}`}>
+            <div className="text-sm text-[#55514D] font-medium mb-2">Holly Booking</div>
+            <div className={`text-4xl font-bold ${weeklyMetrics ? getMetricColor(weeklyMetrics.metrics.hollyResponseRate.value, weeklyMetrics.metrics.hollyResponseRate.target) : 'text-[#1C1B1A]'}`}>
+              {weeklyMetrics?.metrics.hollyResponseRate.value || 0}%
+            </div>
+            <div className="text-xs text-[#55514D] mt-2">
+              Target: {weeklyMetrics?.metrics.hollyResponseRate.target || 40}% • Non-direct
             </div>
           </div>
         </div>
@@ -400,6 +417,16 @@ export default function AnalyticsPage() {
             <div className="text-3xl font-bold text-[#1C1B1A]">{overview?.totalLeads || 0}</div>
             <div className="text-xs text-[#55514D] mt-2">
               {overview?.activeLeadsCount || 0} active, {overview?.convertedCount || 0} converted
+            </div>
+          </div>
+
+          <div className={`backdrop-blur-sm rounded-xl shadow-sm border-2 p-6 ${getMetricBg(overview?.showUpRate || 0, 75)}`}>
+            <div className="text-sm text-[#55514D] font-medium mb-2">Show-Up Rate</div>
+            <div className={`text-3xl font-bold ${getMetricColor(overview?.showUpRate || 0, 75)}`}>
+              {overview?.showUpRate || 0}%
+            </div>
+            <div className="text-xs text-[#55514D] mt-2">
+              Target: 75% • {overview?.callsCompleted || 0} of {overview?.callsScheduled || 0} calls
             </div>
           </div>
 
@@ -420,16 +447,6 @@ export default function AnalyticsPage() {
             </div>
             <div className="text-xs text-[#55514D] mt-2">
               {(overview as any)?.leadsStuck || 0} leads stuck (&gt;7 days)
-            </div>
-          </div>
-
-          <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-6">
-            <div className="text-sm text-[#55514D] font-medium mb-2">Call-to-App Rate</div>
-            <div className="text-3xl font-bold text-[#625FFF]">
-              {overview?.callToAppRate || 0}%
-            </div>
-            <div className="text-xs text-[#55514D] mt-2">
-              Target: 45% • Close rate from calls
             </div>
           </div>
 
