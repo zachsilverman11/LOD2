@@ -45,23 +45,37 @@ export async function GET() {
     // Calculate conversion rate
     const conversionRate = totalLeads > 0 ? (convertedCount / totalLeads) * 100 : 0;
 
-    // FIXED: Get actual scheduled calls from appointments (not status-based)
-    const callsScheduled = await prisma.appointment.count({
+    // FIXED: Get past appointments (exclude future and cancelled) for show-up rate
+    const now = new Date();
+    const pastAppointments = await prisma.appointment.findMany({
       where: {
-        status: {
-          in: ["scheduled", "completed", "no_show"],
-        },
+        scheduledAt: { lt: now },
+        status: { not: "cancelled" },
       },
     });
 
-    // FIXED: Get actual completed calls from CallOutcome records where reached=true
-    const callsCompleted = await prisma.callOutcome.count({
-      where: {
-        reached: true,
-      },
-    });
+    // For each past appointment, check if there's a CallOutcome
+    const pastAppointmentsWithOutcome = await Promise.all(
+      pastAppointments.map(async (appt) => {
+        const outcome = await prisma.callOutcome.findFirst({
+          where: {
+            leadId: appt.leadId,
+            reached: true,
+            createdAt: {
+              // CallOutcome should be within 24 hours of appointment
+              gte: new Date(appt.scheduledAt.getTime() - 24 * 60 * 60 * 1000),
+              lte: new Date(appt.scheduledAt.getTime() + 24 * 60 * 60 * 1000),
+            },
+          },
+        });
+        return outcome !== null;
+      })
+    );
 
-    // Calculate show-up rate (actual calls completed vs scheduled)
+    const callsScheduled = pastAppointments.length;
+    const callsCompleted = pastAppointmentsWithOutcome.filter(Boolean).length;
+
+    // Calculate show-up rate (past appointments with CallOutcome / past appointments)
     const showUpRate = callsScheduled > 0 ? (callsCompleted / callsScheduled) * 100 : 0;
 
     // Get total appointments
