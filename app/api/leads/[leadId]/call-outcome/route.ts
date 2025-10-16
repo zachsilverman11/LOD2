@@ -33,6 +33,32 @@ export async function POST(
       return NextResponse.json({ error: "Lead not found" }, { status: 404 });
     }
 
+    // 🛡️ DEDUPLICATION: Check if a call outcome was already submitted in the last 5 minutes
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const recentCallOutcome = await prisma.callOutcome.findFirst({
+      where: {
+        leadId,
+        createdAt: { gte: fiveMinutesAgo },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (recentCallOutcome) {
+      console.log(`[Call Outcome] ⚠️  Duplicate detected - call outcome already submitted ${Math.floor((Date.now() - recentCallOutcome.createdAt.getTime()) / 1000)}s ago`);
+      return NextResponse.json(
+        {
+          error: "Duplicate submission detected",
+          message: `A call outcome for this lead was already submitted ${Math.floor((Date.now() - recentCallOutcome.createdAt.getTime()) / 60000)} minute(s) ago. Please refresh the page.`,
+          existingOutcome: {
+            id: recentCallOutcome.id,
+            outcome: recentCallOutcome.outcome,
+            createdAt: recentCallOutcome.createdAt,
+          }
+        },
+        { status: 409 }
+      );
+    }
+
     // Create the call outcome record
     const callOutcome = await prisma.callOutcome.create({
       data: {
