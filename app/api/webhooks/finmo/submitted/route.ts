@@ -40,9 +40,14 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Finmo - Submitted] Email: ${email}`);
 
-    // Find lead by email
-    const lead = await prisma.lead.findUnique({
-      where: { email: email.toLowerCase() },
+    // Find lead by email (case-insensitive to handle R277ben vs r277ben)
+    const lead = await prisma.lead.findFirst({
+      where: {
+        email: {
+          equals: email,
+          mode: 'insensitive'
+        }
+      },
       include: {
         communications: {
           where: { channel: "SMS" },
@@ -58,10 +63,19 @@ export async function POST(request: NextRequest) {
 
     if (!lead) {
       console.error(`[Finmo - Submitted] Lead not found for email: ${email}`);
+
+      // Get all emails in database for debugging
+      const allLeads = await prisma.lead.findMany({
+        select: { email: true, firstName: true, lastName: true },
+        take: 20,
+        orderBy: { createdAt: 'desc' }
+      });
+      const recentEmails = allLeads.map(l => `${l.firstName} ${l.lastName}: ${l.email}`).join('\n');
+
       await sendSlackNotification({
         type: "error",
         message: "Finmo Webhook (Submitted): Lead Not Found",
-        details: `Email: ${email}\nSearched in database but no match found.`,
+        details: `Email from Finmo: ${email}\n\nRecent leads in database:\n${recentEmails}`,
       });
       return NextResponse.json(
         { error: "Lead not found" },
