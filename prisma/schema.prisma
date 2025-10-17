@@ -28,6 +28,8 @@ model Lead {
   applicationStartedAt   DateTime?          // When lead started mortgage application
   applicationCompletedAt DateTime?          // When lead completed/submitted application
   pipedriveDealId        String?            // Pipedrive deal ID after conversion
+  nextReviewAt           DateTime?          // For autonomous agent smart scheduling
+  managedByAutonomous    Boolean            @default(false) // True if managed by new autonomous agent
   appointments           Appointment[]
   communications         Communication[]
   activities             LeadActivity[]
@@ -42,6 +44,8 @@ model Lead {
   @@index([createdAt])
   @@index([applicationStartedAt])
   @@index([applicationCompletedAt])
+  @@index([nextReviewAt])
+  @@index([managedByAutonomous])
 }
 
 model LeadActivity {
