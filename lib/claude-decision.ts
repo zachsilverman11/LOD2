@@ -1,12 +1,13 @@
 /**
  * Claude Decision Engine
- * Minimal, rule-free prompt that trusts Claude's intelligence
+ * Rich context + minimal rules = intelligent decisions
  */
 
 import Anthropic from '@anthropic-ai/sdk';
 import { Lead } from '@prisma/client';
 import { DealSignals } from './deal-intelligence';
 import { HollyDecision } from './safety-guardrails';
+import { buildHollyBriefing } from './holly-knowledge-base';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -20,70 +21,97 @@ export async function askHollyToDecide(
   },
   signals: DealSignals
 ): Promise<HollyDecision> {
-  // Build minimal context
   const rawData = lead.rawData as any;
-  const firstName = lead.firstName || rawData?.name?.split(' ')[0] || 'there';
+  const firstName = lead.firstName || rawData?.first_name || rawData?.name?.split(' ')[0] || 'there';
 
-  // Recent conversation (last 5 messages)
+  // Recent conversation (last 8 messages for better context)
   const recentMessages =
-    lead.communications
-      ?.slice(0, 5)
-      .map(
-        (m: any) =>
-          `${m.direction === 'OUTBOUND' ? 'You' : firstName}: ${m.content}`
-      )
-      .join('\n\n') || 'No conversation yet - first contact';
+    lead.communications && lead.communications.length > 0
+      ? lead.communications
+          .slice(0, 8)
+          .map((m: any) => `${m.direction === 'OUTBOUND' ? 'Holly' : firstName}: ${m.content}`)
+          .join('\n\n')
+      : '(No conversation yet - this will be first contact)';
 
-  // Call outcome context (if exists)
-  const callOutcome = lead.callOutcomes?.[0];
-  const callContext = callOutcome
-    ? `
-## Recent Call Outcome
-Advisor: ${callOutcome.advisorName}
-Result: ${callOutcome.outcome}
-${callOutcome.notes ? `Notes: ${callOutcome.notes}` : ''}
-`
-    : '';
+  // Count touches
+  const outboundCount =
+    lead.communications?.filter((c: any) => c.direction === 'OUTBOUND').length || 0;
+  const inboundCount =
+    lead.communications?.filter((c: any) => c.direction === 'INBOUND').length || 0;
 
-  // Build lead summary
-  const leadSummary = buildLeadSummary(rawData, lead);
+  // Days in pipeline
+  const daysInPipeline = Math.floor(
+    (Date.now() - lead.createdAt.getTime()) / (1000 * 60 * 60 * 24)
+  );
 
-  const prompt = `You are Holly, an expert mortgage sales agent reviewing your pipeline.
+  // Last message from
+  let lastMessageFrom: 'holly' | 'lead' | 'none' = 'none';
+  if (lead.communications && lead.communications.length > 0) {
+    lastMessageFrom = lead.communications[0].direction === 'OUTBOUND' ? 'holly' : 'lead';
+  }
 
-## Current Situation
-Lead: ${firstName} ${lead.lastName || ''}
-Temperature: **${signals.temperature}** (${signals.engagementTrend})
-${signals.contextualUrgency ? `⚠️ ${signals.contextualUrgency}` : ''}
+  // Build rich context briefing
+  const hollyBriefing = buildHollyBriefing({
+    leadData: rawData,
+    conversationContext: {
+      touchNumber: outboundCount + 1,
+      hasReplied: inboundCount > 0,
+      daysInPipeline,
+      messageHistory: recentMessages,
+      lastMessageFrom,
+    },
+    appointments: lead.appointments || [],
+    callOutcome: lead.callOutcomes?.[0],
+    applicationStatus: {
+      started: lead.applicationStartedAt || undefined,
+      completed: lead.applicationCompletedAt || undefined,
+    },
+  });
+
+  const prompt = `${hollyBriefing}
+
+---
+
+## 🎯 YOUR DECISION TASK
+
+**Lead Temperature:** ${signals.temperature} (${signals.engagementTrend})
+${signals.contextualUrgency ? `⚠️ **${signals.contextualUrgency}**` : ''}
 
 ${signals.reasoningContext}
 
-${callContext}
+---
 
-${leadSummary}
+## 💭 THINK LIKE A TOP SALES REP
 
-## Recent Conversation
-${recentMessages}
+Analyze this lead and decide your next move:
 
-## Your Task
-Analyze this lead and decide your next move.
+1. **What's their current state of mind?** (engaged, stalling, losing interest, needs help?)
+2. **What do they need right now?** (information, reassurance, push, space?)
+3. **What would move them forward?** (not what follows a rule - what actually works)
+4. **Should you reach out, wait, or get human help?**
 
-Think through:
-1. What's their current state of mind?
-2. Are they moving forward, stalling, or losing interest?
-3. What would a top sales rep do right now?
-4. Should you reach out, wait, or escalate to human?
+**Critical thinking:**
+- Use your knowledge base (programs, conversation principles) as TOOLS, not RULES
+- If you've already mentioned something, try a different angle
+- Match your message to their situation and engagement level
+- Be honest if you're unsure (confidence: low)
 
-Respond with JSON:
+---
+
+## 📤 YOUR RESPONSE (JSON only)
+
+\`\`\`json
 {
-  "thinking": "Your detailed reasoning (2-3 sentences)",
+  "thinking": "Your detailed reasoning (2-3 sentences). WHY this action makes sense.",
   "action": "send_sms" | "send_booking_link" | "send_application_link" | "wait" | "escalate",
-  "message": "Natural, brief message (if sending)",
+  "message": "Natural, conversational message (if sending). Use their name. Sound human.",
   "waitHours": 24,
-  "nextCheckCondition": "if they reply OR in 24h",
+  "nextCheckCondition": "what triggers next review (e.g., 'if they reply OR in 24h')",
   "confidence": "high" | "medium" | "low"
 }
+\`\`\`
 
-Be honest - if you're unsure, say so. Focus on conversion, not activity.`;
+**Focus on conversion, not activity. Quality over quantity.**`;
 
   try {
     const response = await anthropic.messages.create({
@@ -124,47 +152,4 @@ Be honest - if you're unsure, say so. Focus on conversion, not activity.`;
       confidence: 'low',
     };
   }
-}
-
-// Helper: Build concise lead summary
-function buildLeadSummary(rawData: any, lead: Lead): string {
-  const loanType = rawData?.loanType || rawData?.lead_type || 'unknown';
-  const isPurchase = loanType === 'purchase' || loanType === 'Home Purchase';
-  const isRefinance = loanType === 'refinance' || loanType === 'Refinance';
-  const isRenewal = loanType === 'renewal' || loanType === 'Renewal';
-
-  let summary = `Loan Type: ${loanType}\n`;
-
-  if (isPurchase) {
-    summary += `Purchase Price: $${rawData?.purchasePrice || rawData?.home_value || 'unknown'}\n`;
-    summary += `Down Payment: $${rawData?.downPayment || rawData?.down_payment || 'unknown'}\n`;
-    if (rawData?.motivation_level) {
-      summary += `Urgency: ${rawData.motivation_level}\n`;
-    }
-  } else if (isRefinance) {
-    summary += `Property Value: $${rawData?.purchasePrice || rawData?.home_value || 'unknown'}\n`;
-    if (rawData?.withdraw_amount && parseInt(rawData.withdraw_amount) > 0) {
-      summary += `Cash Out: $${rawData.withdraw_amount}\n`;
-    }
-    if (rawData?.lender) {
-      summary += `Current Lender: ${rawData.lender}\n`;
-    }
-  } else if (isRenewal) {
-    if (rawData?.balance) {
-      summary += `Current Balance: $${rawData.balance}\n`;
-    }
-    if (rawData?.timeframe) {
-      summary += `Timeline: ${rawData.timeframe}\n`;
-    }
-  }
-
-  if (rawData?.creditScore) {
-    summary += `Credit Score: ${rawData.creditScore}\n`;
-  }
-
-  if (lead.applicationStartedAt && !lead.applicationCompletedAt) {
-    summary += `⚠️ Application started but not completed\n`;
-  }
-
-  return summary;
 }
