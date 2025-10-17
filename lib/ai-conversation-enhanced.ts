@@ -35,6 +35,7 @@ interface AIDecision {
     | "send_both"
     | "schedule_followup"
     | "send_booking_link"
+    | "send_application_link"
     | "escalate"
     | "do_nothing"
     | "move_stage";
@@ -769,26 +770,30 @@ Otherwise, I'll leave you be. Good luck with everything! 👍"
 2. **send_email**: Send professional email with detailed information
 3. **send_both**: Send coordinated SMS + Email together for maximum impact
 4. **schedule_followup**: Schedule follow-up (specify hours to wait)
-5. **send_booking_link**: Send Cal.com link when ready to book
-6. **move_stage**: Progress lead through pipeline
-7. **escalate**: Flag for human intervention
-8. **do_nothing**: No action needed
+5. **send_booking_link**: Send Cal.com link when ready to book discovery call
+6. **send_application_link**: Send mortgage application link when ready to start app
+7. **move_stage**: Progress lead through pipeline
+8. **escalate**: Flag for human intervention
+9. **do_nothing**: No action needed
 
-🚨 **CRITICAL EMAIL RULE - READ THIS CAREFULLY:**
+🚨 **CRITICAL LINK SENDING RULES - READ THIS CAREFULLY:**
 
-**NEVER claim you sent an email unless you actually used the send_email or send_both tool!**
+**NEVER claim you sent a link unless you actually used the correct tool!**
 
 ❌ **WRONG EXAMPLES:**
-- Choosing send_sms tool with message: "Just emailed you the link!"
-- Choosing send_sms tool with message: "Check your email for the details"
-- Saying you'll email something without actually using send_email/send_both
+- Choosing send_sms with message: "Here's the link to start your application" (NO LINK!)
+- Choosing send_sms with message: "Just sent you the booking link" (NO LINK!)
+- Choosing send_sms with message: "Check your email for the link" without using send_email/send_both
 
 ✅ **CORRECT EXAMPLES:**
-- If lead asks for email: Use send_both tool (sends SMS + Email simultaneously)
-- If you want to email details: Use send_email tool, NOT send_sms
-- If sending important links: Use send_both to ensure they receive it both ways
+- Lead ready to book call: Use **send_booking_link** tool (auto-appends Cal.com URL)
+- Lead ready for application: Use **send_application_link** tool (auto-appends app URL)
+- Want to send via email too: Use **send_both** tool with actual HTML link in email body
 
-**Rule of thumb:** Your actions must match your words. If you say you're emailing, you MUST use send_email or send_both tool.
+**Rule of thumb:**
+- If you mention sending a link, you MUST use send_booking_link or send_application_link
+- If you mention emailing, you MUST use send_email or send_both
+- Your actions must ALWAYS match your words!
 
 # 📱💌 MULTI-CHANNEL STRATEGY - WHEN TO USE SMS vs EMAIL vs BOTH
 
@@ -1078,17 +1083,38 @@ Remember: The goal of message #1 is NOT to book them. It's to demonstrate you re
         type: "function",
         function: {
           name: "send_booking_link",
-          description: "Send the Cal.com booking link when lead is ready to schedule",
+          description: "Send the Cal.com booking link when lead is ready to schedule a discovery call",
           parameters: {
             type: "object",
             properties: {
               message: {
                 type: "string",
-                description: "Message to accompany the booking link. DO NOT include placeholder text like '[link]' or 'here's the link' - the actual URL will be appended automatically. Just write the message naturally.",
+                description: "Message to accompany the booking link. Write naturally - the Cal.com URL will be automatically appended after your message. Example: 'Greg can walk you through your options in 10 mins. When works better for you?'",
               },
               reasoning: {
                 type: "string",
                 description: "Why they're ready to book now",
+              },
+            },
+            required: ["message", "reasoning"],
+          },
+        },
+      },
+      {
+        type: "function",
+        function: {
+          name: "send_application_link",
+          description: "Send the mortgage application link when lead is ready to start their application (typically after discovery call)",
+          parameters: {
+            type: "object",
+            properties: {
+              message: {
+                type: "string",
+                description: "Message to accompany the application link. Write naturally - the application URL will be automatically appended after your message. Example: 'Great! Here's your application link. Takes about 10-15 mins to complete.'",
+              },
+              reasoning: {
+                type: "string",
+                description: "Why they're ready to start the application now",
               },
             },
             required: ["message", "reasoning"],
@@ -1241,6 +1267,9 @@ Remember: The goal of message #1 is NOT to book them. It's to demonstrate you re
       decision.followupHours = functionArgs.hours;
       break;
     case "send_booking_link":
+      decision.message = functionArgs.message;
+      break;
+    case "send_application_link":
       decision.message = functionArgs.message;
       break;
     case "move_stage":
@@ -1473,6 +1502,45 @@ export async function executeDecision(
             error: error instanceof Error ? error : new Error(String(error)),
             context: {
               location: "ai-conversation-enhanced - send_booking_link",
+              leadId,
+              details: { message: decision.message, phone: lead.phone },
+            },
+          });
+          throw error;
+        }
+      }
+      break;
+
+    case "send_application_link":
+      if (decision.message) {
+        try {
+          const applicationUrl = process.env.NEXT_PUBLIC_APPLICATION_URL || "https://stressfree.mtg-app.com/";
+
+          // Send clean link
+          const messageWithLink = `${decision.message}\n\n${applicationUrl}`;
+
+          await sendSms({
+            to: lead.phone,
+            body: messageWithLink,
+          });
+
+          await prisma.communication.create({
+            data: {
+              leadId,
+              channel: "SMS",
+              direction: "OUTBOUND",
+              content: messageWithLink,
+              intent: "application_link_sent",
+              metadata: { aiReasoning: decision.reasoning },
+            },
+          });
+
+          await updateLeadAfterContact(leadId, lead.status);
+        } catch (error) {
+          await sendErrorAlert({
+            error: error instanceof Error ? error : new Error(String(error)),
+            context: {
+              location: "ai-conversation-enhanced - send_application_link",
               leadId,
               details: { message: decision.message, phone: lead.phone },
             },

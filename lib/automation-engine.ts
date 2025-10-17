@@ -953,7 +953,6 @@ async function processApplicationNudges() {
   const now = new Date();
   const twentyFourHoursAgo = new Date(now.getTime() - 24 * 3600000);
   const fortyEightHoursAgo = new Date(now.getTime() - 48 * 3600000);
-  const seventyTwoHoursAgo = new Date(now.getTime() - 72 * 3600000);
 
   // 1. Find leads with APPLICATION_STARTED for 24+ hours (first nudge)
   const incompleteApps24h = await prisma.lead.findMany({
@@ -990,18 +989,18 @@ async function processApplicationNudges() {
     },
   });
 
-  // 3. Find leads with CALL_COMPLETED for 72+ hours (no app started)
+  // 3. Find leads with CALL_COMPLETED for 24+ hours (no app started) - CRITICAL FIX: Changed from 72h to 24h
   const callsWithoutApp = await prisma.lead.findMany({
     where: {
       status: LeadStatus.CALL_COMPLETED,
       updatedAt: {
-        lte: seventyTwoHoursAgo,
+        lte: twentyFourHoursAgo,
       },
     },
     include: {
       communications: {
         where: {
-          createdAt: { gte: seventyTwoHoursAgo },
+          createdAt: { gte: twentyFourHoursAgo },
         },
       },
     },
@@ -1061,10 +1060,10 @@ async function processApplicationNudges() {
 
   // Send "ready to start app?" to completed calls
   for (const lead of callsWithoutApp) {
-    if (lead.communications.length > 0) continue; // Already messaged in last 72h
+    if (lead.communications.length > 0) continue; // Already messaged in last 24h
 
     try {
-      console.log(`[Automation] Sending app start prompt to lead ${lead.id} (call completed 72h ago)`);
+      console.log(`[Automation] Sending app start prompt to lead ${lead.id} (call completed 24h ago)`);
 
       const decision = await handleConversation(lead.id);
       await executeDecision(lead.id, decision);
@@ -1078,7 +1077,7 @@ async function processApplicationNudges() {
         type: "lead_updated",
         leadName: `${lead.firstName} ${lead.lastName}`,
         leadId: lead.id,
-        details: "🚀 Call completed 72h ago, no app - Holly sending application link",
+        details: "🚀 Call completed 24h ago, no app - Holly sending application link",
       });
     } catch (error) {
       console.error(`[Automation] Error sending app start prompt to lead ${lead.id}:`, error);
