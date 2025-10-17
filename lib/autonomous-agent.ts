@@ -37,6 +37,7 @@ export async function runHollyAgentLoop() {
         status: { notIn: ['LOST', 'CONVERTED', 'DEALS_WON'] },
         consentSms: true,
         managedByAutonomous: true, // Only autonomous leads
+        hollyDisabled: false, // Skip leads with Holly disabled (manual relationships)
         OR: [
           { nextReviewAt: null }, // Never reviewed
           { nextReviewAt: { lte: now } }, // Review time passed

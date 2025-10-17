@@ -466,6 +466,42 @@ export function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
             </div>
           </div>
 
+          {/* Holly AI Control */}
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold mb-3 text-[#1C1B1A]">Holly AI Assistant</h3>
+            <div className="flex items-center justify-between p-4 bg-[#FBF3E7]/50 border border-[#E4DDD3] rounded-lg">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-[#1C1B1A] mb-1">
+                  {lead.hollyDisabled ? '🔕 Holly Disabled' : '✅ Holly Active'}
+                </p>
+                <p className="text-xs text-[#55514D]">
+                  {lead.hollyDisabled
+                    ? 'Holly will not send any automated messages to this lead'
+                    : 'Holly can send automated follow-ups and nurture messages'}
+                </p>
+              </div>
+              <button
+                onClick={async () => {
+                  const response = await fetch(`/api/leads/${lead.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ hollyDisabled: !lead.hollyDisabled }),
+                  });
+                  if (response.ok) {
+                    window.location.reload();
+                  }
+                }}
+                className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
+                  lead.hollyDisabled
+                    ? 'bg-[#D9F36E] text-[#1C1B1A] hover:bg-[#D9F36E]/80'
+                    : 'bg-[#B34040] text-white hover:bg-[#B34040]/90'
+                }`}
+              >
+                {lead.hollyDisabled ? 'Enable Holly' : 'Disable Holly'}
+              </button>
+            </div>
+          </div>
+
           {/* Lead Details from Leads on Demand */}
           {lead.rawData && typeof lead.rawData === 'object' && Object.keys(lead.rawData as object).length > 0 && (
             <div className="mb-6">

@@ -30,6 +30,7 @@ model Lead {
   pipedriveDealId        String?            // Pipedrive deal ID after conversion
   nextReviewAt           DateTime?          // For autonomous agent smart scheduling
   managedByAutonomous    Boolean            @default(false) // True if managed by new autonomous agent
+  hollyDisabled          Boolean            @default(false) // True = Holly won't send any messages (manual relationship mode)
   appointments           Appointment[]
   communications         Communication[]
   activities             LeadActivity[]
@@ -46,6 +47,7 @@ model Lead {
   @@index([applicationCompletedAt])
   @@index([nextReviewAt])
   @@index([managedByAutonomous])
+  @@index([hollyDisabled])
 }
 
 model LeadActivity {

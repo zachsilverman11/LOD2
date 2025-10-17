@@ -574,7 +574,7 @@ async function processSmartFollowUps() {
   const twoDaysAgo = new Date(now.getTime() - 48 * 3600000);
 
   // Find leads in CONTACTED or ENGAGED that haven't been contacted recently
-  // Skip leads managed by autonomous agent
+  // Skip leads managed by autonomous agent OR with Holly disabled
   const leads = await prisma.lead.findMany({
     where: {
       status: {
@@ -582,6 +582,7 @@ async function processSmartFollowUps() {
       },
       consentSms: true,
       managedByAutonomous: false, // Only process leads NOT managed by autonomous agent
+      hollyDisabled: false, // Skip leads with Holly disabled (manual relationships)
       lastContactedAt: {
         lte: oneHourAgo, // Check if need follow-up (starts at 1 hour)
       },
