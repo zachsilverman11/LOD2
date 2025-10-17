@@ -200,7 +200,6 @@ export async function GET() {
     }, 0);
 
     // Calculate average days in current stage for active leads
-    const now = new Date();
     const leadsWithDaysInStage = await prisma.lead.findMany({
       where: {
         status: {
