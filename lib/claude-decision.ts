@@ -1,6 +1,14 @@
 /**
- * Claude Decision Engine
- * Rich context + minimal rules = intelligent decisions
+ * Claude Decision Engine - ENHANCED WITH 5-LAYER TRAINING
+ *
+ * Holly is now trained with:
+ * 1. Lead Journey Context (customer psychology)
+ * 2. Behavioral Intelligence (SMS pattern recognition)
+ * 3. Sales Psychology (proven frameworks)
+ * 4. Training Examples (few-shot learning)
+ * 5. Extended Thinking (step-by-step reasoning)
+ *
+ * This makes Holly autonomous AND world-class
  */
 
 import Anthropic from '@anthropic-ai/sdk';
@@ -8,6 +16,10 @@ import { Lead } from '@prisma/client';
 import { DealSignals } from './deal-intelligence';
 import { HollyDecision } from './safety-guardrails';
 import { buildHollyBriefing } from './holly-knowledge-base';
+import { getLeadJourneyIntro, getValueProposition, LEAD_JOURNEY } from './lead-journey-context';
+import { analyzeReply, isImmediateBooking, BEHAVIORAL_INTELLIGENCE } from './behavioral-intelligence';
+import { getConversationGuidance, SALES_PSYCHOLOGY } from './sales-psychology';
+import { getRelevantExamples } from './holly-training-examples';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -50,6 +62,19 @@ export async function askHollyToDecide(
     lastMessageFrom = lead.communications[0].direction === 'OUTBOUND' ? 'holly' : 'lead';
   }
 
+  // Get last inbound reply for behavioral analysis
+  const lastReply = lead.communications?.find((c: any) => c.direction === 'INBOUND')?.content;
+
+  // Determine lead type
+  const loanType = (rawData?.loanType || rawData?.lead_type || '').toLowerCase();
+  const leadType = loanType.includes('purchase')
+    ? 'purchase'
+    : loanType.includes('refinance')
+    ? 'refinance'
+    : loanType.includes('renewal')
+    ? 'renewal'
+    : 'purchase';
+
   // Build rich context briefing
   const hollyBriefing = buildHollyBriefing({
     leadData: rawData,
@@ -68,33 +93,171 @@ export async function askHollyToDecide(
     },
   });
 
+  // === LAYER 1: LEAD JOURNEY CONTEXT ===
+  const journeyContext = getLeadJourneyIntro(leadType, rawData?.motivation_level);
+  const valueProp = getValueProposition(rawData);
+
+  // === LAYER 2: BEHAVIORAL INTELLIGENCE ===
+  const replyAnalysis = lastReply ? analyzeReply(lastReply) : null;
+  const urgentBooking = isImmediateBooking(rawData);
+
+  // === LAYER 3: SALES PSYCHOLOGY ===
+  const conversationGuidance = getConversationGuidance(outboundCount + 1);
+
+  // === LAYER 4: TRAINING EXAMPLES ===
+  const relevantExamples = getRelevantExamples(
+    leadType,
+    rawData?.motivation_level,
+    lastReply,
+    outboundCount + 1
+  );
+
+  // Build training examples section
+  const examplesSection = relevantExamples.length > 0
+    ? `
+## 📚 LEARN FROM THESE EXAMPLES
+
+These are real (anonymized) conversations showing how top mortgage sales reps handle similar situations.
+Use these as INSPIRATION and GUIDANCE, not rigid scripts. Adapt the principles to THIS specific lead.
+
+${relevantExamples
+  .map(
+    (ex, i) => `
+### Example ${i + 1}: ${ex.scenario}
+
+**Similar lead context:**
+- Type: ${ex.leadContext.type}
+${ex.leadContext.urgency ? `- Urgency: ${ex.leadContext.urgency}` : ''}
+${ex.leadContext.objection ? `- Objection: ${ex.leadContext.objection}` : ''}
+${ex.leadContext.engagement ? `- Engagement: ${ex.leadContext.engagement}` : ''}
+
+**✅ GOOD APPROACH:**
+\`\`\`
+${ex.goodApproach.message}
+\`\`\`
+
+**Why it works:**
+${ex.goodApproach.whyItWorks.map(w => `  - ${w}`).join('\n')}
+
+**❌ BAD APPROACH (don't do this):**
+\`\`\`
+${ex.badApproach.message}
+\`\`\`
+
+**Why it fails:**
+${ex.badApproach.whyItFails.map(w => `  - ${w}`).join('\n')}
+`
+  )
+  .join('\n\n')}
+
+---
+`
+    : '';
+
+  // Build behavioral intelligence section
+  const behavioralSection = replyAnalysis
+    ? `
+## 🧠 BEHAVIORAL ANALYSIS OF THEIR LAST REPLY
+
+**They said:** "${lastReply}"
+
+**Pattern detected:** ${replyAnalysis.pattern}
+**What it means:** ${replyAnalysis.meaning}
+**Recommended approach:** ${replyAnalysis.recommendedAction}
+
+${replyAnalysis.exampleResponse ? `**Example response:**\n\`\`\`\n${replyAnalysis.exampleResponse}\n\`\`\`` : ''}
+
+---
+`
+    : '';
+
+  // Build sales psychology section
+  const psychologySection = `
+## 🎯 SALES PSYCHOLOGY GUIDANCE (Touch #${outboundCount + 1})
+
+**Your goal for this touch:**
+${conversationGuidance.goal}
+
+**Recommended approach:**
+${conversationGuidance.approach}
+
+**What to avoid:**
+${conversationGuidance.avoid.map(a => `  - ${a}`).join('\n')}
+
+**Key trust-building principles:**
+${SALES_PSYCHOLOGY.trustBuilding.principles.slice(0, 3).map(p => `  - ${p}`).join('\n')}
+
+**Friction-reducing language tips:**
+- Instead of "schedule a consultation" → use "quick 10-15 min call"
+- Instead of "see what you qualify for" → use "get your exact rate"
+- Instead of "our rates" → use "rates we can get you"
+
+---
+`;
+
+  // === LAYER 5: ENHANCED PROMPT WITH EXTENDED THINKING ===
   const prompt = `${hollyBriefing}
 
 ---
+
+${journeyContext}
+
+${examplesSection}
+
+${behavioralSection}
+
+${psychologySection}
 
 ## 🎯 YOUR DECISION TASK
 
 **Lead Temperature:** ${signals.temperature} (${signals.engagementTrend})
 ${signals.contextualUrgency ? `⚠️ **${signals.contextualUrgency}**` : ''}
+${urgentBooking ? `⚠️ **URGENT BOOKING SIGNAL DETECTED**` : ''}
 
 ${signals.reasoningContext}
 
+**Relevant value proposition for this lead:**
+${valueProp}
+
 ---
 
-## 💭 THINK LIKE A TOP SALES REP
+## 💭 THINK STEP-BY-STEP (Extended Thinking)
 
-Analyze this lead and decide your next move:
+You are Holly, an expert mortgage sales agent. You've been trained on successful conversations, behavioral psychology, and sales frameworks.
 
-1. **What's their current state of mind?** (engaged, stalling, losing interest, needs help?)
-2. **What do they need right now?** (information, reassurance, push, space?)
-3. **What would move them forward?** (not what follows a rule - what actually works)
-4. **Should you reach out, wait, or get human help?**
+Now, think through this lead STEP-BY-STEP:
 
-**Critical thinking:**
-- Use your knowledge base (programs, conversation principles) as TOOLS, not RULES
-- If you've already mentioned something, try a different angle
-- Match your message to their situation and engagement level
-- Be honest if you're unsure (confidence: low)
+### Step 1: Customer Psychology Analysis
+- What were they searching for when they found us?
+- What did they expect when they filled out the form?
+- What's their mental state RIGHT NOW?
+  ${inboundCount > 0 ? `- They've replied ${inboundCount} time(s) - what does that tell you?` : '- They haven\'t replied yet - why might that be?'}
+  ${lastReply ? `- Their last message was: "${lastReply}" - what does this reveal?` : ''}
+- What's likely blocking them from booking?
+
+### Step 2: Behavioral Pattern Recognition
+${behavioralSection ? '- You have behavioral intelligence above - use it' : '- No reply yet - what does first touch strategy suggest?'}
+- Engagement level: ${signals.temperature} (${signals.engagementTrend})
+- Touch number: ${outboundCount + 1} - what's the right approach for this stage?
+- Timeline urgency: ${rawData?.motivation_level || 'Unknown'}
+
+### Step 3: Value Proposition Strategy
+- What specific value can you create for THIS lead?
+- Which program (if any) is most relevant?
+- How should you quantify the benefit?
+- What's the right level of friction? (push for booking vs continue conversation)
+
+### Step 4: Message Crafting
+- Look at the training examples - what principles apply here?
+- What would a TOP sales rep say in this exact situation?
+- How can you sound natural and human, not robotic?
+- Should you ask a question? Create urgency? Address an objection?
+
+### Step 5: Autonomous Decision
+- Action: send_sms, wait, or escalate?
+- If sending: craft a specific message for THIS lead
+- If waiting: how long and why?
+- Confidence level: honest assessment
 
 ---
 
@@ -102,21 +265,29 @@ Analyze this lead and decide your next move:
 
 \`\`\`json
 {
-  "thinking": "Your detailed reasoning (2-3 sentences). WHY this action makes sense.",
+  "thinking": "Your step-by-step reasoning covering all 5 steps above (3-5 sentences)",
+  "customerMindset": "One sentence: what you believe they're feeling/thinking right now",
   "action": "send_sms" | "send_booking_link" | "send_application_link" | "wait" | "escalate",
-  "message": "Natural, conversational message (if sending). Use their name. Sound human.",
+  "message": "Your natural, conversational message (if sending). Use their name. Sound human. Apply what you learned from the examples.",
   "waitHours": 24,
-  "nextCheckCondition": "what triggers next review (e.g., 'if they reply OR in 24h')",
+  "nextCheckCondition": "What triggers next review",
   "confidence": "high" | "medium" | "low"
 }
 \`\`\`
+
+**Remember:**
+- Use the journey context to understand their mindset
+- Apply behavioral intelligence if they've replied
+- Follow sales psychology principles
+- Learn from the training examples
+- Think autonomously - you decide what works best
 
 **Focus on conversion, not activity. Quality over quantity.**`;
 
   try {
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-5-20250929',
-      max_tokens: 1024,
+      max_tokens: 1536, // Increased for extended thinking
       messages: [{ role: 'user', content: prompt }],
     });
 
@@ -137,12 +308,12 @@ Analyze this lead and decide your next move:
 
     // Log decision for debugging
     console.log(
-      `[Claude] ${firstName}: ${decision.thinking} → ${decision.action} (confidence: ${decision.confidence})`
+      `[Holly - Enhanced] ${firstName}: ${decision.thinking} → ${decision.action} (confidence: ${decision.confidence})`
     );
 
     return decision;
   } catch (error) {
-    console.error('[Claude] Error getting decision:', error);
+    console.error('[Holly - Enhanced] Error getting decision:', error);
 
     // Fallback decision on error: wait and retry
     return {
