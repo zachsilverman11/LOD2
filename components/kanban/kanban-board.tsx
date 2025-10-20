@@ -87,15 +87,22 @@ export function KanbanBoard({ onLeadClick }: KanbanBoardProps) {
 
     // Update on server
     try {
+      console.log(`[Kanban] Updating lead ${leadId} from ${oldStatus} to ${newStatus}`);
+
       const response = await fetch(`/api/leads/${leadId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error('Failed to update lead status');
+        console.error('[Kanban] Server error:', data);
+        throw new Error(data.details || data.error || 'Failed to update lead status');
       }
+
+      console.log('[Kanban] Lead updated successfully:', data);
 
       // Success notification
       setNotification({
@@ -105,17 +112,18 @@ export function KanbanBoard({ onLeadClick }: KanbanBoardProps) {
 
       setTimeout(() => setNotification(null), 3000);
     } catch (error) {
-      console.error("Error updating lead:", error);
+      console.error("[Kanban] Error updating lead:", error);
 
       // Revert on error
       setLeads((prev) =>
         prev.map((l) => (l.id === leadId ? { ...l, status: oldStatus } : l))
       );
 
-      // Error notification
+      // Error notification with more details
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update lead. Please try again.';
       setNotification({
         type: 'error',
-        message: 'Failed to update lead. Please try again.'
+        message: errorMessage
       });
 
       setTimeout(() => setNotification(null), 5000);

@@ -298,8 +298,14 @@ Email Body: More detailed with HTML formatting, include the link prominently`;
         break;
 
       case "NO_ANSWER":
-        // Keep in current status, continue normal automation
-        actionTaken = "Holly will continue normal nurturing schedule.";
+        // Move to NURTURING - voicemail left, Holly will continue nurturing
+        newStatus = "NURTURING";
+        actionTaken = "Moved to NURTURING. Holly will continue nurturing schedule.";
+
+        await prisma.lead.update({
+          where: { id: leadId },
+          data: { status: "NURTURING" },
+        });
         break;
 
       default:

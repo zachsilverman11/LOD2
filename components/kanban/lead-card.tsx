@@ -5,7 +5,7 @@ import { format } from "date-fns";
 
 interface LeadCardProps {
   lead: LeadWithRelations;
-  onClick: () => void;
+  onClick: (e?: React.MouseEvent) => void;
 }
 
 export function LeadCard({ lead, onClick }: LeadCardProps) {

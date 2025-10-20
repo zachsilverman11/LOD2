@@ -142,6 +142,10 @@ export function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
   const [showManualSms, setShowManualSms] = useState(false);
   const [manualSmsText, setManualSmsText] = useState("");
   const [isSendingSms, setIsSendingSms] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editedFirstName, setEditedFirstName] = useState(lead?.firstName || "");
+  const [editedLastName, setEditedLastName] = useState(lead?.lastName || "");
+  const [isSavingName, setIsSavingName] = useState(false);
 
   if (!lead) return null;
 
@@ -270,19 +274,101 @@ export function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
     }
   };
 
+  const handleSaveName = async () => {
+    if (!editedFirstName.trim() || !editedLastName.trim()) {
+      alert("First name and last name are required");
+      return;
+    }
+
+    setIsSavingName(true);
+    try {
+      const response = await fetch(`/api/leads/${lead.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          firstName: editedFirstName.trim(),
+          lastName: editedLastName.trim(),
+        }),
+      });
+
+      if (response.ok) {
+        setIsEditingName(false);
+        window.location.reload(); // Simple refresh for now
+      } else {
+        const error = await response.json();
+        alert(`Failed to update name: ${error.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error("Error updating name:", error);
+      alert("Error updating name");
+    } finally {
+      setIsSavingName(false);
+    }
+  };
+
+  const handleCancelNameEdit = () => {
+    setEditedFirstName(lead.firstName);
+    setEditedLastName(lead.lastName);
+    setIsEditingName(false);
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
       <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-[#E4DDD3]" onClick={(e) => e.stopPropagation()}>
-        <div className="sticky top-0 bg-white border-b border-[#E4DDD3] px-6 py-4 flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-[#1C1B1A]">
-            {lead.firstName} {lead.lastName}
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-[#55514D] hover:text-[#1C1B1A] text-2xl"
-          >
-            ×
-          </button>
+        <div className="sticky top-0 bg-white border-b border-[#E4DDD3] px-6 py-4">
+          <div className="flex justify-between items-center">
+            {isEditingName ? (
+              <div className="flex items-center gap-3 flex-1">
+                <input
+                  type="text"
+                  value={editedFirstName}
+                  onChange={(e) => setEditedFirstName(e.target.value)}
+                  placeholder="First Name"
+                  className="text-xl font-bold text-[#1C1B1A] border border-[#E4DDD3] rounded px-3 py-1 focus:outline-none focus:border-[#625FFF]"
+                />
+                <input
+                  type="text"
+                  value={editedLastName}
+                  onChange={(e) => setEditedLastName(e.target.value)}
+                  placeholder="Last Name"
+                  className="text-xl font-bold text-[#1C1B1A] border border-[#E4DDD3] rounded px-3 py-1 focus:outline-none focus:border-[#625FFF]"
+                />
+                <button
+                  onClick={handleSaveName}
+                  disabled={isSavingName}
+                  className="px-3 py-1 bg-[#625FFF] text-white rounded hover:bg-[#4E4BCC] transition-colors text-sm disabled:opacity-50"
+                >
+                  {isSavingName ? "Saving..." : "Save"}
+                </button>
+                <button
+                  onClick={handleCancelNameEdit}
+                  disabled={isSavingName}
+                  className="px-3 py-1 border border-[#E4DDD3] text-[#55514D] rounded hover:bg-[#FBF3E7] transition-colors text-sm disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 flex-1">
+                <h2 className="text-2xl font-bold text-[#1C1B1A]">
+                  {lead.firstName} {lead.lastName}
+                </h2>
+                <button
+                  onClick={() => setIsEditingName(true)}
+                  className="text-[#625FFF] hover:text-[#4E4BCC] text-sm px-2 py-1 rounded hover:bg-[#FBF3E7] transition-colors"
+                  title="Edit name"
+                >
+                  ✏️ Edit
+                </button>
+              </div>
+            )}
+            <button
+              onClick={onClose}
+              className="text-[#55514D] hover:text-[#1C1B1A] text-2xl ml-4"
+            >
+              ×
+            </button>
+          </div>
         </div>
 
         <div className="p-6">
