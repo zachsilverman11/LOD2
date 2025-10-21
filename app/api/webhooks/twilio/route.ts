@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { normalizePhoneNumber } from "@/lib/sms";
 import { ActivityType, CommunicationChannel } from "@/app/generated/prisma";
-import { handleConversation, executeDecision } from "@/lib/ai-conversation-enhanced";
+import { processLeadWithAutonomousAgent } from "@/lib/autonomous-agent";
 import { sendErrorAlert } from "@/lib/slack";
 import { humanDelay } from "@/lib/human-delay";
 
@@ -90,33 +90,31 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // 🤖 TRIGGER AI RESPONSE
-      // Must await in serverless environment (can't use setImmediate)
+      // 🤖 TRIGGER AUTONOMOUS HOLLY AGENT (INSTANT RESPONSE)
+      // Process this lead immediately through the intelligent autonomous agent
+      // The agent will analyze, decide, and respond using Claude Sonnet 4.5 with 5-layer training
       try {
-        console.log(`[AI] Processing incoming SMS from lead: ${lead.id}`);
+        console.log(`[Autonomous Holly] Processing incoming SMS from lead: ${lead.id}`);
 
-        // Generate AI response
-        const decision = await handleConversation(lead.id, body);
+        // Add small human-like delay before processing (natural feeling)
+        await humanDelay(body, null);
 
-        // Add human-like delay before responding (makes Holly appear more natural)
-        await humanDelay(body, decision.message);
+        // Process lead through autonomous agent
+        const result = await processLeadWithAutonomousAgent(lead.id);
 
-        // Execute the decision
-        await executeDecision(lead.id, decision);
-
-        // NOTE: Stage progression (CONTACTED -> ENGAGED/NURTURING/LOST) is now handled
-        // by Holly via the move_stage tool based on response sentiment. She decides if
-        // the reply is positive (ENGAGED), hesitant (NURTURING), or negative (LOST).
-
-        console.log(`[AI] ✅ Response handled: ${decision.action}`);
+        if (result.success) {
+          console.log(`[Autonomous Holly] ✅ Response handled: ${result.action}`);
+        } else {
+          console.log(`[Autonomous Holly] ⏭️  Skipped or deferred: ${result.reason}`);
+        }
       } catch (error) {
-        console.error("[AI] Failed to handle conversation:", error);
+        console.error("[Autonomous Holly] Failed to process lead:", error);
 
         // Send error alert to Slack
         await sendErrorAlert({
           error: error instanceof Error ? error : new Error(String(error)),
           context: {
-            location: "webhooks/twilio - AI conversation handler",
+            location: "webhooks/twilio - Autonomous Holly handler",
             leadId: lead.id,
             details: { incomingMessage: body, phone: normalizedPhone },
           },

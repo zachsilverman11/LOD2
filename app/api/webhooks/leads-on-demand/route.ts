@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { handleConversation, executeDecision } from "@/lib/ai-conversation-enhanced";
+import { processLeadWithAutonomousAgent } from "@/lib/autonomous-agent";
 import { sendSlackNotification, sendErrorAlert } from "@/lib/slack";
 import { correctNames } from "@/lib/name-correction";
 
@@ -197,40 +197,28 @@ export async function POST(req: NextRequest) {
       data: { processed: true },
     });
 
-    // 🚀 INSTANT AI CONTACT - Only for new leads
+    // 🚀 INSTANT AUTONOMOUS HOLLY CONTACT - Only for new leads
     if (!existingLead && lead.consentSms) {
-      console.log(`[AI] Initiating instant contact for lead: ${lead.id}`);
+      console.log(`[Autonomous Holly] Initiating instant contact for lead: ${lead.id}`);
 
       try {
-        // Generate AI response for first contact
-        const decision = await handleConversation(lead.id);
+        // Process new lead through autonomous agent (instant first contact)
+        // The agent will analyze, decide, and send the first message using Claude Sonnet 4.5
+        const result = await processLeadWithAutonomousAgent(lead.id);
 
-        // Execute the decision (send SMS)
-        await executeDecision(lead.id, decision);
-
-        // Update lead status to CONTACTED
-        await prisma.lead.update({
-          where: { id: lead.id },
-          data: { status: "CONTACTED", lastContactedAt: new Date() },
-        });
-
-        await prisma.leadActivity.create({
-          data: {
-            leadId: lead.id,
-            type: "SMS_SENT",
-            content: "Initial AI-generated SMS sent",
-          },
-        });
-
-        console.log(`[AI] ✅ Initial contact sent successfully`);
+        if (result.success) {
+          console.log(`[Autonomous Holly] ✅ Instant contact sent successfully: ${result.action}`);
+        } else {
+          console.log(`[Autonomous Holly] ⏭️  First contact deferred: ${result.reason}`);
+        }
       } catch (error) {
-        console.error("[AI] Failed to send initial contact:", error);
+        console.error("[Autonomous Holly] Failed to send initial contact:", error);
 
         // Send error alert to Slack
         await sendErrorAlert({
           error: error instanceof Error ? error : new Error(String(error)),
           context: {
-            location: "webhooks/leads-on-demand - Initial AI contact",
+            location: "webhooks/leads-on-demand - Autonomous Holly instant contact",
             leadId: lead.id,
             details: { firstName, lastName, phone: lead.phone },
           },
@@ -241,7 +229,7 @@ export async function POST(req: NextRequest) {
           data: {
             leadId: lead.id,
             type: "NOTE_ADDED",
-            content: `Failed to send initial SMS: ${error instanceof Error ? error.message : "Unknown error"}`,
+            content: `Failed to send initial autonomous message: ${error instanceof Error ? error.message : "Unknown error"}`,
           },
         });
       }

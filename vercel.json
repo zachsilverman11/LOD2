@@ -1,6 +1,10 @@
 {
   "crons": [
     {
+      "path": "/api/cron/autonomous-holly",
+      "schedule": "*/15 * * * *"
+    },
+    {
       "path": "/api/cron/automations",
       "schedule": "*/15 * * * *"
     },
