@@ -9,6 +9,7 @@ import { askHollyToDecide } from './claude-decision';
 import { validateDecision, detectMessageRepetition } from './safety-guardrails';
 import { executeDecision } from './ai-conversation-enhanced';
 import { sendSlackNotification } from './slack';
+import { trackConversationOutcome } from './conversation-outcome-tracker';
 
 // Environment variables for safe rollout
 const ENABLE_AUTONOMOUS_AGENT = process.env.ENABLE_AUTONOMOUS_AGENT === 'true';
@@ -172,6 +173,17 @@ export async function processLeadWithAutonomousAgent(leadId: string) {
           action: decision.action,
           message: decision.message,
           reasoning: decision.thinking,
+        });
+
+        // Track conversation outcome for continuous learning
+        trackConversationOutcome({
+          leadId: lead.id,
+          messageSent: decision.message || '',
+          hollyDecision: {
+            ...decision,
+            sentAt: now,
+            signals,
+          },
         });
 
         // Schedule next review based on temperature

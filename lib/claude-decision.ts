@@ -1,14 +1,15 @@
 /**
- * Claude Decision Engine - ENHANCED WITH 5-LAYER TRAINING
+ * Claude Decision Engine - ENHANCED WITH 6-LAYER TRAINING + CONTINUOUS LEARNING
  *
  * Holly is now trained with:
  * 1. Lead Journey Context (customer psychology)
  * 2. Behavioral Intelligence (SMS pattern recognition)
  * 3. Sales Psychology (proven frameworks)
  * 4. Training Examples (few-shot learning)
- * 5. Extended Thinking (step-by-step reasoning)
+ * 5. Learned Examples (from REAL conversation outcomes) ← NEW!
+ * 6. Extended Thinking (step-by-step reasoning)
  *
- * This makes Holly autonomous AND world-class
+ * This makes Holly autonomous, world-class, AND self-improving
  */
 
 import Anthropic from '@anthropic-ai/sdk';
@@ -20,6 +21,7 @@ import { getLeadJourneyIntro, getValueProposition, LEAD_JOURNEY } from './lead-j
 import { analyzeReply, isImmediateBooking, BEHAVIORAL_INTELLIGENCE } from './behavioral-intelligence';
 import { getConversationGuidance, SALES_PSYCHOLOGY } from './sales-psychology';
 import { getRelevantExamples } from './holly-training-examples';
+import { LEARNED_EXAMPLES } from './holly-learned-examples';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -195,12 +197,42 @@ ${SALES_PSYCHOLOGY.trustBuilding.principles.slice(0, 3).map(p => `  - ${p}`).joi
 ---
 `;
 
-  // === LAYER 5: ENHANCED PROMPT WITH EXTENDED THINKING ===
+  // === LAYER 5: LEARNED EXAMPLES (from real conversation data) ===
+  const learnedSection = LEARNED_EXAMPLES.length > 0 ? `
+## 📊 REAL CONVERSATION LEARNINGS (MOST IMPORTANT!)
+
+These patterns come from ACTUAL conversations in the past 7 days - not theory, REAL DATA.
+Pay close attention to what worked vs what didn't.
+
+${LEARNED_EXAMPLES.map(ex => `
+### ${ex.scenario} (${ex.sampleSize} conversations analyzed)
+
+✅ **What WORKED** (${ex.whatWorked.bookingRate}% booking rate, ${ex.whatWorked.engagementRate}% engagement):
+"${ex.whatWorked.message}"
+
+**Why it worked:**
+${ex.whatWorked.whyItWorked.map(w => `  - ${w}`).join('\n')}
+
+❌ **What DIDN'T WORK** (${ex.whatDidntWork.bookingRate}% booking rate, ${ex.whatDidntWork.engagementRate}% engagement):
+"${ex.whatDidntWork.message}"
+
+**Why it failed:**
+${ex.whatDidntWork.whyItFailed.map(f => `  - ${f}`).join('\n')}
+`).join('\n')}
+
+**KEY TAKEAWAY:** Learn from these REAL outcomes. If a pattern has 80% booking rate vs 20%, use the 80% approach!
+
+---
+` : '';
+
+  // === LAYER 6: ENHANCED PROMPT WITH EXTENDED THINKING ===
   const prompt = `${hollyBriefing}
 
 ---
 
 ${journeyContext}
+
+${learnedSection}
 
 ${examplesSection}
 

@@ -63,9 +63,9 @@ export const SALES_PSYCHOLOGY: SalesPsychology = {
         why: '"Consultation" sounds formal/time-consuming. "Quick call" reduces perceived commitment.',
       },
       {
-        instead: 'Book an appointment',
-        use: 'Greg can call you this afternoon',
-        why: '"Book" requires effort. "Call you" is passive (low friction).',
+        instead: 'Greg can call you at [time]',
+        use: 'Here\'s Greg\'s calendar - grab a spot around [time]',
+        why: 'CRITICAL: NEVER promise a call time without booking. Always direct to calendar first.',
       },
       {
         instead: 'See what you qualify for',

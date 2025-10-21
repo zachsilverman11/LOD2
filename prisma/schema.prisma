@@ -38,6 +38,7 @@ model Lead {
   scheduledMessages      ScheduledMessage[]
   tasks                  Task[]
   callOutcomes           CallOutcome[]
+  conversationOutcomes   ConversationOutcome[]
 
   @@index([email])
   @@index([phone])
@@ -162,6 +163,26 @@ model Communication {
   @@index([createdAt])
 }
 
+model ConversationOutcome {
+  id              String   @id @default(cuid())
+  leadId          String
+  messageSent     String   // What Holly said
+  leadResponse    String?  // What lead said back (null if they didn't respond)
+  outcome         ConversationOutcomeType
+  sentiment       ConversationSentiment?
+  hollyDecision   Json?    // Store Claude's full decision for analysis
+  responseTime    Int?     // Minutes until lead responded (null if no response)
+  booked          Boolean  @default(false) // Did they book a call?
+  metadata        Json?    // Additional context
+  createdAt       DateTime @default(now())
+  lead            Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([outcome])
+  @@index([booked])
+  @@index([createdAt])
+}
+
 model ScheduledMessage {
   id           String               @id @default(cuid())
   leadId       String
@@ -251,6 +272,20 @@ enum CallOutcomeType {
   NOT_INTERESTED     // Lead not interested, move to LOST
   WRONG_NUMBER       // Invalid contact info
   NO_ANSWER          // Voicemail left, Holly continues nurturing
+}
+
+enum ConversationOutcomeType {
+  ENGAGED            // Lead replied within 4 hours with positive/neutral response
+  BOOKED             // Lead booked a call through Cal.com
+  GHOSTED            // No reply after 24+ hours
+  OPTED_OUT          // Lead said STOP/unsubscribe
+  ESCALATED          // Holly escalated to human review
+}
+
+enum ConversationSentiment {
+  POSITIVE           // Interested, engaged, asking questions
+  NEUTRAL            // Acknowledged but non-committal
+  NEGATIVE           // Not interested, frustrated, annoyed
 }
 
 enum LeadStatus {
