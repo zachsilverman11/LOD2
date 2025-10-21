@@ -134,6 +134,7 @@ export async function POST(req: NextRequest) {
           consentSms: payload.consent === "TRUE" || payload.consent === true,
           consentEmail: payload.consent === "TRUE" || payload.consent === true,
           consentCall: payload.consent === "TRUE" || payload.consent === true,
+          managedByAutonomous: true, // Use new Autonomous Holly agent
         },
       });
 
