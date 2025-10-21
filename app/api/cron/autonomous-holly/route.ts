@@ -16,12 +16,7 @@ import { runHollyAgentLoop } from "@/lib/autonomous-agent";
  * Instant responses (SMS replies, new leads) are handled by webhooks calling the agent directly
  *
  * Vercel cron config (vercel.json):
- * {
- *   "crons": [{
- *     "path": "/api/cron/autonomous-holly",
- *     "schedule": "*/15 * * * *"
- *   }]
- * }
+ * Runs every 15 minutes to review leads due for follow-up
  */
 export async function GET(request: NextRequest) {
   try {

@@ -90,6 +90,25 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      // ✅ AUTO-PROGRESS STAGE: CONTACTED → ENGAGED (if lead replies)
+      if (lead.status === "CONTACTED") {
+        await prisma.lead.update({
+          where: { id: lead.id },
+          data: { status: "ENGAGED" },
+        });
+
+        await prisma.leadActivity.create({
+          data: {
+            leadId: lead.id,
+            type: ActivityType.STATUS_CHANGE,
+            channel: CommunicationChannel.SYSTEM,
+            content: "Lead status changed from CONTACTED to ENGAGED (replied to message)",
+          },
+        });
+
+        console.log(`[Auto-Progress] ${lead.firstName} ${lead.lastName}: CONTACTED → ENGAGED`);
+      }
+
       // 🤖 TRIGGER AUTONOMOUS HOLLY AGENT (INSTANT RESPONSE)
       // Process this lead immediately through the intelligent autonomous agent
       // The agent will analyze, decide, and respond using Claude Sonnet 4.5 with 5-layer training
