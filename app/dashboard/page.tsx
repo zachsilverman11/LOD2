@@ -5,6 +5,7 @@ import Link from "next/link";
 import { KanbanBoard } from "@/components/kanban/kanban-board";
 import { LeadDetailModal } from "@/components/lead-detail/lead-detail-modal";
 import { ActivityFeed } from "@/components/activity-feed";
+import { LeadSearchBar } from "@/components/lead-search-bar";
 import { LeadWithRelations } from "@/types/lead";
 import { LogoutButton } from "./logout-button";
 
@@ -24,14 +25,21 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-gradient-to-br from-[#FBF3E7] via-[#B1AFFF]/20 to-[#F6D7FF]/30">
       <header className="bg-white/80 backdrop-blur-sm shadow-sm border-b border-[#E4DDD3]">
         <div className="max-w-full mx-auto px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex items-center justify-between gap-8">
+            <div className="flex-shrink-0">
               <h1 className="text-4xl font-extrabold text-[#1C1B1A]">
                 <span className="italic text-[#625FFF]">inspired</span> <span className="font-bold">mortgage.</span>
               </h1>
               <p className="text-[#55514D] mt-2 text-lg">Lead Conversion Dashboard</p>
             </div>
-            <div className="flex items-center gap-3">
+
+            {/* Search Bar - Center */}
+            <div className="flex-1 max-w-xl">
+              <LeadSearchBar onLeadSelect={handleActivityLeadClick} />
+            </div>
+
+            {/* Action Buttons - Right */}
+            <div className="flex items-center gap-3 flex-shrink-0">
               <Link
                 href="/dev-board"
                 className="px-4 py-2 text-sm text-[#625FFF] border border-[#625FFF] rounded-md hover:bg-[#625FFF] hover:text-white transition-colors"
