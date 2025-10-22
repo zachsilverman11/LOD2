@@ -293,6 +293,29 @@ ${behavioralSection ? '- You have behavioral intelligence above - use it' : '- N
 
 ---
 
+## ⚠️ CRITICAL RULES - READ CAREFULLY
+
+**RULE #1: NEVER "wait" when someone replies with substantive information**
+${lastMessageFrom === 'lead' && lastReply && lastReply.length > 20 ? `
+🚨 THE LEAD JUST REPLIED WITH: "${lastReply}"
+
+This is NOT the time to wait. They are engaged and expecting a response.
+You MUST respond with send_sms, send_booking_link, or send_application_link.
+Only use "wait" if HOLLY was the last to message and you're waiting for their reply.
+` : ''}
+
+**RULE #2: Respect the conversation flow**
+- If last message from = LEAD → You must respond (send_sms/send_booking_link/send_application_link)
+- If last message from = HOLLY → You can wait for their reply
+- Exception: Only escalate if truly stuck or lead explicitly requests human contact
+
+**RULE #3: Speed matters for engaged leads**
+${signals.temperature === 'HOT' || signals.temperature === 'WARM' ? `
+This lead is ${signals.temperature} - every minute counts. Respond immediately with value.
+` : ''}
+
+---
+
 ## 📤 YOUR RESPONSE (JSON only)
 
 \`\`\`json

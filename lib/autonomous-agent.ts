@@ -154,6 +154,17 @@ export async function processLeadWithAutonomousAgent(leadId: string) {
       );
 
       if (!DRY_RUN_MODE) {
+        // Log the wait decision so we can debug
+        await prisma.leadActivity.create({
+          data: {
+            leadId: lead.id,
+            type: 'NOTE_ADDED',
+            channel: 'SYSTEM',
+            content: `⏸️ Holly decided to WAIT ${decision.waitHours || signals.nextReviewHours}h\n\nReasoning: ${decision.thinking}\n\nCustomer mindset: ${decision.customerMindset || 'N/A'}\n\nNext check: ${decision.nextCheckCondition || 'Scheduled review'}`,
+            metadata: { automated: true, autonomous: true },
+          },
+        });
+
         await prisma.lead.update({
           where: { id: lead.id },
           data: { nextReviewAt: nextReview },
