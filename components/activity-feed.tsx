@@ -65,27 +65,24 @@ export function ActivityFeed({
   const getActivityIcon = (type: string): string => {
     switch (type) {
       case 'SMS_SENT':
-        return '💬';
       case 'SMS_RECEIVED':
-        return '📱';
+        return '💬';
       case 'EMAIL_SENT':
-        return '📧';
       case 'EMAIL_RECEIVED':
-        return '📨';
+        return '📧';
       case 'STATUS_CHANGE':
-        return '🔄';
+        return '→';
       case 'APPOINTMENT_BOOKED':
         return '📅';
       case 'APPOINTMENT_COMPLETED':
-        return '✅';
+      case 'CALL_COMPLETED':
+        return '✓';
       case 'APPOINTMENT_CANCELLED':
-        return '❌';
-      case 'APPLICATION_STARTED':
+        return '✕';
+      case 'NOTE_ADDED':
         return '📝';
-      case 'APPLICATION_COMPLETED':
-        return '🎉';
       default:
-        return '📌';
+        return '•';
     }
   };
 
@@ -93,23 +90,22 @@ export function ActivityFeed({
     switch (type) {
       case 'SMS_SENT':
       case 'EMAIL_SENT':
-        return 'border-l-[#625FFF]';
+        return 'border-l-[#625FFF]/40';
       case 'SMS_RECEIVED':
       case 'EMAIL_RECEIVED':
-        return 'border-l-[#2E7D32]';
+        return 'border-l-green-500/40';
       case 'STATUS_CHANGE':
-        return 'border-l-[#FF9800]';
+        return 'border-l-blue-400/40';
       case 'APPOINTMENT_BOOKED':
-        return 'border-l-[#2196F3]';
-      case 'APPOINTMENT_COMPLETED':
-        return 'border-l-[#4CAF50]';
+        return 'border-l-purple-500/40';
+      case 'CALL_COMPLETED':
+        return 'border-l-green-600/40';
       case 'APPOINTMENT_CANCELLED':
-        return 'border-l-[#F44336]';
-      case 'APPLICATION_STARTED':
-      case 'APPLICATION_COMPLETED':
-        return 'border-l-[#9C27B0]';
+        return 'border-l-red-400/40';
+      case 'NOTE_ADDED':
+        return 'border-l-gray-400/40';
       default:
-        return 'border-l-[#757575]';
+        return 'border-l-gray-300/40';
     }
   };
 
@@ -168,65 +164,54 @@ export function ActivityFeed({
   }
 
   return (
-    <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold text-[#1C1B1A]">Recent Activity</h2>
-        <div className="flex items-center gap-2">
-          {autoRefresh && (
-            <span className="text-xs text-[#55514D]">
-              Auto-refresh: {refreshInterval}s
-            </span>
-          )}
-          <button
-            onClick={fetchActivities}
-            className="text-xs text-[#625FFF] hover:text-[#524DD9] font-medium"
-          >
-            Refresh
-          </button>
-        </div>
+    <div className="bg-white/70 backdrop-blur-sm rounded-lg shadow-sm border border-[#E4DDD3]/50 p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold text-[#55514D] uppercase tracking-wide">Activity</h3>
+        <button
+          onClick={fetchActivities}
+          className="text-xs text-[#625FFF]/70 hover:text-[#625FFF] transition-colors"
+          title="Refresh"
+        >
+          ↻
+        </button>
       </div>
 
-      <div className="space-y-3 max-h-[600px] overflow-y-auto">
+      <div className="space-y-1.5 max-h-[calc(100vh-250px)] overflow-y-auto pr-1">
         {activities.length === 0 ? (
-          <div className="text-center py-8 text-[#55514D]">
-            No recent activity in the last 24 hours
+          <div className="text-center py-6 text-xs text-[#55514D]">
+            No recent activity
           </div>
         ) : (
           activities.map((activity) => (
             <div
               key={activity.id}
-              className={`border-l-4 ${getActivityColor(activity.type)} pl-4 py-3 hover:bg-[#FBF3E7]/30 transition-colors cursor-pointer rounded-r`}
+              className={`border-l-2 ${getActivityColor(activity.type)} pl-2.5 py-2 hover:bg-[#FBF3E7]/20 transition-colors cursor-pointer rounded-r`}
               onClick={() => onLeadClick?.(activity.leadId)}
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-lg">{getActivityIcon(activity.type)}</span>
-                    <span className="font-semibold text-[#1C1B1A] text-sm truncate">
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <span className="text-xs opacity-60">{getActivityIcon(activity.type)}</span>
+                    <span className="font-medium text-[#1C1B1A] text-xs truncate">
                       {activity.leadName}
                     </span>
                     {activity.metadata?.autonomous && (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#625FFF]/10 text-[#625FFF]">
-                        🤖 Auto
+                      <span className="inline-flex items-center px-1 py-0.5 rounded text-[10px] font-medium bg-[#625FFF]/5 text-[#625FFF]/70">
+                        auto
                       </span>
                     )}
                   </div>
-                  <div className="text-xs text-[#55514D] mb-1">
+                  <div className="text-[11px] text-[#55514D]/80 leading-tight">
                     {getActivityLabel(activity.type, activity.metadata)}
                   </div>
                   {activity.content && (
-                    <div className="text-sm text-[#1C1B1A] bg-[#FBF3E7]/50 rounded px-2 py-1 mt-2">
-                      "{truncateText(activity.content)}"
-                    </div>
-                  )}
-                  {activity.subject && (
-                    <div className="text-sm text-[#1C1B1A] font-medium mt-1">
-                      {activity.subject}
+                    <div className="text-[11px] text-[#55514D]/70 mt-1 leading-tight">
+                      "{truncateText(activity.content, 60)}"
                     </div>
                   )}
                 </div>
-                <div className="text-xs text-[#55514D] whitespace-nowrap">
-                  {formatDistanceToNow(new Date(activity.createdAt), { addSuffix: true })}
+                <div className="text-[10px] text-[#55514D]/60 whitespace-nowrap">
+                  {formatDistanceToNow(new Date(activity.createdAt), { addSuffix: true }).replace(' ago', '')}
                 </div>
               </div>
             </div>

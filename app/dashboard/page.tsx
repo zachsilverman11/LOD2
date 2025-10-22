@@ -51,20 +51,22 @@ export default function DashboardPage() {
       </header>
 
       <main className="max-w-full mx-auto px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Main Kanban Board - Takes 3 columns on large screens */}
-          <div className="lg:col-span-3">
+        <div className="flex gap-6">
+          {/* Main Kanban Board - Takes most of the space */}
+          <div className="flex-1 min-w-0">
             <KanbanBoard onLeadClick={setSelectedLead} />
           </div>
 
-          {/* Activity Feed Sidebar - Takes 1 column on large screens */}
-          <div className="lg:col-span-1">
-            <ActivityFeed
-              onLeadClick={handleActivityLeadClick}
-              limit={20}
-              autoRefresh={true}
-              refreshInterval={30}
-            />
+          {/* Activity Feed Sidebar - Fixed narrow width */}
+          <div className="w-80 flex-shrink-0 hidden xl:block">
+            <div className="sticky top-8">
+              <ActivityFeed
+                onLeadClick={handleActivityLeadClick}
+                limit={15}
+                autoRefresh={true}
+                refreshInterval={30}
+              />
+            </div>
           </div>
         </div>
       </main>
