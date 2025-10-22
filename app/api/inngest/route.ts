@@ -12,10 +12,10 @@ import { serve } from "inngest/next";
 import { inngest } from "@/lib/inngest";
 import { processLeadReply } from "./functions";
 
+// Inngest serve() automatically reads INNGEST_SIGNING_KEY from environment
 export const { GET, POST, PUT } = serve({
   client: inngest,
   functions: [
     processLeadReply, // Our worker function for SMS replies
   ],
-  signingKey: process.env.INNGEST_SIGNING_KEY,
 });
