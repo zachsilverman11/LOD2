@@ -73,6 +73,25 @@ export async function processLeadWithAutonomousAgent(leadId: string) {
         `[Holly Agent] ❌ ${lead.firstName}: Blocked - ${validation.errors.join(', ')}`
       );
 
+      // Log the guardrail block to database for visibility
+      if (!DRY_RUN_MODE) {
+        await prisma.leadActivity.create({
+          data: {
+            leadId: lead.id,
+            type: 'NOTE_ADDED',
+            channel: 'SYSTEM',
+            content: `⛔ Holly Blocked by Safety Guardrails\n\n${validation.errors.map(e => `• ${e}`).join('\n')}\n\n**Holly's attempted decision:**\nAction: ${decision.action}\n${decision.message ? `Message: "${decision.message.substring(0, 200)}${decision.message.length > 200 ? '...' : ''}"\n` : ''}Thinking: ${decision.thinking}`,
+            metadata: {
+              automated: true,
+              autonomous: true,
+              guardrailBlock: true,
+              blockedAction: decision.action,
+              errors: validation.errors,
+            },
+          },
+        });
+      }
+
       // Schedule retry in 1 hour
       await prisma.lead.update({
         where: { id: lead.id },

@@ -61,19 +61,32 @@ export function validateDecision(
     }
   }
 
-  // === HARD RULE: Anti-spam (4 hour minimum between messages) ===
+  // === HARD RULE: Context-Aware Anti-Spam ===
+  // Different rules for conversations vs cold outreach
   if (context.lead.lastContactedAt) {
     const hoursSinceLastOutbound =
       (now.getTime() - context.lead.lastContactedAt.getTime()) / (1000 * 60 * 60);
 
+    // Check if lead has replied since our last message (conversational mode)
+    const repliedSinceLastContact = context.lead.communications?.some(
+      (c: any) =>
+        c.direction === 'INBOUND' &&
+        c.createdAt.getTime() > context.lead.lastContactedAt!.getTime()
+    );
+
     if (
-      hoursSinceLastOutbound < 4 &&
       decision.action !== 'wait' &&
       decision.action !== 'escalate'
     ) {
-      errors.push(
-        `Too soon - last message ${hoursSinceLastOutbound.toFixed(1)}h ago (minimum 4h gap required)`
-      );
+      if (repliedSinceLastContact) {
+        // CONVERSATIONAL MODE: Lead replied, allow immediate response
+        // No time restriction - natural conversation flow
+      } else if (hoursSinceLastOutbound < 4) {
+        // BROADCAST MODE: No reply yet, enforce 4-hour anti-spam
+        errors.push(
+          `Too soon - last message ${hoursSinceLastOutbound.toFixed(1)}h ago, lead hasn't replied (4h minimum for follow-ups)`
+        );
+      }
     }
   }
 

@@ -64,8 +64,10 @@ export async function askHollyToDecide(
     lastMessageFrom = lead.communications[0].direction === 'OUTBOUND' ? 'holly' : 'lead';
   }
 
-  // Get last inbound reply for behavioral analysis
-  const lastReply = lead.communications?.find((c: any) => c.direction === 'INBOUND')?.content;
+  // Get MOST RECENT inbound reply for behavioral analysis (not first/oldest)
+  const lastReply = lead.communications
+    ?.filter((c: any) => c.direction === 'INBOUND')
+    .sort((a: any, b: any) => b.createdAt.getTime() - a.createdAt.getTime())[0]?.content;
 
   // Determine lead type
   const loanType = (rawData?.loanType || rawData?.lead_type || '').toLowerCase();
@@ -290,29 +292,6 @@ ${behavioralSection ? '- You have behavioral intelligence above - use it' : '- N
 - If sending: craft a specific message for THIS lead
 - If waiting: how long and why?
 - Confidence level: honest assessment
-
----
-
-## ⚠️ CRITICAL RULES - READ CAREFULLY
-
-**RULE #1: NEVER "wait" when someone replies with substantive information**
-${lastMessageFrom === 'lead' && lastReply && lastReply.length > 20 ? `
-🚨 THE LEAD JUST REPLIED WITH: "${lastReply}"
-
-This is NOT the time to wait. They are engaged and expecting a response.
-You MUST respond with send_sms, send_booking_link, or send_application_link.
-Only use "wait" if HOLLY was the last to message and you're waiting for their reply.
-` : ''}
-
-**RULE #2: Respect the conversation flow**
-- If last message from = LEAD → You must respond (send_sms/send_booking_link/send_application_link)
-- If last message from = HOLLY → You can wait for their reply
-- Exception: Only escalate if truly stuck or lead explicitly requests human contact
-
-**RULE #3: Speed matters for engaged leads**
-${signals.temperature === 'HOT' || signals.temperature === 'WARM' ? `
-This lead is ${signals.temperature} - every minute counts. Respond immediately with value.
-` : ''}
 
 ---
 
