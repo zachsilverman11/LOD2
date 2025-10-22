@@ -17,4 +17,5 @@ export const { GET, POST, PUT } = serve({
   functions: [
     processLeadReply, // Our worker function for SMS replies
   ],
+  signingKey: process.env.INNGEST_SIGNING_KEY,
 });
