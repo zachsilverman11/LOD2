@@ -80,7 +80,6 @@ export async function PATCH(
       data: {
         ...otherUpdates,
         ...(status && { status }),
-        updatedAt: new Date(),
       },
     });
 
