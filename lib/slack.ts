@@ -2,7 +2,7 @@ const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL || "";
 const DASHBOARD_URL = process.env.NEXT_PUBLIC_APP_URL || "https://lod2.vercel.app";
 
 interface SlackNotification {
-  type: "new_lead" | "no_response" | "lead_rotting" | "hot_lead_going_cold" | "call_booked" | "call_missed" | "converted";
+  type: "new_lead" | "no_response" | "lead_rotting" | "hot_lead_going_cold" | "call_booked" | "call_missed" | "converted" | "lead_escalated";
   leadName: string;
   leadId: string;
   details?: string;
@@ -74,6 +74,13 @@ export async function sendSlackNotification(notification: SlackNotification) {
       color = "#D9F36E";
       title = "Lead Converted!";
       message = `*${leadName}* converted! 🎉\n${details || ""}`;
+      break;
+
+    case "lead_escalated":
+      emoji = "🚨";
+      color = "#FF0000";
+      title = "HOLLY ESCALATION - Action Required";
+      message = `*${leadName}* has been escalated by Holly.\n\n${details || "Review needed"}`;
       break;
   }
 

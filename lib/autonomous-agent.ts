@@ -343,17 +343,34 @@ export async function runHollyAgentLoop() {
                 leadId: lead.id,
                 type: 'NOTE_ADDED',
                 channel: 'SYSTEM',
-                content: `🚨 ESCALATED BY HOLLY: ${decision.thinking}\nSuggested action: ${decision.suggestedAction || 'Review needed'}`,
-                metadata: { automated: true, autonomous: true },
+                subject: '🚨 ESCALATED BY HOLLY',
+                content: `${decision.thinking}\n\nSuggested action: ${decision.suggestedAction || 'Review needed'}`,
+                metadata: {
+                  automated: true,
+                  autonomous: true,
+                  escalation: true,
+                  leadPhone: lead.phone,
+                  leadEmail: lead.email,
+                },
               },
             });
 
-            // Send Slack alert
+            // Send Slack alert with actionable information
+            const advisorInfo = lead.appointments?.[0]?.advisorName || 'Jakub or Greg';
+            const slackDetails = [
+              decision.thinking,
+              '',
+              `*Suggested Action:* ${decision.suggestedAction || 'Review needed'}`,
+              `*Lead Contact:* ${lead.phone}${lead.email ? ` • ${lead.email}` : ''}`,
+              `*Advisor:* ${advisorInfo}`,
+              `*Status:* ${lead.status}`,
+            ].join('\n');
+
             await sendSlackNotification({
               type: 'lead_escalated',
               leadName: `${lead.firstName} ${lead.lastName}`,
               leadId: lead.id,
-              details: `${decision.thinking}\nSuggested: ${decision.suggestedAction || 'Review needed'}`,
+              details: slackDetails,
             });
 
             // Don't auto-review for 48 hours (human will handle)
