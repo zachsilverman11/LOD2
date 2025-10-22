@@ -259,15 +259,38 @@ export async function runHollyAgentLoop() {
 
   try {
     // === SMART QUERY: Only leads due for review ===
+    const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
+
     const leadsToReview = await prisma.lead.findMany({
       where: {
         status: { notIn: ['LOST', 'CONVERTED', 'DEALS_WON'] },
         consentSms: true,
         managedByAutonomous: true, // Only autonomous leads
         hollyDisabled: false, // Skip leads with Holly disabled (manual relationships)
+        // Skip leads recently contacted by Inngest queue (avoid duplicate processing)
         OR: [
-          { nextReviewAt: null }, // Never reviewed
-          { nextReviewAt: { lte: now } }, // Review time passed
+          {
+            AND: [
+              { nextReviewAt: null }, // Never reviewed
+              {
+                OR: [
+                  { lastContactedAt: null },
+                  { lastContactedAt: { lte: fiveMinutesAgo } }, // Not contacted in last 5min
+                ],
+              },
+            ],
+          },
+          {
+            AND: [
+              { nextReviewAt: { lte: now } }, // Review time passed
+              {
+                OR: [
+                  { lastContactedAt: null },
+                  { lastContactedAt: { lte: fiveMinutesAgo } }, // Not contacted in last 5min
+                ],
+              },
+            ],
+          },
         ],
       },
       include: {
@@ -284,7 +307,7 @@ export async function runHollyAgentLoop() {
         },
       },
       orderBy: { nextReviewAt: 'asc' }, // Prioritize overdue reviews
-      take: 50, // Process max 50 leads per cycle (safety limit)
+      take: 15, // Process max 15 leads per cycle (ensures < 5min completion)
     });
 
     console.log(`[Holly Agent] 📊 Reviewing ${leadsToReview.length} leads due for review...`);
