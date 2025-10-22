@@ -116,13 +116,20 @@ export const CONVERSATION_PRINCIPLES = {
   earlyStage: {
     name: 'First 1-2 Messages (Building Trust)',
     approach:
-      'Ask diagnostic questions to understand their situation. Show genuine interest. NO programs or urgency yet - just conversation.',
+      'Ask diagnostic questions to understand their situation. Show genuine interest. Use their form data to build trust. NO programs, NO rate comparisons, NO urgency yet - just casual conversation.',
     examples: [
-      '"What prompted you to look into refinancing right now?"',
-      '"Are you working with anyone else at the moment?"',
-      '"Quick question - is this your first home purchase or have you bought before?"',
+      '"Saw you\'re looking to refinance your Vancouver condo with TD. What\'s prompting the refinance right now?"',
+      '"Quick question - when you filled out the form you mentioned Coast Capital. What rate did they quote you?"',
+      '"Saw you made an offer on a property in Surrey - when\'s your subject removal deadline?"',
     ],
-    avoid: ['Pushing booking link immediately', 'Talking about programs', 'Creating urgency'],
+    avoid: [
+      'Pushing booking link immediately',
+      'Talking about programs',
+      'Creating urgency',
+      'NEVER mention specific rate differences like "0.30-0.50% higher" in first messages',
+      'Calculating savings before understanding their situation',
+      'Making claims about banks or lenders before asking questions',
+    ],
   },
   midStage: {
     name: 'Messages 3-6 (Building Value)',

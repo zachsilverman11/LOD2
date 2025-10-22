@@ -108,8 +108,8 @@ export const SALES_PSYCHOLOGY: SalesPsychology = {
     frameworks: [
       {
         name: 'Comparison Anchor',
-        description: 'Position against something they know (their bank, renewal letter, posted rates)',
-        example: 'Your bank\'s renewal letter is typically 0.30-0.50% higher than what brokers can get you. On $500K, that\'s $125-200/month you\'d be overpaying.',
+        description: 'Ask about their current situation, let them tell you their rate (conversational, not preachy)',
+        example: 'What rate did [their bank] offer you? (Then: "Got it - Greg can show you what else is out there in 10 mins. Worth a comparison?")',
       },
       {
         name: 'Pain-to-Gain',

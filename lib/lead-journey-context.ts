@@ -108,26 +108,26 @@ Bridge the gap. They're not refusing the call because they don't want help - the
 }
 
 /**
- * Get lead-specific value proposition based on their journey
+ * Get lead-specific diagnostic question based on their journey
+ *
+ * IMPORTANT: This is for LATER in the conversation (touch 3-4+), NOT first message
+ * First messages should be simple diagnostic questions from their form data
  */
 export function getValueProposition(leadData: any): string {
   const loanType = (leadData.loanType || leadData.lead_type || '').toLowerCase();
   const urgency = leadData.motivation_level;
-  const loanAmount = leadData.loanAmount || leadData.purchasePrice || leadData.home_value;
+  const lender = leadData.lender;
 
   let value = '';
 
-  // Calculate savings estimate
-  const savings = loanAmount ? Math.round(parseFloat(loanAmount) * 0.002 / 12) : 200;
-
   if (urgency === 'I have made an offer to purchase') {
-    value = `Since you have an accepted offer, getting the best rate locked in before subject removal is CRITICAL. A 0.20% difference on ${loanAmount ? `$${parseInt(loanAmount).toLocaleString()}` : 'your mortgage'} = ~$${savings}/month or $${savings * 60} over 5 years. Our advisors can lock you into our Reserved Rate pool (typically 0.10-0.30% below posted rates) in a 15-min call.`;
-  } else if (loanType.includes('refinance')) {
-    value = `Most people refinancing don't realize their current lender's offer is usually 0.30-0.50% higher than what mortgage brokers can access. On ${loanAmount ? `$${parseInt(loanAmount).toLocaleString()}` : 'your balance'}, that's $${savings}-${savings * 2}/month savings. The 15-min call with our advisors compares 30+ lenders to get you the absolute best rate.`;
-  } else if (loanType.includes('renewal')) {
-    value = `Your bank's renewal letter is typically 0.30-0.50% higher than rates brokers can get you - they're counting on you NOT shopping around. On ${loanAmount ? `$${parseInt(loanAmount).toLocaleString()}` : 'your balance'}, that's $${savings}-${savings * 2}/month you're overpaying. Our advisors can show you the difference in a quick 10-min call.`;
+    value = `Since you have an accepted offer, timing is tight. Our advisors can get you a Guaranteed Approvals Certificate - it makes your offer way stronger. Takes 15 mins. When works - today or tomorrow?`;
+  } else if (loanType.includes('refinance') && lender) {
+    value = `${lender} can be tricky with early breakage penalties. Our advisors specialize in finding lenders with the lowest penalties AND better rates. Worth a quick call to see what's available?`;
+  } else if (loanType.includes('renewal') && lender) {
+    value = `Most people don't realize their bank's renewal letter isn't the best offer out there. Our advisors can show you what else is available - takes 10 mins. Worth a quick comparison?`;
   } else {
-    value = `Mortgage rates vary by 0.20-0.50% depending on the lender and product. On ${loanAmount ? `$${parseInt(loanAmount).toLocaleString()}` : 'a typical mortgage'}, that's $${savings}-${savings * 2}/month difference. Our advisors compare 30+ lenders in a 15-min call to get you the absolute best rate.`;
+    value = `Our advisors compare 30+ lenders to find exactly what fits your situation. Takes 10-15 mins. Worth a quick call to see what you qualify for?`;
   }
 
   return value;

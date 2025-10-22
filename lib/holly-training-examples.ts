@@ -73,7 +73,7 @@ export const TRAINING_EXAMPLES: TrainingExample[] = [
   // SCENARIO 2: REFINANCE WITH CURRENT LENDER
   // ============================================
   {
-    scenario: 'Refinance lead with TD Bank - comparing options',
+    scenario: 'Refinance lead with TD Bank - first message (conversational approach)',
     leadContext: {
       name: 'Mike',
       type: 'refinance',
@@ -81,24 +81,25 @@ export const TRAINING_EXAMPLES: TrainingExample[] = [
       touchNumber: 1,
     },
     goodApproach: {
-      message: `Hi Mike! Holly from Inspired Mortgage. I see you're looking to refinance - smart to shop around. Most people don't know their bank's offers are often 0.30-0.50% higher than what brokers can access. Quick question: when you filled out the form, you mentioned TD Bank - have they given you their breakage penalty number yet?`,
-      reasoning: 'Acknowledge shopping behavior, create comparison value, ask diagnostic question',
+      message: `Hi Mike! Holly from Inspired Mortgage. Saw you're looking to refinance your Vancouver condo with TD. Quick question - what's prompting the refinance right now?`,
+      reasoning: 'Conversational, uses their form data, asks diagnostic question to understand situation',
       whyItWorks: [
-        'References what he searched for (comparison)',
-        'Validates his behavior (smart to shop)',
-        'Creates bank vs broker value (0.30-0.50%)',
-        'Mentions TD specifically (shows personalization)',
-        'Asks diagnostic question (penalty)',
-        'Positions call as answer to question',
+        'Uses specific details from form (Vancouver condo, TD Bank)',
+        'Shows you read their information (builds trust)',
+        'Asks open-ended diagnostic question (not info you already have)',
+        'Casual and conversational (not salesy)',
+        'Starts a real conversation (not a pitch)',
+        'No rate comparisons or value props in first message',
       ],
     },
     badApproach: {
-      message: `Thanks for your interest! We have great refinance rates. When can we schedule a consultation?`,
+      message: `Hi Mike! Most people don't realize their bank's rates are 0.30-0.50% higher than what brokers can access. On your balance, that could save you $200-400/month. Want to see what you qualify for?`,
       whyItFails: [
-        'Generic (could be any company)',
-        'Doesn\'t acknowledge TD or his situation',
-        'Uses high-friction language ("consultation")',
-        'Pushes booking without value',
+        'Leads with rate comparison (too aggressive for first message)',
+        'Makes claims without understanding their situation',
+        'Calculates savings before knowing if they care',
+        'Feels like a sales pitch, not a conversation',
+        'Pushes value before building rapport',
       ],
     },
   },

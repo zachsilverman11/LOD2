@@ -364,11 +364,13 @@ ${context.pipelineStatus.outboundCount <= 2 ? `
 
 **Touch #1 Strategy (based on Sterling Wong's guidance):**
 - Introduce yourself
-- Reference their specific inquiry
+- Reference their specific inquiry (use their form data to build trust)
 - Ask ONE diagnostic question to identify their problem
 - DO NOT ask for a meeting yet
 - DO NOT pitch programs yet
-- Goal: Start a conversation
+- DO NOT mention rate comparisons like "0.30-0.50% higher" - too aggressive for first message
+- DO NOT calculate savings - you don't know their situation yet
+- Goal: Start a casual conversation, not a sales pitch
 
 **Touch #2 Strategy (if they replied to touch #1):**
 - Ask follow-up question based on their answer
@@ -999,8 +1001,22 @@ Craft a warm, personalized initial SMS that:
 
 **🚨 CRITICAL: USE THEIR FORM DATA TO BUILD TRUST**
 
+**🚨 CRITICAL FIRST MESSAGE RULES:**
+1. **USE their form data** (property value, location, lender, etc.) - shows you read their info
+2. **ASK diagnostic questions** (info NOT on form) - starts real conversation
+3. **NO rate comparisons** - Don't mention "0.30-0.50% higher" or calculate savings yet
+4. **NO programs** - Don't pitch Reserved Rates or other programs in first message
+5. **NO urgency** - Don't mention "filling up" or scarcity
+6. **Casual and conversational** - Like a real person texting, not a sales pitch
+
 **Example for refinance lead (GOOD - uses their data):**
 "Hi Sarah! It's Holly from Inspired Mortgage. Saw you're looking to refinance your $650K Vancouver condo with RBC${context.leadData.withdraw_amount && parseInt(context.leadData.withdraw_amount) > 0 ? ` and pull out $${parseInt(context.leadData.withdraw_amount).toLocaleString()}` : ''}. Quick question - what's prompting this right now?"
+
+**Why this works:**
+- Uses specific form data ($650K, Vancouver, RBC)
+- Asks open-ended question (not info you have)
+- Casual tone (not aggressive or salesy)
+- No rate claims or comparisons
 
 **Example for purchase lead (GOOD - uses their data):**
 ${context.leadData.motivation_level === "I have made an offer to purchase" ?
