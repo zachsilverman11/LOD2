@@ -109,45 +109,53 @@ export async function POST(request: NextRequest) {
         console.log(`[Auto-Progress] ${lead.firstName} ${lead.lastName}: CONTACTED → ENGAGED`);
       }
 
-      // 🤖 TRIGGER AUTONOMOUS HOLLY AGENT (INSTANT RESPONSE)
+      // 🤖 TRIGGER AUTONOMOUS HOLLY AGENT (ASYNC - NON-BLOCKING)
       // Process this lead immediately through the intelligent autonomous agent
-      // The agent will analyze, decide, and respond using Claude Sonnet 4.5 with 5-layer training
-      try {
-        console.log(`[Autonomous Holly] Processing incoming SMS from lead: ${lead.id}`);
+      // Using fire-and-forget pattern to avoid Twilio webhook timeout (15s limit)
+      // The agent will analyze, decide, and respond using Claude Sonnet 4.5 with 6-layer training
 
-        // Add small human-like delay before processing (natural feeling)
-        await humanDelay(body, null);
+      // Fire-and-forget: Don't await, let it run in background
+      (async () => {
+        try {
+          console.log(`[Autonomous Holly] Processing incoming SMS from lead: ${lead.id}`);
 
-        // Process lead through autonomous agent
-        const result = await processLeadWithAutonomousAgent(lead.id);
+          // Add small human-like delay before processing (natural feeling)
+          await humanDelay(body, null);
 
-        if (result.success) {
-          console.log(`[Autonomous Holly] ✅ Response handled: ${result.action}`);
-        } else {
-          console.log(`[Autonomous Holly] ⏭️  Skipped or deferred: ${result.reason}`);
+          // Process lead through autonomous agent
+          const result = await processLeadWithAutonomousAgent(lead.id);
+
+          if (result.success) {
+            console.log(`[Autonomous Holly] ✅ Response handled: ${result.action}`);
+          } else {
+            console.log(`[Autonomous Holly] ⏭️  Skipped or deferred: ${result.reason}`);
+          }
+        } catch (error) {
+          console.error("[Autonomous Holly] Failed to process lead:", error);
+
+          // Send error alert to Slack
+          await sendErrorAlert({
+            error: error instanceof Error ? error : new Error(String(error)),
+            context: {
+              location: "webhooks/twilio - Autonomous Holly handler (async)",
+              leadId: lead.id,
+              details: { incomingMessage: body, phone: normalizedPhone },
+            },
+          });
+
+          // Log error but don't crash
+          await prisma.leadActivity.create({
+            data: {
+              leadId: lead.id,
+              type: ActivityType.NOTE_ADDED,
+              content: `AI response failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+            },
+          });
         }
-      } catch (error) {
-        console.error("[Autonomous Holly] Failed to process lead:", error);
+      })();
 
-        // Send error alert to Slack
-        await sendErrorAlert({
-          error: error instanceof Error ? error : new Error(String(error)),
-          context: {
-            location: "webhooks/twilio - Autonomous Holly handler",
-            leadId: lead.id,
-            details: { incomingMessage: body, phone: normalizedPhone },
-          },
-        });
-
-        // Log error but don't crash
-        await prisma.leadActivity.create({
-          data: {
-            leadId: lead.id,
-            type: ActivityType.NOTE_ADDED,
-            content: `AI response failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-          },
-        });
-      }
+      // DON'T WAIT - return immediately to Twilio (< 1 second)
+      console.log(`[Twilio Webhook] ⚡ Queued async processing for lead ${lead.id}`);
     }
 
     // Log webhook event
