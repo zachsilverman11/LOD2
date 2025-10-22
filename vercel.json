@@ -16,5 +16,10 @@
       "path": "/api/cron/system-monitor",
       "schedule": "*/30 * * * *"
     }
-  ]
+  ],
+  "functions": {
+    "app/api/cron/autonomous-holly/route.ts": {
+      "maxDuration": 300
+    }
+  }
 }
