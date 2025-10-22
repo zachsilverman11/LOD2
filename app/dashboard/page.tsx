@@ -4,11 +4,21 @@ import { useState } from "react";
 import Link from "next/link";
 import { KanbanBoard } from "@/components/kanban/kanban-board";
 import { LeadDetailModal } from "@/components/lead-detail/lead-detail-modal";
+import { ActivityFeed } from "@/components/activity-feed";
 import { LeadWithRelations } from "@/types/lead";
 import { LogoutButton } from "./logout-button";
 
 export default function DashboardPage() {
   const [selectedLead, setSelectedLead] = useState<LeadWithRelations | null>(null);
+
+  const handleActivityLeadClick = async (leadId: string) => {
+    // Fetch the full lead details
+    const res = await fetch(`/api/leads/${leadId}`);
+    if (res.ok) {
+      const data = await res.json();
+      setSelectedLead(data);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#FBF3E7] via-[#B1AFFF]/20 to-[#F6D7FF]/30">
@@ -41,7 +51,22 @@ export default function DashboardPage() {
       </header>
 
       <main className="max-w-full mx-auto px-8 py-8">
-        <KanbanBoard onLeadClick={setSelectedLead} />
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+          {/* Main Kanban Board - Takes 3 columns on large screens */}
+          <div className="lg:col-span-3">
+            <KanbanBoard onLeadClick={setSelectedLead} />
+          </div>
+
+          {/* Activity Feed Sidebar - Takes 1 column on large screens */}
+          <div className="lg:col-span-1">
+            <ActivityFeed
+              onLeadClick={handleActivityLeadClick}
+              limit={20}
+              autoRefresh={true}
+              refreshInterval={30}
+            />
+          </div>
+        </div>
       </main>
 
       <LeadDetailModal
