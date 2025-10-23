@@ -91,11 +91,12 @@ export async function POST(request: NextRequest) {
         type: ActivityType.NOTE_ADDED,
         channel: CommunicationChannel.SYSTEM,
         subject: "Application Started",
-        content: "Lead started mortgage application via Finmo",
+        content: "Lead started mortgage application via Finmo\n\n✅ Holly's autonomous messaging is now disabled - application communication handled by Finmo system",
         metadata: {
           finmoDealId: payload.finmoDealId || payload.dealId,
           finmoId: payload.id,
           event: "application.started",
+          hollyDisabled: true,
         },
       },
     });
