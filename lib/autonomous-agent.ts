@@ -10,6 +10,7 @@ import { validateDecision, detectMessageRepetition } from './safety-guardrails';
 import { executeDecision } from './ai-conversation-enhanced';
 import { sendSlackNotification } from './slack';
 import { trackConversationOutcome } from './conversation-outcome-tracker';
+import { getNext8AM, getLocalTimeString } from './timezone-utils';
 
 // Environment variables for safe rollout
 const ENABLE_AUTONOMOUS_AGENT = process.env.ENABLE_AUTONOMOUS_AGENT === 'true';
@@ -92,10 +93,33 @@ export async function processLeadWithAutonomousAgent(leadId: string) {
         });
       }
 
-      // Schedule retry in 1 hour
+      // Smart retry scheduling based on block reason
+      const isTimeBlock = validation.errors.some(error =>
+        error.includes('Outside SMS hours') || error.includes('can only send 8am-9pm')
+      );
+
+      let nextReviewAt: Date;
+      if (isTimeBlock) {
+        // TIME BLOCK: Schedule for next 8 AM in lead's timezone
+        const rawData = lead.rawData as any;
+        const province = rawData?.province || 'British Columbia';
+        nextReviewAt = getNext8AM(province);
+
+        console.log(
+          `[Holly Agent] ⏰ ${lead.firstName}: Scheduled for next 8 AM (${getLocalTimeString(province)}) due to time restriction`
+        );
+      } else {
+        // OTHER BLOCKS (anti-spam, opt-out, etc.): Retry in 1 hour
+        nextReviewAt = new Date(now.getTime() + 60 * 60 * 1000);
+
+        console.log(
+          `[Holly Agent] ⏱️  ${lead.firstName}: Retry in 1 hour due to: ${validation.errors[0]}`
+        );
+      }
+
       await prisma.lead.update({
         where: { id: lead.id },
-        data: { nextReviewAt: new Date(now.getTime() + 60 * 60 * 1000) },
+        data: { nextReviewAt },
       });
 
       return { success: false, reason: validation.errors.join(', ') };
