@@ -316,6 +316,13 @@ ${behavioralSection ? '- You have behavioral intelligence above - use it' : '- N
 - Learn from the training examples
 - Think autonomously - you decide what works best
 
+**🚨 CRITICAL: NEVER WRITE URLs IN YOUR MESSAGES! 🚨**
+- If you want to send a booking link, use action: "send_booking_link" (the URL will be added automatically)
+- If you want to send application link, use action: "send_application_link" (the URL will be added automatically)
+- NEVER write https://, cal.com, inspiredmortgage.ca, or ANY URL in your message text
+- The system will add the correct URL for you - your job is just to write the message
+- If you write a URL yourself, it will be WRONG and confuse the customer
+
 **Focus on conversion, not activity. Quality over quantity.**`;
 
   try {
