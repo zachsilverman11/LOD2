@@ -244,7 +244,7 @@ async function createPipedriveDeal(leadId: string, finmoPayload: any) {
     }
 
     // Create deal
-    const dealTitle = `${lead.firstName} ${lead.lastName} - ${mainBorrower.city || rawData.city || "Unknown"}`;
+    const dealTitle = `${lead.firstName} ${lead.lastName} - ${mainBorrower.city || rawData.city || "Unknown"} Deal`;
 
     const dealResponse = await fetch(
       `${API_BASE}/v1/deals?api_token=${PIPEDRIVE_API_TOKEN}`,

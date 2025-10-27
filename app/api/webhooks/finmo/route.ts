@@ -407,7 +407,7 @@ async function createPipedriveDeal(leadId: string) {
     }
 
     // Create deal in Pipedrive
-    const dealTitle = `${lead.firstName} ${lead.lastName} - ${rawData.propertyType || "Property"} in ${rawData.city || "Unknown"}`;
+    const dealTitle = `${lead.firstName} ${lead.lastName} - ${rawData.propertyType || "Property"} in ${rawData.city || "Unknown"} Deal`;
 
     const dealResponse = await fetch(
       `${API_BASE}/v1/deals?api_token=${PIPEDRIVE_API_TOKEN}`,
