@@ -344,6 +344,10 @@ async function createPipedriveDeal(leadId: string) {
           },
           take: 1,
         },
+        activities: {
+          where: { type: "NOTE_ADDED" },
+          orderBy: { createdAt: "asc" },
+        },
       },
     });
 
@@ -444,6 +448,23 @@ async function createPipedriveDeal(leadId: string) {
       })
       .join("\n\n");
 
+    // Format notes history
+    const notesHistory = lead.activities && lead.activities.length > 0
+      ? lead.activities
+          .map((activity) => {
+            const timestamp = new Date(activity.createdAt).toLocaleString("en-US", {
+              month: "short",
+              day: "numeric",
+              hour: "numeric",
+              minute: "2-digit",
+              hour12: true,
+            });
+            const subject = activity.subject ? `[${activity.subject}] ` : "";
+            return `[${timestamp}] ${subject}${activity.content}`;
+          })
+          .join("\n\n")
+      : "No notes recorded";
+
     // Add note to deal with full context
     const noteContent = `
 Lead converted from LOD2 system:
@@ -469,6 +490,9 @@ ${callOutcome.preferredProgram ? `- Preferred Program: ${callOutcome.preferredPr
 **Application:**
 - Started: ${lead.applicationStartedAt ? new Date(lead.applicationStartedAt).toLocaleString() : "N/A"}
 - Completed: ${lead.applicationCompletedAt ? new Date(lead.applicationCompletedAt).toLocaleString() : "N/A"}
+
+**Notes History:**
+${notesHistory}
 
 **SMS Conversation History:**
 ${smsHistory || "No SMS conversations recorded"}
