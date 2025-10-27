@@ -254,7 +254,7 @@ async function createPipedriveDeal(leadId: string, finmoPayload: any) {
           currency: "CAD",
           status: "open",
           pipeline_id: 22,
-          stage_id: 148, // Application Started (changed from 152 - Documents)
+          stage_id: 223, // Application stage in Active Mortgage Pipeline
           ...(assignedUserId && { user_id: assignedUserId }),
         }),
       }
