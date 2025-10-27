@@ -309,14 +309,14 @@ This lead has SUBMITTED their mortgage application!
 
 🎯 **YOUR OBJECTIVE:**
 - Send a warm congratulations message
-- Let them know next steps (advisor will be in touch)
+- Let them know next steps (team will be in touch within 48 hours)
 - Offer to answer any questions while they wait
 - Keep them excited and reassured
 
 **Example message:**
 "Congrats on submitting your application, ${data.name?.split(' ')[0] || 'there'}! That's a huge step!
 
-Our team will review everything and be in touch within 24-48 hours. In the meantime, if you have any questions at all, I'm here to help!
+Our team will review everything and be in touch within 48 hours. In the meantime, if you have any questions at all, I'm here to help!
 
 Exciting times ahead!"
 
