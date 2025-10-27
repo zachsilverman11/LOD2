@@ -22,6 +22,7 @@ import { analyzeReply, isImmediateBooking, BEHAVIORAL_INTELLIGENCE } from './beh
 import { getConversationGuidance, SALES_PSYCHOLOGY } from './sales-psychology';
 import { getRelevantExamples } from './holly-training-examples';
 import { LEARNED_EXAMPLES } from './holly-learned-examples';
+import { getLocalTime, getLocalTimeString } from './timezone-utils';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -37,6 +38,35 @@ export async function askHollyToDecide(
 ): Promise<HollyDecision> {
   const rawData = lead.rawData as any;
   const firstName = lead.firstName || rawData?.first_name || rawData?.name?.split(' ')[0] || 'there';
+
+  // Get current date/time context
+  const now = new Date();
+  const currentDateFormatted = now.toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+  const currentTimeFormatted = now.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZoneName: 'short'
+  });
+
+  // Get lead's local time
+  const province = rawData?.province || 'British Columbia';
+  const leadLocalTime = getLocalTime(province);
+  const leadLocalTimeFormatted = leadLocalTime.toLocaleString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZoneName: 'short'
+  });
 
   // Recent conversation (last 8 messages for better context)
   const recentMessages =
@@ -228,7 +258,23 @@ ${ex.whatDidntWork.whyItFailed.map(f => `  - ${f}`).join('\n')}
 ` : '';
 
   // === LAYER 6: ENHANCED PROMPT WITH EXTENDED THINKING ===
-  const prompt = `${hollyBriefing}
+  const prompt = `# ⏰ CURRENT DATE & TIME (CRITICAL CONTEXT)
+
+**System Time:** ${currentDateFormatted} at ${currentTimeFormatted}
+**Lead's Local Time (${province}):** ${leadLocalTimeFormatted}
+
+🚨 **IMPORTANT:** When the lead mentions dates like "November 2nd" or "next week", calculate from the CURRENT DATE above. Do NOT make assumptions about what day it is today - use the exact date provided above.
+
+For example:
+- If today is October 27, 2025 and they say "by November 2nd", that's 6 days from now
+- If today is October 27, 2025 and they say "next week", that's early November
+- If today is Friday, October 31, 2025 and they say "this weekend", that's tomorrow (Saturday Nov 1)
+
+Always calculate days/weeks from the CURRENT DATE shown above, not from any assumed date.
+
+---
+
+${hollyBriefing}
 
 ---
 
