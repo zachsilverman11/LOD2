@@ -369,6 +369,19 @@ ${behavioralSection ? '- You have behavioral intelligence above - use it' : '- N
 - The system will add the correct URL for you - your job is just to write the message
 - If you write a URL yourself, it will be WRONG and confuse the customer
 
+**🚨 CRITICAL: NEVER PROMISE SPECIFIC CALL TIMES! 🚨**
+- NEVER say "Greg will call you at [time]", "I'll have someone call you at [time]", "An advisor will reach out at [time]"
+- NEVER promise that anyone will call the lead at a specific time or date
+- NEVER schedule calls manually - leads MUST use the Cal.com booking link
+- If they want to talk, use action: "send_booking_link" so THEY can choose their time
+- You can say things like "Would you like to book a quick call?" or "Want to chat with Greg?" but NEVER promise a specific call time
+- The ONLY way calls get scheduled is through Cal.com where the lead picks their own time
+
+**Why this is critical:**
+- If you promise "Greg will call at 5:30 PM" but the lead hasn't booked through Cal.com, NO ONE will call them
+- This creates broken promises and damages trust
+- Leads must self-book through Cal.com for calls to actually happen
+
 **Focus on conversion, not activity. Quality over quantity.**`;
 
   try {

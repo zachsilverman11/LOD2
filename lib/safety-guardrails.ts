@@ -114,6 +114,26 @@ export function validateDecision(
     errors.push('Message cannot be empty or whitespace only');
   }
 
+  // === HARD RULE: Never promise specific call times ===
+  if (decision.message) {
+    const message = decision.message.toLowerCase();
+    const forbiddenPatterns = [
+      /will call you (at|around|by)/i,
+      /call you (at|around|by|tomorrow|today)/i,
+      /reach out (at|around|by|tomorrow|today)/i,
+      /(greg|advisor|someone|i'll|i will|we'll|we will).*(call|reach out).*(at|around|by)/i,
+      /(at|around|by) \d+:\d+/i,  // Catches "at 5:30", "by 3:00"
+      /scheduled.*call.*(at|for) \d+/i,  // Catches "scheduled call at 5"
+    ];
+
+    const violations = forbiddenPatterns.filter(pattern => pattern.test(message));
+    if (violations.length > 0) {
+      errors.push(
+        'CRITICAL: Message promises a specific call time. Leads MUST book through Cal.com. Never say "will call you at [time]" - instead use send_booking_link action.'
+      );
+    }
+  }
+
   // === SOFT WARNING: Flag long messages (>320 chars = 2 SMS) ===
   if (decision.message && decision.message.length > 320) {
     warnings.push(
