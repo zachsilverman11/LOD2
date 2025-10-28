@@ -71,7 +71,26 @@ export function KanbanBoard({ onLeadClick }: KanbanBoardProps) {
     }
 
     const leadId = active.id as string;
-    const newStatus = over.id as LeadStatus;
+
+    // Check if we dropped on a column (status) or on another lead
+    // If dropped on a lead, find which column that lead belongs to
+    let newStatus: LeadStatus;
+    const overId = over.id as string;
+
+    // Check if overId is a valid LeadStatus
+    const isValidStatus = PIPELINE_STAGES.some(stage => stage.id === overId);
+
+    if (isValidStatus) {
+      // Dropped on a column directly
+      newStatus = overId as LeadStatus;
+    } else {
+      // Dropped on another lead - find that lead's status
+      const targetLead = leads.find((l) => l.id === overId);
+      if (!targetLead) {
+        return;
+      }
+      newStatus = targetLead.status;
+    }
 
     const lead = leads.find((l) => l.id === leadId);
     if (!lead || lead.status === newStatus) {
