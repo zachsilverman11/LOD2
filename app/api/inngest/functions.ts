@@ -50,12 +50,17 @@ export const processLeadReply = inngest.createFunction(
     } else {
       console.log(`[Inngest Worker] ⏭️  Deferred: ${leadId} → ${result.reason}`);
 
-      // Only send error alert if it's an actual error (not just "wait" decision)
+      // Only send error alert if it's an actual error (not just "wait" decision or safety guardrail block)
+      const reasonLower = (result.reason || '').toLowerCase();
       const isError =
         result.reason &&
-        !result.reason.toLowerCase().includes("wait") &&
-        !result.reason.toLowerCase().includes("blocked") &&
-        !result.reason.toLowerCase().includes("disabled");
+        !reasonLower.includes("wait") &&
+        !reasonLower.includes("blocked") &&
+        !reasonLower.includes("disabled") &&
+        !reasonLower.includes("critical:") && // Safety guardrail blocks start with "CRITICAL:"
+        !reasonLower.includes("outside sms hours") &&
+        !reasonLower.includes("too soon") &&
+        !reasonLower.includes("opted out");
 
       if (isError) {
         await sendErrorAlert({

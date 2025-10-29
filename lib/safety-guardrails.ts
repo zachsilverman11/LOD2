@@ -117,20 +117,27 @@ export function validateDecision(
   // === HARD RULE: Never promise specific call times ===
   if (decision.message) {
     const message = decision.message.toLowerCase();
-    const forbiddenPatterns = [
-      /will call you (at|around|by)/i,
-      /call you (at|around|by|tomorrow|today)/i,
-      /reach out (at|around|by|tomorrow|today)/i,
-      /(greg|advisor|someone|i'll|i will|we'll|we will).*(call|reach out).*(at|around|by)/i,
-      /(at|around|by) \d+:\d+/i,  // Catches "at 5:30", "by 3:00"
-      /scheduled.*call.*(at|for) \d+/i,  // Catches "scheduled call at 5"
-    ];
 
-    const violations = forbiddenPatterns.filter(pattern => pattern.test(message));
-    if (violations.length > 0) {
-      errors.push(
-        'CRITICAL: Message promises a specific call time. Leads MUST book through Cal.com. Never say "will call you at [time]" - instead use send_booking_link action.'
-      );
+    // Allow acknowledging existing bookings (e.g., "your 2pm booking", "saw your booking")
+    const isAcknowledgingBooking =
+      /saw your.*booking|your.*booking|confirmed.*booking|booking.*through/i.test(message) ||
+      /already.*booked|just.*booked|you.*booked/i.test(message);
+
+    if (!isAcknowledgingBooking) {
+      const forbiddenPatterns = [
+        /will call you (at|around|by)/i,
+        /\b(i'll|i will|we'll|we will|going to) call you (at|around|by)/i,
+        /\b(greg|advisor|someone|team).*(will|going to) call you (at|around|by)/i,
+        /(reach out|contact you|call you) (at|around|by) \d+/i,  // "call you at 5pm"
+        /\b(i'll|i will|we'll|we will) (reach out|call|contact).*(at|around|by) \d+/i,
+      ];
+
+      const violations = forbiddenPatterns.filter(pattern => pattern.test(message));
+      if (violations.length > 0) {
+        errors.push(
+          'CRITICAL: Message promises a specific call time. Leads MUST book through Cal.com. Never say "will call you at [time]" - instead use send_booking_link action.'
+        );
+      }
     }
   }
 
