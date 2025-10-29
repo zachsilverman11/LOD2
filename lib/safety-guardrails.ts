@@ -48,13 +48,13 @@ export function validateDecision(
   const rawData = context.lead.rawData as any;
   const province = rawData?.province || 'British Columbia';
   const leadLocalTime = getLocalTime(province);
-  const hour = leadLocalTime.getHours();
+  const hour = leadLocalTime.getUTCHours(); // Use UTC hours since getLocalTime returns time stored in UTC
 
   if (hour < 8 || hour >= 21) {
     if (decision.action !== 'wait' && decision.action !== 'escalate') {
       errors.push(
         `Outside SMS hours (${hour}:${leadLocalTime
-          .getMinutes()
+          .getUTCMinutes()
           .toString()
           .padStart(2, '0')} local time in ${province}) - can only send 8am-9pm`
       );
