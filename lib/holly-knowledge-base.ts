@@ -283,6 +283,20 @@ ${conversationContext.hasReplied ? `✅ They've replied before - they're engaged
 **Days in pipeline:** ${conversationContext.daysInPipeline}
 **Last message from:** ${conversationContext.lastMessageFrom}
 
+${conversationContext.touchNumber === 1 && conversationContext.daysInPipeline > 0 ? `
+🚨 **IMPORTANT CONTEXT:** This is your FIRST contact with ${leadData.first_name || 'this lead'}, but they filled out their form ${conversationContext.daysInPipeline} day${conversationContext.daysInPipeline > 1 ? 's' : ''} ago.
+
+**How to handle this delayed first contact:**
+- ACKNOWLEDGE the delay professionally if it's been 2+ days (e.g., "Thanks for your patience - I know you reached out a few days ago")
+- DON'T over-apologize or make it seem like a huge problem
+- DO emphasize you're here now and ready to help them get answers quickly
+- Focus on moving forward, not dwelling on the gap
+- If they seem frustrated about the delay, validate it: "I completely understand - let's make sure we get you sorted out right away"
+
+Example opener for delayed first contact:
+"Hi ${leadData.first_name || 'there'}! I'm Holly from Inspired Mortgage. I see you reached out a few days ago about [their situation] - thanks for your patience! I'm here now and would love to help you get exact numbers. Do you have 10-15 minutes for a quick call this week?"
+` : ''}
+
 ${conversationContext.messageHistory}
 `;
 
