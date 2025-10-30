@@ -99,6 +99,23 @@ export function validateDecision(
     errors.push('Lead already has an appointment scheduled - cannot double-book');
   }
 
+  // === HARD RULE: Don't send booking/application links to CONVERTED leads ===
+  if (
+    context.lead.status === 'CONVERTED' ||
+    context.lead.status === 'DEALS_WON'
+  ) {
+    if (decision.action === 'send_booking_link') {
+      errors.push(
+        'Lead is CONVERTED - already booked and completed application. Use send_sms for customer support only.'
+      );
+    }
+    if (decision.action === 'send_application_link') {
+      errors.push(
+        'Lead is CONVERTED - already completed application. Use send_sms for customer support only.'
+      );
+    }
+  }
+
   // === HARD RULE: Require message for send actions ===
   if (
     (decision.action === 'send_sms' ||

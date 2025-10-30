@@ -20,8 +20,16 @@ const AUTONOMOUS_LEAD_PERCENTAGE = parseInt(process.env.AUTONOMOUS_LEAD_PERCENTA
 /**
  * Process a single lead through autonomous Holly agent
  * Used for instant responses (SMS replies, new leads)
+ *
+ * @param leadId - The ID of the lead to process
+ * @param triggerSource - Whether this is proactive (cron) or reactive (sms_reply)
+ *   - 'cron': Proactive outreach via scheduled review (blocks CONVERTED leads)
+ *   - 'sms_reply': Reactive response to lead's SMS (allows CONVERTED leads)
  */
-export async function processLeadWithAutonomousAgent(leadId: string) {
+export async function processLeadWithAutonomousAgent(
+  leadId: string,
+  triggerSource: 'cron' | 'sms_reply' = 'cron'
+) {
   if (!ENABLE_AUTONOMOUS_AGENT) {
     console.log(`[Holly Agent] ⏸️  Disabled via ENABLE_AUTONOMOUS_AGENT env var - skipping lead ${leadId}`);
     return { success: false, reason: 'Agent disabled' };
@@ -53,11 +61,18 @@ export async function processLeadWithAutonomousAgent(leadId: string) {
       return { success: false, reason: 'Lead not found' };
     }
 
-    // Skip processing leads that have completed their journey
+    // Skip processing leads that have completed their journey (proactive mode only)
+    // Allow reactive responses when leads text us, even if CONVERTED
     const excludedStatuses = ['CONVERTED', 'DEALS_WON', 'LOST'];
-    if (excludedStatuses.includes(lead.status)) {
-      console.log(`[Holly Agent] ⏭️  Skipping ${lead.firstName} ${lead.lastName} - status is ${lead.status} (no autonomous processing for completed leads)`);
-      return { success: false, reason: `Lead status is ${lead.status} - journey complete` };
+
+    if (triggerSource === 'cron' && excludedStatuses.includes(lead.status)) {
+      console.log(`[Holly Agent] ⏭️  Skipping ${lead.firstName} ${lead.lastName} - status is ${lead.status} (no proactive outreach to completed leads)`);
+      return { success: false, reason: `Lead status is ${lead.status} - no proactive outreach` };
+    }
+
+    // If triggered by SMS reply from CONVERTED lead, allow processing but log it
+    if (triggerSource === 'sms_reply' && excludedStatuses.includes(lead.status)) {
+      console.log(`[Holly Agent] 💬 Processing SMS reply from ${lead.firstName} ${lead.lastName} (status: ${lead.status}) - reactive response allowed`);
     }
 
     console.log(`[Holly Agent] 🔍 Processing ${lead.firstName} ${lead.lastName}...`);

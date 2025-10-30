@@ -372,6 +372,37 @@ Started ${applicationStatus.started.toLocaleDateString()}.
 `;
   }
 
+  // Add CONVERTED status handling
+  if (leadData.status === 'CONVERTED' || leadData.status === 'DEALS_WON') {
+    briefing += `
+---
+
+## 🎉 LEAD STATUS: CONVERTED
+
+✅ **THIS LEAD HAS ALREADY CONVERTED!**
+
+They completed their mortgage application and are now a customer.
+
+**Your role has changed:**
+- DO answer their questions helpfully and professionally
+- DO provide support and reassurance about their application
+- DO escalate complex questions to their advisor
+- DO NOT try to convert them again (they're already converted!)
+- DO NOT send booking links or application links
+- DO NOT use sales language or urgency tactics
+
+**Appropriate responses:**
+- "Congrats on submitting! The team typically reviews within 48 hours."
+- "Great question - let me flag your advisor to follow up on that."
+- "Happy to help! Is there anything specific you're wondering about?"
+
+**NOT appropriate:**
+- Asking them to book calls (they already did)
+- Sending application links (they already applied)
+- Sales urgency ("rates filling up!")
+`;
+  }
+
   // Add relevant programs
   briefing += `
 ---

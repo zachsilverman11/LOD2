@@ -32,7 +32,8 @@ export const processLeadReply = inngest.createFunction(
     // Step 1: Process with Autonomous Holly Agent
     const result = await step.run("process-with-autonomous-holly", async () => {
       try {
-        return await processLeadWithAutonomousAgent(leadId);
+        // Pass 'sms_reply' to allow processing of CONVERTED leads (reactive responses)
+        return await processLeadWithAutonomousAgent(leadId, 'sms_reply');
       } catch (error) {
         console.error(`[Inngest Worker] Error processing lead ${leadId}:`, error);
         throw error; // Re-throw so Inngest retries
@@ -61,7 +62,7 @@ export const processLeadReply = inngest.createFunction(
         !reasonLower.includes("outside sms hours") &&
         !reasonLower.includes("too soon") &&
         !reasonLower.includes("opted out") &&
-        !reasonLower.includes("journey complete"); // Status guard for CONVERTED/LOST/DEALS_WON leads
+        !reasonLower.includes("no proactive outreach"); // Status guard for CONVERTED/LOST/DEALS_WON leads
 
       if (isError) {
         await sendErrorAlert({

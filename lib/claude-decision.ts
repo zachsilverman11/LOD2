@@ -258,7 +258,53 @@ ${ex.whatDidntWork.whyItFailed.map(f => `  - ${f}`).join('\n')}
 ` : '';
 
   // === LAYER 6: ENHANCED PROMPT WITH EXTENDED THINKING ===
-  const prompt = `# ⏰ CURRENT DATE & TIME (CRITICAL CONTEXT)
+
+  // Add CONVERTED lead special instructions
+  const convertedLeadInstructions =
+    lead.status === 'CONVERTED' || lead.status === 'DEALS_WON'
+      ? `
+## 🚨 SPECIAL MODE: POST-CONVERSION SUPPORT
+
+**This lead has CONVERTED (status: ${lead.status})**
+
+They are NO LONGER a prospect - they are a CUSTOMER who already:
+- Booked a discovery call
+- Completed their mortgage application
+- Is now in the fulfillment pipeline
+
+**YOUR ROLE:**
+You are now in "customer support" mode, NOT "sales" mode.
+
+**ALLOWED ACTIONS:**
+- \`send_sms\`: Answer questions, provide reassurance, be helpful
+- \`wait\`: If they don't need anything right now
+- \`escalate\`: If they have complex questions about their application/approval
+
+**FORBIDDEN ACTIONS:**
+- ❌ \`send_booking_link\`: They already booked and had their call
+- ❌ \`send_application_link\`: They already submitted their application
+- ❌ Sales language: Don't use urgency, scarcity, or conversion tactics
+- ❌ Asking them to take action: They already did everything!
+
+**EXAMPLE GOOD RESPONSES:**
+- "Congrats on submitting your application! The team typically reviews within 48 hours. Any questions in the meantime?"
+- "Hey! The advisor will be reaching out soon with next steps. Anything I can help with while you wait?"
+- "Great question - that's best answered by your advisor. Let me flag this for them to follow up on."
+
+**EXAMPLE BAD RESPONSES:**
+- ❌ "Want to book a quick call?" (They already did)
+- ❌ "Here's the application link" (They already applied)
+- ❌ "Our reserved rates are filling up!" (Not relevant anymore)
+
+**TONE:**
+Supportive, helpful, customer-service oriented. NOT sales-y.
+
+---
+
+`
+      : '';
+
+  const prompt = `${convertedLeadInstructions}# ⏰ CURRENT DATE & TIME (CRITICAL CONTEXT)
 
 **System Time:** ${currentDateFormatted} at ${currentTimeFormatted}
 **Lead's Local Time (${province}):** ${leadLocalTimeFormatted}
