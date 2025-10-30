@@ -97,7 +97,25 @@ export async function POST(request: NextRequest) {
       }
     } catch (error) {
       console.error("[Finmo - Started] Error creating Pipedrive deal:", error);
+
+      // Send Slack alert for deal creation failure
+      try {
+        await sendSlackNotification({
+          type: 'error',
+          message: `⚠️  Failed to create Pipedrive deal on application start`,
+          context: {
+            lead: `${lead.firstName} ${lead.lastName} (${lead.email})`,
+            leadId: lead.id,
+            error: error instanceof Error ? error.message : String(error),
+            note: 'Deal creation failed but lead will be marked as APPLICATION_STARTED. Fallback in /submitted endpoint will attempt to create deal.',
+          },
+        });
+      } catch (slackError) {
+        console.error("[Finmo - Started] Failed to send Slack notification:", slackError);
+      }
+
       // Continue even if Pipedrive fails - don't block status update
+      // pipedriveDealId will remain null, fallback in /submitted will create deal
     }
 
     // Update lead to APPLICATION_STARTED with Pipedrive deal ID
@@ -166,13 +184,13 @@ export async function POST(request: NextRequest) {
 /**
  * Create deal in Pipedrive when application starts
  */
-async function createPipedriveDeal(leadId: string, finmoPayload: any) {
+export async function createPipedriveDeal(leadId: string, finmoPayload: any) {
   const PIPEDRIVE_API_TOKEN = process.env.PIPEDRIVE_API_TOKEN;
   const PIPEDRIVE_COMPANY_DOMAIN = process.env.PIPEDRIVE_COMPANY_DOMAIN || "api";
 
   if (!PIPEDRIVE_API_TOKEN) {
-    console.log("[Pipedrive] API token not configured, skipping deal creation");
-    return null;
+    console.error("[Pipedrive] CRITICAL: PIPEDRIVE_API_TOKEN environment variable is not set");
+    throw new Error("PIPEDRIVE_API_TOKEN environment variable is not set. Cannot create Pipedrive deal.");
   }
 
   const API_BASE = `https://${PIPEDRIVE_COMPANY_DOMAIN}.pipedrive.com`;

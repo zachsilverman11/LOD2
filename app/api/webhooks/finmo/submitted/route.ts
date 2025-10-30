@@ -85,8 +85,54 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Finmo - Submitted] Found lead: ${lead.firstName} ${lead.lastName} (ID: ${lead.id})`);
 
-    // Deal should already exist from APPLICATION_STARTED - use existing pipedriveDealId
-    const pipedriveDealId = lead.pipedriveDealId;
+    // Deal should already exist from APPLICATION_STARTED - create if missing (fallback)
+    let pipedriveDealId = lead.pipedriveDealId;
+
+    if (!pipedriveDealId) {
+      console.warn(`[Finmo - Submitted] ⚠️  No Pipedrive deal found for ${lead.firstName} ${lead.lastName}`);
+      console.warn(`[Finmo - Submitted] This indicates /started webhook failed to create deal. Creating now as fallback.`);
+
+      // Send Slack alert that fallback was needed
+      try {
+        await sendSlackNotification({
+          type: 'warning',
+          message: `⚠️  Pipedrive deal created on COMPLETION (should have been on START)`,
+          context: {
+            lead: `${lead.firstName} ${lead.lastName} (${lead.email})`,
+            leadId: lead.id,
+            note: 'The /started webhook failed to create the deal. Creating deal now as fallback. Check /started endpoint logs for the root cause.',
+          },
+        });
+      } catch (slackError) {
+        console.error("[Finmo - Submitted] Failed to send Slack notification:", slackError);
+      }
+
+      // Create Pipedrive deal as fallback
+      try {
+        // Import the createPipedriveDeal function dynamically from started endpoint
+        // This is a fallback - normally deals should be created in /started
+        const { createPipedriveDeal } = await import('../started/route');
+        pipedriveDealId = await createPipedriveDeal(lead.id, payload);
+
+        if (pipedriveDealId) {
+          console.log(`[Finmo - Submitted] ✅ Fallback deal created: ${pipedriveDealId}`);
+        }
+      } catch (error) {
+        console.error("[Finmo - Submitted] ❌ Failed to create fallback deal:", error);
+
+        // Critical alert - both /started and /submitted failed
+        await sendSlackNotification({
+          type: 'error',
+          message: `🚨 CRITICAL: Failed to create Pipedrive deal even on completion`,
+          context: {
+            lead: `${lead.firstName} ${lead.lastName} (${lead.email})`,
+            leadId: lead.id,
+            error: error instanceof Error ? error.message : String(error),
+            note: 'Both /started and /submitted webhooks failed to create deal. Manual intervention required.',
+          },
+        });
+      }
+    }
 
     // Update lead to CONVERTED (deal already created when application started)
     await prisma.lead.update({
