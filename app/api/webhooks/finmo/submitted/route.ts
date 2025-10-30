@@ -96,6 +96,8 @@ export async function POST(request: NextRequest) {
         status: LeadStatus.CONVERTED,
         convertedAt: new Date(),
         updatedAt: new Date(),
+        hollyDisabled: true,      // Stop autonomous processing - journey is complete
+        nextReviewAt: null,        // Clear any scheduled reviews
       },
     });
 

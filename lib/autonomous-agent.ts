@@ -53,6 +53,13 @@ export async function processLeadWithAutonomousAgent(leadId: string) {
       return { success: false, reason: 'Lead not found' };
     }
 
+    // Skip processing leads that have completed their journey
+    const excludedStatuses = ['CONVERTED', 'DEALS_WON', 'LOST'];
+    if (excludedStatuses.includes(lead.status)) {
+      console.log(`[Holly Agent] ⏭️  Skipping ${lead.firstName} ${lead.lastName} - status is ${lead.status} (no autonomous processing for completed leads)`);
+      return { success: false, reason: `Lead status is ${lead.status} - journey complete` };
+    }
+
     console.log(`[Holly Agent] 🔍 Processing ${lead.firstName} ${lead.lastName}...`);
 
     // === ANALYZE DEAL HEALTH ===
@@ -283,7 +290,8 @@ export async function runHollyAgentLoop() {
 
   try {
     // === SMART QUERY: Only leads due for review ===
-    const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
+    // Increased from 5 to 10 minutes to prevent race conditions with Inngest queue
+    const tenMinutesAgo = new Date(now.getTime() - 10 * 60 * 1000);
 
     const leadsToReview = await prisma.lead.findMany({
       where: {
@@ -299,7 +307,7 @@ export async function runHollyAgentLoop() {
               {
                 OR: [
                   { lastContactedAt: null },
-                  { lastContactedAt: { lte: fiveMinutesAgo } }, // Not contacted in last 5min
+                  { lastContactedAt: { lte: tenMinutesAgo } }, // Not contacted in last 10min
                 ],
               },
             ],
@@ -310,7 +318,7 @@ export async function runHollyAgentLoop() {
               {
                 OR: [
                   { lastContactedAt: null },
-                  { lastContactedAt: { lte: fiveMinutesAgo } }, // Not contacted in last 5min
+                  { lastContactedAt: { lte: tenMinutesAgo } }, // Not contacted in last 10min
                 ],
               },
             ],
