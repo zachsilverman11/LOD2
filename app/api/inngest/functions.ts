@@ -60,7 +60,8 @@ export const processLeadReply = inngest.createFunction(
         !reasonLower.includes("critical:") && // Safety guardrail blocks start with "CRITICAL:"
         !reasonLower.includes("outside sms hours") &&
         !reasonLower.includes("too soon") &&
-        !reasonLower.includes("opted out");
+        !reasonLower.includes("opted out") &&
+        !reasonLower.includes("journey complete"); // Status guard for CONVERTED/LOST/DEALS_WON leads
 
       if (isError) {
         await sendErrorAlert({
