@@ -94,6 +94,11 @@ export async function askHollyToDecide(
     lastMessageFrom = lead.communications[0].direction === 'OUTBOUND' ? 'holly' : 'lead';
   }
 
+  // Calculate days since last outbound contact (for re-engagement detection)
+  const daysSinceLastContact = lastMessageFrom === 'holly' && lead.lastContactedAt
+    ? Math.floor((now.getTime() - lead.lastContactedAt.getTime()) / (1000 * 60 * 60 * 24))
+    : 0;
+
   // Get MOST RECENT inbound reply for behavioral analysis (not first/oldest)
   const lastReply = lead.communications
     ?.filter((c: any) => c.direction === 'INBOUND')
@@ -317,6 +322,33 @@ For example:
 - If today is Friday, October 31, 2025 and they say "this weekend", that's tomorrow (Saturday Nov 1)
 
 Always calculate days/weeks from the CURRENT DATE shown above, not from any assumed date.
+${daysSinceLastContact >= 2 && outboundCount > 0 ? `
+
+---
+
+## 🚨 RE-ENGAGEMENT ALERT: ${daysSinceLastContact}-DAY GAP
+
+⚠️ **CRITICAL:** It's been ${daysSinceLastContact} day${daysSinceLastContact > 1 ? 's' : ''} since your last message to ${firstName}.
+${lead.lastContactedAt ? `**Your last contact:** ${lead.lastContactedAt.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}` : ''}
+**Today's date:** ${currentDateFormatted}
+
+This is a RE-ENGAGEMENT, not a normal follow-up.
+
+**You MUST:**
+- Acknowledge the time gap explicitly in your message
+- Reference what you discussed before (show continuity)
+- DO NOT act like no time passed - ${firstName} will notice
+- Calculate from the dates above: Last contact was ${daysSinceLastContact} days ago
+
+**Examples of good acknowledgment:**
+${daysSinceLastContact >= 7 ? `- "It's been a while - wanted to check back in on..."` : `- "Sorry for going quiet - wanted to circle back on..."`}
+- "Hi ${firstName}! Apologies for the delay..."
+
+**BAD (DO NOT DO THIS):**
+- ❌ "Following up on my last message" (ignores the gap)
+- ❌ Acting like it's been hours when it's been days
+- ❌ Generic message that doesn't reference previous conversation
+` : ''}
 
 ---
 

@@ -296,6 +296,42 @@ ${conversationContext.touchNumber === 1 && conversationContext.daysInPipeline > 
 Example opener for delayed first contact:
 "Hi ${leadData.first_name || 'there'}! I'm Holly from Inspired Mortgage. I see you reached out a few days ago about [their situation] - thanks for your patience! I'm here now and would love to help you get exact numbers. Do you have 10-15 minutes for a quick call this week?"
 ` : ''}
+${(() => {
+  // Calculate days since last outbound message for re-engagement detection
+  const daysSinceLastContact = conversationContext.lastMessageFrom === 'holly' && leadData.lastContactedAt
+    ? Math.floor((Date.now() - leadData.lastContactedAt.getTime()) / (1000 * 60 * 60 * 24))
+    : 0;
+
+  // Scenario B & C: Re-engagement after abandonment (we went silent)
+  if (conversationContext.touchNumber > 1 && daysSinceLastContact >= 2) {
+    return `
+🚨 **CRITICAL: RE-ENGAGEMENT AFTER ${daysSinceLastContact}-DAY GAP**
+
+You went SILENT for ${daysSinceLastContact} day${daysSinceLastContact > 1 ? 's' : ''} after previous contact. This is NOT a normal follow-up - it's a RE-ENGAGEMENT.
+
+**How to handle re-engagement after abandonment:**
+- ACKNOWLEDGE the gap directly: "Sorry for going quiet..." or "${daysSinceLastContact >= 7 ? "It's been a while..." : "Wanted to circle back..."}"
+- REFERENCE the previous conversation topic: Show continuity, not amnesia
+- DON'T act like no time passed - they notice and it feels impersonal
+- CREATE CONTINUITY: "Last we chatted about [topic]..." or "Wanted to follow up on [thing]..."
+- BE GENUINE: Brief acknowledgment, then move forward
+
+${daysSinceLastContact >= 7 ? `
+**Example for LONG gap (${daysSinceLastContact} days):**
+"Hi ${leadData.first_name || 'there'}! It's been a while - wanted to check back in on your [mortgage type] situation. Are you still looking at [property/refinance/etc], or has anything changed?"
+` : `
+**Example for SHORT gap (${daysSinceLastContact} days):**
+"Hi ${leadData.first_name || 'there'}! Sorry for going quiet on you. Wanted to circle back on your [topic from last conversation]. [Ask relevant question based on where you left off]"
+`}
+
+**What NOT to do:**
+- ❌ "Following up on my last message!" (ignores the gap)
+- ❌ Generic message that doesn't reference previous conversation
+- ❌ Acting like you just met (they already know you)
+`;
+  }
+  return '';
+})()}
 
 ${conversationContext.messageHistory}
 `;

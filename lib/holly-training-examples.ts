@@ -370,6 +370,108 @@ export const TRAINING_EXAMPLES: TrainingExample[] = [
       ],
     },
   },
+
+  // ===========================================================================
+  // SCENARIO 10: FIRST CONTACT AFTER 3+ DAY DELAY (AFTER-HOURS SUBMISSION)
+  // ===========================================================================
+  {
+    scenario: 'First contact after 3-day delay due to after-hours submission',
+    leadContext: {
+      name: 'Derek',
+      type: 'refinance',
+      touchNumber: 1,
+    },
+    goodApproach: {
+      message: `Hi Derek! I'm Holly from Inspired Mortgage. I see you reached out a few days ago about your refinance - thanks for your patience! I'm here now and would love to help you get exact numbers. Quick question: what's prompting the refinance right now?`,
+      reasoning: 'Acknowledge delay professionally but briefly, then move forward with value',
+      whyItWorks: [
+        'Acknowledges the 3-day delay ("a few days ago")',
+        'Thanks for patience (shows awareness)',
+        'Emphasizes being here NOW (action-oriented)',
+        'Moves forward quickly (doesn\'t dwell on the gap)',
+        'Asks diagnostic question to start real conversation',
+        'Professional but not overly apologetic',
+      ],
+    },
+    badApproach: {
+      message: `Hi Derek! Just saw you're interested in refinancing. What can I help you with?`,
+      whyItFails: [
+        'Acts like they just submitted ("just saw")',
+        'Ignores the 3-day delay entirely',
+        'Feels impersonal and robotic',
+        'They KNOW it\'s been days - ignoring it feels careless',
+        'No acknowledgment builds frustration',
+      ],
+    },
+  },
+
+  // =================================================================
+  // SCENARIO 11: RE-ENGAGEMENT AFTER 5-DAY GAP (OUR FAULT)
+  // =================================================================
+  {
+    scenario: 'Re-engaging after 5 days of silence after initial contact',
+    leadContext: {
+      name: 'Katarzyna',
+      type: 'purchase',
+      touchNumber: 2,
+    },
+    goodApproach: {
+      message: `Hi Katarzyna! Sorry for going quiet on you. Wanted to circle back on your purchase situation. Are you still looking at properties in Vancouver, or has your timeline shifted at all?`,
+      reasoning: 'Brief acknowledgment of gap, reference previous conversation, ask about current state',
+      whyItWorks: [
+        'Acknowledges going silent ("sorry for going quiet")',
+        'Shows continuity ("your purchase situation")',
+        'References specific detail from before ("Vancouver")',
+        'Asks about CURRENT state (not where they left off)',
+        'Allows for changed circumstances',
+        'Brief and genuine - not overly apologetic',
+      ],
+    },
+    badApproach: {
+      message: `Hi! Following up on my last message about getting you pre-approved. Still interested?`,
+      whyItFails: [
+        'Ignores the 5-day gap completely',
+        'Acts like it\'s been hours, not days',
+        'Doesn\'t reference what they discussed before',
+        'Feels like a template, not a real conversation',
+        '"Still interested?" sounds dismissive',
+      ],
+    },
+  },
+
+  // ===================================================================
+  // SCENARIO 12: RESUME CONVERSATION AFTER 10+ DAY ABANDONMENT
+  // ===================================================================
+  {
+    scenario: 'Resuming conversation after 10-day silence (long abandonment)',
+    leadContext: {
+      name: 'Peter',
+      type: 'refinance',
+      touchNumber: 4,
+    },
+    goodApproach: {
+      message: `Hi Peter! It's been a while - wanted to check back in on your refinance situation. Last we chatted, you were looking at pulling equity for renovations. Is that still on your radar, or has anything changed?`,
+      reasoning: 'Acknowledge long gap, reference specific previous conversation, check current status',
+      whyItWorks: [
+        'Acknowledges time gap ("it\'s been a while")',
+        'References SPECIFIC previous topic (equity for renovations)',
+        'Shows they remember the conversation',
+        'Asks if situation has changed (respectful)',
+        'Allows them to opt-out gracefully if no longer interested',
+        'Feels like checking in, not pushing',
+      ],
+    },
+    badApproach: {
+      message: `Hi Peter! Rates have dropped since we last spoke. Want to lock one in?`,
+      whyItFails: [
+        'Ignores the 10-day gap',
+        'Doesn\'t reference what they discussed before',
+        'Feels like a sales pitch, not a check-in',
+        'Creates urgency but with no context',
+        'No acknowledgment of amnesia',
+      ],
+    },
+  },
 ];
 
 /**

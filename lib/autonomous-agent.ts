@@ -354,10 +354,10 @@ export async function runHollyAgentLoop() {
         },
       },
       orderBy: { nextReviewAt: 'asc' }, // Prioritize overdue reviews
-      take: 15, // Process max 15 leads per cycle (ensures < 5min completion)
+      take: 50, // Process max 50 leads per cycle (increased from 15 to clear backlog faster)
     });
 
-    console.log(`[Holly Agent] 📊 Reviewing ${leadsToReview.length} leads due for review...`);
+    console.log(`[Holly Agent] 📊 Found ${leadsToReview.length} leads due for review at ${now.toISOString()}...`);
 
     const results = {
       acted: 0,
@@ -575,6 +575,51 @@ export async function runHollyAgentLoop() {
       `[Holly Agent] ✨ Cycle complete - acted: ${results.acted}, waited: ${results.waited}, escalated: ${results.escalated}, skipped: ${results.skipped}`
     );
     console.log(`[Holly Agent] 📊 Next cycle in 15 minutes`);
+
+    // Check for severely overdue leads (>24h past their nextReviewAt)
+    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const severelyOverdueLeads = await prisma.lead.findMany({
+      where: {
+        nextReviewAt: { lte: oneDayAgo },
+        hollyDisabled: false,
+        consentSms: true,
+        managedByAutonomous: true,
+        status: { notIn: ['LOST', 'CONVERTED', 'DEALS_WON', 'APPLICATION_STARTED'] },
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        status: true,
+        nextReviewAt: true,
+        lastContactedAt: true,
+        createdAt: true,
+      },
+      take: 10, // Only show top 10 worst cases
+      orderBy: { nextReviewAt: 'asc' },
+    });
+
+    if (severelyOverdueLeads.length > 0) {
+      console.warn(`[Holly Agent] ⚠️  Found ${severelyOverdueLeads.length} leads >24h overdue`);
+
+      const leadDetails = severelyOverdueLeads.map(lead => {
+        const hoursOverdue = lead.nextReviewAt
+          ? Math.floor((now.getTime() - lead.nextReviewAt.getTime()) / (1000 * 60 * 60))
+          : 0;
+        const daysSinceCreated = Math.floor((now.getTime() - lead.createdAt.getTime()) / (1000 * 60 * 60 * 24));
+        return `• ${lead.firstName} ${lead.lastName} (${lead.status}): ${hoursOverdue}h overdue, ${lead.lastContactedAt ? 'contacted' : 'NEVER contacted'}, ${daysSinceCreated}d in pipeline`;
+      }).join('\n');
+
+      await sendSlackNotification({
+        type: 'warning',
+        message: `⚠️  ${severelyOverdueLeads.length} leads are >24h overdue for contact`,
+        context: {
+          timestamp: now.toISOString(),
+          details: leadDetails,
+          action: 'Check if cron is running properly or if there are processing issues',
+        },
+      });
+    }
   } catch (error) {
     console.error('[Holly Agent] 💥 Critical error in agent loop:', error);
   }
