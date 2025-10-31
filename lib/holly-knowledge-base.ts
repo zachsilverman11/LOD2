@@ -300,40 +300,91 @@ Example opener for delayed first contact:
 ${conversationContext.messageHistory}
 `;
 
-  // Add appointment status
+  // Add appointment status - CRITICAL: Show ALL appointments with explicit past/future context
   if (appointments && appointments.length > 0) {
-    const nextAppt = appointments[0];
+    const now = new Date();
+
+    // Separate past and future appointments
+    const pastAppointments = appointments.filter(a => {
+      const scheduledDate = a.scheduledFor || a.scheduledAt;
+      return scheduledDate < now;
+    });
+
+    const upcomingAppointments = appointments.filter(a => {
+      const scheduledDate = a.scheduledFor || a.scheduledAt;
+      return scheduledDate >= now;
+    });
+
     briefing += `
 ---
 
-## 🗓️ APPOINTMENT STATUS
+## 🗓️ APPOINTMENT HISTORY
+`;
 
-⚠️ **THEY ALREADY HAVE A CALL SCHEDULED** ⚠️
+    // Show upcoming appointments first (most important)
+    if (upcomingAppointments.length > 0) {
+      const nextAppt = upcomingAppointments[0];
+      const scheduledDate = nextAppt.scheduledFor || nextAppt.scheduledAt;
+      const daysUntil = Math.round((scheduledDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
-**Date/Time:** ${(nextAppt.scheduledFor || nextAppt.scheduledAt).toLocaleString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' })} PT
+      briefing += `
+### ⏰ UPCOMING CALL (${daysUntil} days from now)
+
+**Date/Time:** ${scheduledDate.toLocaleString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' })} PT
+**Advisor:** ${nextAppt.advisorName}
 **Status:** ${nextAppt.status}
 
-**Your objective has changed:**
+🚨 **CRITICAL CONTEXT:**
+This call is SCHEDULED FOR THE FUTURE. It has NOT happened yet.
+Do NOT ask "how did the call go?" - it hasn't happened yet!
+
+**Your objective:**
 - DON'T try to book another call
+- DON'T ask about a call that hasn't happened
 - DO confirm they know when their call is
 - DO build excitement and ensure they show up
 - DO prepare them (have property details ready)
 `;
+    }
+
+    // Show past appointments for context
+    if (pastAppointments.length > 0) {
+      const lastPastAppt = pastAppointments[0];
+      const scheduledDate = lastPastAppt.scheduledFor || lastPastAppt.scheduledAt;
+      const daysAgo = Math.abs(Math.round((scheduledDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+
+      briefing += `
+### 📅 PREVIOUS APPOINTMENT (${daysAgo} days ago)
+
+**Date/Time:** ${scheduledDate.toLocaleString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' })} PT
+**Advisor:** ${lastPastAppt.advisorName}
+**Status:** ${lastPastAppt.status}
+
+This call was ${daysAgo} days ago (not yesterday, not recently - ${daysAgo} DAYS AGO).
+`;
+    }
   }
 
-  // Add call outcome if exists
+  // Add call outcome if exists - WITH EXPLICIT DATE
   if (callOutcome) {
+    const now = new Date();
+    const callDate = callOutcome.createdAt;
+    const daysAgo = Math.abs(Math.round((callDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+
     briefing += `
 ---
 
-## 📞 RECENT CALL OUTCOME
+## 📞 CALL OUTCOME FROM ${daysAgo} DAYS AGO
+
+🚨 **CRITICAL:** This call happened ${daysAgo} days ago, NOT yesterday, NOT recently.
+**Exact date:** ${callDate.toLocaleString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
 
 **Advisor:** ${callOutcome.advisorName}
 **Result:** ${callOutcome.outcome}
 **Reached:** ${callOutcome.reached ? 'Yes' : 'No (voicemail/no answer)'}
 ${callOutcome.notes ? `**Notes:** ${callOutcome.notes}` : ''}
 
-**What this means:** Reference the call in your message. Ask how it went. Use advisor's notes to personalize.
+**What this means:** This call was ${daysAgo} days ago. If you reference it, be accurate about when it happened.
 `;
   }
 
