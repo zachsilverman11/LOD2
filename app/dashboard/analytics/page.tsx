@@ -115,16 +115,38 @@ export default function AnalyticsPage() {
   });
   const [saving, setSaving] = useState(false);
 
+  // Cohort filtering
+  const [selectedCohort, setSelectedCohort] = useState<string>("all");
+  const [availableCohorts, setAvailableCohorts] = useState<string[]>([]);
+
+  useEffect(() => {
+    fetchAvailableCohorts();
+  }, []);
+
   useEffect(() => {
     fetchAnalytics();
-  }, []);
+  }, [selectedCohort]);
+
+  const fetchAvailableCohorts = async () => {
+    try {
+      const res = await fetch("/api/admin/cohorts");
+      const data = await res.json();
+      if (data.success && data.data.cohortStats) {
+        const cohorts = data.data.cohortStats.map((c: any) => c.cohort).sort();
+        setAvailableCohorts(cohorts);
+      }
+    } catch (error) {
+      console.error("Failed to fetch cohorts:", error);
+    }
+  };
 
   const fetchAnalytics = async () => {
     setLoading(true);
     try {
+      const cohortParam = selectedCohort !== "all" ? `?cohort=${selectedCohort}` : "";
       const [overviewRes, funnelRes, topLeadsRes, metricsRes] = await Promise.all([
-        fetch("/api/analytics/overview"),
-        fetch("/api/analytics/funnel"),
+        fetch(`/api/analytics/overview${cohortParam}`),
+        fetch(`/api/analytics/funnel${cohortParam}`),
         fetch("/api/analytics/top-leads"),
         fetch("/api/analytics/metrics"),
       ]);
@@ -237,6 +259,34 @@ export default function AnalyticsPage() {
               <p className="text-[#55514D] mt-2 text-lg">Analytics Dashboard</p>
             </div>
             <div className="flex items-center gap-3">
+              {/* Cohort Filter */}
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-[#55514D]">Cohort:</label>
+                <select
+                  value={selectedCohort}
+                  onChange={(e) => setSelectedCohort(e.target.value)}
+                  className="px-3 py-2 text-sm border border-[#E4DDD3] rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-[#625FFF]"
+                >
+                  <option value="all">All Cohorts</option>
+                  {availableCohorts.map((cohort) => (
+                    <option key={cohort} value={cohort}>
+                      {cohort}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <Link
+                href="/dashboard/cohorts"
+                className="px-4 py-2 text-sm text-white bg-[#625FFF] rounded-md hover:bg-[#524DD9] transition-colors"
+              >
+                Compare Cohorts
+              </Link>
+              <Link
+                href="/dashboard/admin"
+                className="px-4 py-2 text-sm text-[#625FFF] border border-[#625FFF] rounded-md hover:bg-[#625FFF] hover:text-white transition-colors"
+              >
+                Admin
+              </Link>
               <Link
                 href="/dashboard"
                 className="px-4 py-2 text-sm text-[#625FFF] border border-[#625FFF] rounded-md hover:bg-[#625FFF] hover:text-white transition-colors"
@@ -250,6 +300,28 @@ export default function AnalyticsPage() {
       </header>
 
       <main className="max-w-full mx-auto px-8 py-8">
+        {/* Cohort Filter Indicator */}
+        {selectedCohort !== "all" && (
+          <div className="mb-6 bg-[#625FFF]/10 border border-[#625FFF] rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-semibold text-[#625FFF]">
+                  Viewing: {selectedCohort}
+                </span>
+                <span className="text-xs text-[#55514D]">
+                  All metrics below are filtered to this cohort only
+                </span>
+              </div>
+              <button
+                onClick={() => setSelectedCohort("all")}
+                className="text-sm text-[#625FFF] hover:text-[#524DD9] font-medium"
+              >
+                Clear Filter
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Weekly Performance Scorecard */}
         {weeklyMetrics && (
           <div className="mb-8">
