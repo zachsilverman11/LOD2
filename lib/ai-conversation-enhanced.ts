@@ -1530,7 +1530,7 @@ export async function executeDecision(
     case "send_application_link":
       if (decision.message) {
         try {
-          const applicationUrl = process.env.NEXT_PUBLIC_APPLICATION_URL || "https://stressfree.mtg-app.com/";
+          const applicationUrl = process.env.MORTGAGE_APPLICATION_URL || "https://stressfree.mtg-app.com/";
 
           // Send clean link
           const messageWithLink = `${decision.message}\n\n${applicationUrl}`;

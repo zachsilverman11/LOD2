@@ -127,7 +127,7 @@ export async function POST(
           console.log(`[Call Outcome] Triggering immediate application link for lead ${leadId}`);
 
           // 🛡️ DEDUPLICATION CHECK: Don't send if we already sent app link recently (within 15 min)
-          const appUrl = process.env.MORTGAGE_APPLICATION_URL || "stressfree.mtg-app.com";
+          const appUrl = process.env.MORTGAGE_APPLICATION_URL || "https://stressfree.mtg-app.com/";
           const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
 
           const recentAppLink = await prisma.communication.findFirst({
