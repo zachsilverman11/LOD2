@@ -1,0 +1,26 @@
+[
+  {
+    "leadId": "cmgog548e0001l504p9nxyhm7",
+    "leadEmail": "gqakfamily@gmail.com",
+    "issueType": "CONVERSION_STATUS_MISMATCH",
+    "description": "Lead has convertedAt timestamp but status is not CONVERTED",
+    "applied": true,
+    "timestamp": "2025-11-03T22:16:25.509Z"
+  },
+  {
+    "leadId": "cmgmai8us0001jv04u6wqzqud",
+    "leadEmail": "R277ben@gmail.com",
+    "issueType": "CONVERSION_STATUS_MISMATCH",
+    "description": "Lead has convertedAt timestamp but status is not CONVERTED",
+    "applied": true,
+    "timestamp": "2025-11-03T22:16:25.667Z"
+  },
+  {
+    "leadId": "cmgq3tscw0001jo04a30o05up",
+    "leadEmail": "neneboeye@gmail.com",
+    "issueType": "CONVERSION_STATUS_MISMATCH",
+    "description": "Lead has convertedAt timestamp but status is not CONVERTED",
+    "applied": true,
+    "timestamp": "2025-11-03T22:16:25.762Z"
+  }
+]

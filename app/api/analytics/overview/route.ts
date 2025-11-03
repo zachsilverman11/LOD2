@@ -1,34 +1,66 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import {
+  calculateFunnelMetrics,
+  calculateShowUpRate,
+  filterByCohort,
+  filterByDateRange,
+  getPastAppointments,
+  isLeadConverted,
+  type LeadWithRelations,
+} from "@/lib/analytics-helpers";
 
 /**
  * Analytics Overview API
  * Returns key metrics: total leads, pipeline value, conversion rate, calls booked
+ * Supports cohort and date range filtering via query params
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // Parse query parameters for filtering
+  const { searchParams } = new URL(request.url);
+  const cohort = searchParams.get("cohort");
+  const startDateParam = searchParams.get("startDate");
+  const endDateParam = searchParams.get("endDate");
+
+  const startDate = startDateParam ? new Date(startDateParam) : null;
+  const endDate = endDateParam ? new Date(endDateParam) : null;
   try {
-    // Get total leads by status
-    const leadsByStatus = await prisma.lead.groupBy({
-      by: ["status"],
-      _count: {
-        id: true,
+    // Fetch all leads with relations for comprehensive analytics
+    const allLeads = await prisma.lead.findMany({
+      include: {
+        communications: true,
+        appointments: true,
+        callOutcomes: true,
       },
-    });
+    }) as LeadWithRelations[];
+
+    // Apply filters
+    let filteredLeads = filterByDateRange(allLeads, startDate, endDate);
+    filteredLeads = filterByCohort(filteredLeads, cohort);
+
+    // Calculate funnel metrics using standardized helpers
+    const funnelMetrics = calculateFunnelMetrics(filteredLeads);
+
+    // Get leads by status for breakdown
+    const leadsByStatus = filteredLeads.reduce((acc, lead) => {
+      const existing = acc.find(s => s.status === lead.status);
+      if (existing) {
+        existing.count++;
+      } else {
+        acc.push({ status: lead.status, count: 1 });
+      }
+      return acc;
+    }, [] as Array<{ status: string; count: number }>);
 
     // Calculate total pipeline value (sum of loan amounts for active leads)
-    const activeLeads = await prisma.lead.findMany({
-      where: {
-        status: {
-          notIn: ["LOST", "CONVERTED"],
-        },
-      },
-      select: {
-        rawData: true,
-      },
-    });
+    const activeLeads = filteredLeads.filter(
+      (lead) => !["LOST", "CONVERTED", "DEALS_WON"].includes(lead.status)
+    );
 
     let totalPipelineValue = 0;
-    activeLeads.forEach((lead) => {
+    let activePipelineValue = 0;
+
+    filteredLeads.forEach((lead) => {
       const rawData = lead.rawData as any;
       const loanAmount = parseFloat(rawData?.loanAmount || rawData?.loan_amount || "0");
       if (!isNaN(loanAmount)) {
@@ -36,87 +68,41 @@ export async function GET() {
       }
     });
 
-    // Get total leads
-    const totalLeads = leadsByStatus.reduce((sum, status) => sum + status._count.id, 0);
-
-    // Get converted leads
-    const convertedCount = leadsByStatus.find((s) => s.status === "CONVERTED")?._count.id || 0;
-
-    // Calculate conversion rate
-    const conversionRate = totalLeads > 0 ? (convertedCount / totalLeads) * 100 : 0;
-
-    // FIXED: Get past appointments (exclude future and cancelled) for show-up rate
-    const now = new Date();
-    const pastAppointments = await prisma.appointment.findMany({
-      where: {
-        scheduledAt: { lt: now },
-        status: { not: "cancelled" },
-      },
+    activeLeads.forEach((lead) => {
+      const rawData = lead.rawData as any;
+      const loanAmount = parseFloat(rawData?.loanAmount || rawData?.loan_amount || "0");
+      if (!isNaN(loanAmount)) {
+        activePipelineValue += loanAmount;
+      }
     });
 
-    // For each past appointment, check if there's a CallOutcome
-    const pastAppointmentsWithOutcome = await Promise.all(
-      pastAppointments.map(async (appt) => {
-        const outcome = await prisma.callOutcome.findFirst({
-          where: {
-            leadId: appt.leadId,
-            reached: true,
-            createdAt: {
-              // CallOutcome should be within 24 hours of appointment
-              gte: new Date(appt.scheduledAt.getTime() - 24 * 60 * 60 * 1000),
-              lte: new Date(appt.scheduledAt.getTime() + 24 * 60 * 60 * 1000),
-            },
-          },
-        });
-        return outcome !== null;
-      })
-    );
+    // Get all appointments from filtered leads for show-up rate calculation
+    const allAppointments = filteredLeads.flatMap((lead) => lead.appointments || []);
+    const showUpRate = calculateShowUpRate(allAppointments);
 
+    // Get past appointments for call metrics
+    const pastAppointments = getPastAppointments(allAppointments);
     const callsScheduled = pastAppointments.length;
-    const callsCompleted = pastAppointmentsWithOutcome.filter(Boolean).length;
-
-    // Calculate show-up rate (past appointments with CallOutcome / past appointments)
-    const showUpRate = callsScheduled > 0 ? (callsCompleted / callsScheduled) * 100 : 0;
+    const callsCompleted = pastAppointments.filter((appt) => appt.status === "completed").length;
 
     // Get total appointments
-    const totalAppointments = await prisma.appointment.count();
+    const totalAppointments = allAppointments.length;
 
-    // Get response rate (leads who have replied)
-    const leadsWithInbound = await prisma.lead.count({
-      where: {
-        communications: {
-          some: {
-            direction: "INBOUND",
-          },
-        },
-      },
-    });
-
-    const responseRate = totalLeads > 0 ? (leadsWithInbound / totalLeads) * 100 : 0;
+    // Response rate is same as engagement rate from funnel metrics
+    const responseRate = funnelMetrics.engagementRate;
 
     // Get average time to first response (for leads who responded)
-    const leadsWithResponse = await prisma.lead.findMany({
-      where: {
-        communications: {
-          some: {
-            direction: "INBOUND",
-          },
-        },
-      },
-      include: {
-        communications: {
-          orderBy: { createdAt: "asc" },
-          take: 2,
-        },
-      },
-    });
+    const engagedLeads = filteredLeads.filter(
+      (lead) => lead.communications && lead.communications.some((c) => c.direction === "INBOUND")
+    );
 
     let totalResponseTime = 0;
     let responseCount = 0;
 
-    leadsWithResponse.forEach((lead) => {
-      const firstOutbound = lead.communications.find((c) => c.direction === "OUTBOUND");
-      const firstInbound = lead.communications.find((c) => c.direction === "INBOUND");
+    engagedLeads.forEach((lead) => {
+      const comms = lead.communications || [];
+      const firstOutbound = comms.find((c) => c.direction === "OUTBOUND");
+      const firstInbound = comms.find((c) => c.direction === "INBOUND");
 
       if (firstOutbound && firstInbound) {
         const timeToResponse =
@@ -129,146 +115,82 @@ export async function GET() {
     const avgTimeToResponse =
       responseCount > 0 ? totalResponseTime / responseCount / 1000 / 60 / 60 : 0; // Convert to hours
 
-    // Get leads by status for breakdown
-    const statusBreakdown = leadsByStatus.map((s) => ({
-      status: s.status,
-      count: s._count.id,
-    }));
-
-    // Get leads with call outcomes (advisor actually spoke with them)
-    const leadsWithCallOutcomes = await prisma.lead.count({
-      where: {
-        callOutcomes: {
-          some: {
-            reached: true,
-          },
-        },
-      },
-    });
-
-    // Get APPLICATION_STARTED count
-    const appsStartedCount = await prisma.lead.count({
-      where: {
-        applicationStartedAt: {
-          not: null,
-        },
-      },
-    });
-
-    // Get DEALS_WON count
-    const dealsWonCount = leadsByStatus.find((s) => s.status === "DEALS_WON")?._count.id || 0;
-
-    // Calculate Engaged to Book rate (of leads who replied, % who booked a call)
-    const leadsWhoBooked = await prisma.lead.count({
-      where: {
-        AND: [
-          {
-            communications: {
-              some: {
-                direction: "INBOUND",
-              },
-            },
-          },
-          {
-            appointments: {
-              some: {},
-            },
-          },
-        ],
-      },
-    });
-    const engagedToBookRate = leadsWithInbound > 0 ? (leadsWhoBooked / leadsWithInbound) * 100 : 0;
-
-    // Calculate key KPIs
-    const leadToCallRate = totalLeads > 0 ? (callsScheduled / totalLeads) * 100 : 0;
-    const leadToAppRate = totalLeads > 0 ? (appsStartedCount / totalLeads) * 100 : 0;
-
-    // FIXED: Call to App uses leads with CallOutcome and APPLICATION_STARTED
-    const callToAppRate = leadsWithCallOutcomes > 0 ? (appsStartedCount / leadsWithCallOutcomes) * 100 : 0;
-
-    // NEW: App to Close rate (of apps started, % that converted)
-    const appToCloseRate = appsStartedCount > 0 ? (convertedCount / appsStartedCount) * 100 : 0;
-
-    // NEW: Lead to Won rate (of total leads, % that won deals)
-    const leadToWonRate = totalLeads > 0 ? (dealsWonCount / totalLeads) * 100 : 0;
-
-    // Calculate Active Pipeline Value (only active leads, not LOST/CONVERTED/DEALS_WON)
-    const activePipelineValue = activeLeads.reduce((sum, lead) => {
-      const rawData = lead.rawData as any;
-      const loanAmount = parseFloat(rawData?.loanAmount || rawData?.loan_amount || "0");
-      return sum + (isNaN(loanAmount) ? 0 : loanAmount);
-    }, 0);
-
     // Calculate average days in current stage for active leads
-    const leadsWithDaysInStage = await prisma.lead.findMany({
-      where: {
-        status: {
-          notIn: ["LOST", "CONVERTED", "DEALS_WON"],
-        },
-      },
-      include: {
-        activities: {
-          where: {
-            type: "STATUS_CHANGE",
-          },
-          orderBy: {
-            createdAt: "desc",
-          },
-          take: 1,
-        },
-      },
-    });
-
+    const now = new Date();
     let totalDaysInStage = 0;
-    let leadsWithStageData = 0;
+    let leadsStuck = 0;
 
-    leadsWithDaysInStage.forEach((lead) => {
-      const lastStatusChange = lead.activities[0];
-      const stageStartDate = lastStatusChange ? lastStatusChange.createdAt : lead.createdAt;
-      const daysInStage = Math.floor((now.getTime() - stageStartDate.getTime()) / (1000 * 60 * 60 * 24));
+    activeLeads.forEach((lead) => {
+      const daysInStage = Math.floor((now.getTime() - lead.createdAt.getTime()) / (1000 * 60 * 60 * 24));
       totalDaysInStage += daysInStage;
-      leadsWithStageData++;
+      if (daysInStage > 7) {
+        leadsStuck++;
+      }
     });
 
-    const avgDaysInStage = leadsWithStageData > 0 ? totalDaysInStage / leadsWithStageData : 0;
+    const avgDaysInStage = activeLeads.length > 0 ? totalDaysInStage / activeLeads.length : 0;
 
-    // Calculate leads stuck (> 7 days in same stage)
-    const leadsStuck = leadsWithDaysInStage.filter((lead) => {
-      const lastStatusChange = lead.activities[0];
-      const stageStartDate = lastStatusChange ? lastStatusChange.createdAt : lead.createdAt;
-      const daysInStage = Math.floor((now.getTime() - stageStartDate.getTime()) / (1000 * 60 * 60 * 24));
-      return daysInStage > 7;
-    }).length;
+    // Calculate additional KPIs using funnel metrics
+    const leadToCallRate = funnelMetrics.totalLeads > 0 ? (callsScheduled / funnelMetrics.totalLeads) * 100 : 0;
+    const leadToAppRate = funnelMetrics.totalLeads > 0 ? (funnelMetrics.applicationStarted / funnelMetrics.totalLeads) * 100 : 0;
+    const callToAppRate = funnelMetrics.callCompleted > 0 ? (funnelMetrics.applicationStarted / funnelMetrics.callCompleted) * 100 : 0;
+    const appToCloseRate = funnelMetrics.applicationStarted > 0 ? (funnelMetrics.converted / funnelMetrics.applicationStarted) * 100 : 0;
+    const leadToWonRate = funnelMetrics.totalLeads > 0 ? (funnelMetrics.dealsWon / funnelMetrics.totalLeads) * 100 : 0;
 
     return NextResponse.json({
       success: true,
       data: {
-        totalLeads,
-        totalPipelineValue, // Keep old calculation for backwards compatibility
-        activePipelineValue: parseFloat(activePipelineValue.toFixed(2)), // NEW: Only active leads
-        conversionRate: parseFloat(conversionRate.toFixed(2)),
+        // Core metrics
+        totalLeads: funnelMetrics.totalLeads,
+        totalPipelineValue: parseFloat(totalPipelineValue.toFixed(2)),
+        activePipelineValue: parseFloat(activePipelineValue.toFixed(2)),
+        conversionRate: funnelMetrics.conversionRate,
+
+        // Call metrics
         callsScheduled,
         callsCompleted,
         showUpRate: parseFloat(showUpRate.toFixed(2)),
         totalAppointments,
-        responseRate: parseFloat(responseRate.toFixed(2)),
+
+        // Engagement metrics
+        responseRate,
         avgTimeToResponse: parseFloat(avgTimeToResponse.toFixed(2)),
-        avgDaysInStage: parseFloat(avgDaysInStage.toFixed(1)), // NEW
-        leadsStuck, // NEW: Leads sitting > 7 days
-        statusBreakdown,
-        convertedCount,
+
+        // Pipeline health
+        avgDaysInStage: parseFloat(avgDaysInStage.toFixed(1)),
+        leadsStuck,
         activeLeadsCount: activeLeads.length,
-        // KPIs
+
+        // Status breakdown
+        statusBreakdown: leadsByStatus,
+
+        // Funnel counts
+        contacted: funnelMetrics.contacted,
+        engaged: funnelMetrics.engaged,
+        booked: funnelMetrics.booked,
+        callCompleted: funnelMetrics.callCompleted,
+        applicationStarted: funnelMetrics.applicationStarted,
+        converted: funnelMetrics.converted,
+        dealsWon: funnelMetrics.dealsWon,
+
+        // KPI rates
+        contactRate: funnelMetrics.contactRate,
+        engagementRate: funnelMetrics.engagementRate,
+        bookingRate: funnelMetrics.bookingRate,
         leadToCallRate: parseFloat(leadToCallRate.toFixed(2)),
         leadToAppRate: parseFloat(leadToAppRate.toFixed(2)),
         callToAppRate: parseFloat(callToAppRate.toFixed(2)),
-        // NEW METRICS
-        engagedToBookRate: parseFloat(engagedToBookRate.toFixed(2)),
+        callCompletionRate: funnelMetrics.callCompletionRate,
         appToCloseRate: parseFloat(appToCloseRate.toFixed(2)),
         leadToWonRate: parseFloat(leadToWonRate.toFixed(2)),
-        dealsWonCount,
-        appsStartedCount,
-        leadsWithCallOutcomes,
+        dealsWonRate: funnelMetrics.dealsWonRate,
+
+        // Filters applied (for UI display)
+        filters: {
+          cohort: cohort || "all",
+          startDate: startDateParam,
+          endDate: endDateParam,
+        },
       },
     });
   } catch (error) {

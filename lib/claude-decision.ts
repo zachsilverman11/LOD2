@@ -73,7 +73,19 @@ export async function askHollyToDecide(
     lead.communications && lead.communications.length > 0
       ? lead.communications
           .slice(0, 8)
-          .map((m: any) => `${m.direction === 'OUTBOUND' ? 'Holly' : firstName}: ${m.content}`)
+          .map((m: any) => {
+            // Format timestamp for each message to give Holly temporal context
+            const msgDate = new Date(m.createdAt);
+            const timestamp = msgDate.toLocaleString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true
+            });
+            const sender = m.direction === 'OUTBOUND' ? 'Holly' : firstName;
+            return `${sender} (${timestamp}): ${m.content}`;
+          })
           .join('\n\n')
       : '(No conversation yet - this will be first contact)';
 
@@ -314,14 +326,81 @@ Supportive, helpful, customer-service oriented. NOT sales-y.
 **System Time:** ${currentDateFormatted} at ${currentTimeFormatted}
 **Lead's Local Time (${province}):** ${leadLocalTimeFormatted}
 
-🚨 **IMPORTANT:** When the lead mentions dates like "November 2nd" or "next week", calculate from the CURRENT DATE above. Do NOT make assumptions about what day it is today - use the exact date provided above.
+🚨 **CRITICAL: TEMPORAL INTERPRETATION RULES** 🚨
 
-For example:
-- If today is October 27, 2025 and they say "by November 2nd", that's 6 days from now
-- If today is October 27, 2025 and they say "next week", that's early November
-- If today is Friday, October 31, 2025 and they say "this weekend", that's tomorrow (Saturday Nov 1)
+You MUST follow these rules when interpreting time-related words in the lead's messages:
 
-Always calculate days/weeks from the CURRENT DATE shown above, not from any assumed date.
+## 1. MESSAGE TIMESTAMPS ARE YOUR ANCHOR
+- EVERY message in the conversation history shows WHEN it was sent (e.g., "Derek (Oct 31, 3:15 PM): I'll look at it tonight")
+- When the lead uses words like "tonight", "tomorrow", "yesterday", "last night", they mean relative to WHEN THEY SENT THE MESSAGE
+- DO NOT interpret based on current time - interpret based on THEIR message timestamp
+
+## 2. RELATIVE TIME WORDS IN LEAD MESSAGES
+When the lead says temporal words, check their message timestamp:
+
+**"tonight" / "this evening" / "later today":**
+- Means the evening of the day THEY sent the message
+- If they sent it Oct 31 at 3 PM saying "I'll do it tonight", they meant Oct 31 evening
+- If you're responding on Nov 1, their "tonight" is now "last night" from your perspective
+- ✅ Correct: "How did it go last night with the application?"
+- ❌ Wrong: "Great! Let me know how it goes tonight" (that already happened!)
+
+**"tomorrow":**
+- Means the day after THEY sent the message
+- If they said "I'll call tomorrow" on Oct 31, they meant Nov 1
+- If you're responding on Nov 2, their "tomorrow" was yesterday from your perspective
+
+**"last night" / "yesterday":**
+- Means the night/day before THEY sent the message
+- Check their timestamp to understand what "last night" refers to
+
+**"this weekend" / "next week":**
+- Calculate from the date THEY sent the message, not current date
+
+## 3. SPECIFIC DATES AND FUTURE REFERENCES
+For non-relative references like "November 2nd", "next week", "in 3 days":
+- Calculate from the CURRENT DATE (shown above), not from when they said it
+- If today is November 1 and they say "by November 2nd", that's tomorrow
+
+## 4. EXAMPLES TO PREVENT HALLUCINATIONS
+
+**Example 1: The Derek Wynne Bug**
+Derek (Oct 31, 3:15 PM): I'll look at the application tonight
+Holly (Oct 31, 3:20 PM): Great! Let me know if you have any questions
+[System Time: Nov 1, 9:00 AM - Holly is composing new message]
+
+- Derek's "tonight" meant Oct 31 evening (already happened)
+- ✅ Correct response: "Hi Derek! How did you make out with the application last night?"
+- ❌ WRONG response: "Hi Derek! Did you get a chance to look at it tonight?" (that's Nov 1 evening, not what he meant)
+
+**Example 2: Future Date**
+Sarah (Nov 1, 10 AM): I can talk tomorrow afternoon
+[System Time: Nov 1, 11 AM - Holly responding immediately]
+
+- Sarah's "tomorrow" = Nov 2 (still in future)
+- ✅ Correct: "Perfect! Tomorrow afternoon works. Here's the booking link"
+- Message sent same day, so "tomorrow" is still tomorrow
+
+**Example 3: Stale Future Reference**
+Mike (Oct 30, 2 PM): I'll call you back tomorrow
+Holly (Oct 30, 2:15 PM): Sounds good!
+[System Time: Nov 2, 10 AM - Holly checking in]
+
+- Mike's "tomorrow" was Oct 31 (3 days ago)
+- ✅ Correct: "Hi Mike! I know you mentioned calling back earlier this week. Did you still want to chat?"
+- ❌ WRONG: "Looking forward to your call tomorrow!" (that was days ago)
+
+## 5. YOUR PROCESS
+Before interpreting ANY time word from the lead:
+1. Find their message in the conversation history
+2. Look at the timestamp: (Month Day, Time)
+3. Look at CURRENT TIME shown above
+4. Calculate what their time reference meant at the time they said it
+5. Translate it to what that means NOW
+
+**NEVER assume or guess what "tonight" or "tomorrow" means. Always anchor to the message timestamp.**
+
+Always calculate days/weeks from the appropriate context - message timestamp for relative words, current date for specific dates.
 ${daysSinceLastContact >= 2 && outboundCount > 0 ? `
 
 ---

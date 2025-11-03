@@ -1,22 +1,56 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import {
+  calculateFunnelMetrics,
+  filterByCohort,
+  filterByDateRange,
+  type LeadWithRelations,
+} from "@/lib/analytics-helpers";
 
 /**
  * Analytics Funnel API
  * Returns conversion funnel data: NEW -> CONTACTED -> ENGAGED -> CALL_SCHEDULED -> CONVERTED
+ * Supports cohort and date range filtering via query params
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    // Get lead counts by status
-    const leadsByStatus = await prisma.lead.groupBy({
-      by: ["status"],
-      _count: {
-        id: true,
-      },
-    });
+    // Parse query parameters
+    const { searchParams } = new URL(request.url);
+    const cohort = searchParams.get("cohort");
+    const startDateParam = searchParams.get("startDate");
+    const endDateParam = searchParams.get("endDate");
 
-    // Map to funnel stages
-    const statusMap = new Map(leadsByStatus.map((s) => [s.status, s._count.id]));
+    const startDate = startDateParam ? new Date(startDateParam) : null;
+    const endDate = endDateParam ? new Date(endDateParam) : null;
+
+    // Fetch all leads with relations
+    const allLeads = await prisma.lead.findMany({
+      include: {
+        communications: true,
+        appointments: true,
+        callOutcomes: true,
+      },
+    }) as LeadWithRelations[];
+
+    // Apply filters
+    let filteredLeads = filterByDateRange(allLeads, startDate, endDate);
+    filteredLeads = filterByCohort(filteredLeads, cohort);
+
+    // Calculate funnel metrics
+    const metrics = calculateFunnelMetrics(filteredLeads);
+
+    // Get lead counts by status for visual funnel
+    const leadsByStatus = filteredLeads.reduce((acc, lead) => {
+      const existing = acc.find(s => s.status === lead.status);
+      if (existing) {
+        existing.count++;
+      } else {
+        acc.push({ status: lead.status, count: 1 });
+      }
+      return acc;
+    }, [] as Array<{ status: string; count: number }>);
+
+    const statusMap = new Map(leadsByStatus.map((s) => [s.status, s.count]));
 
     const funnelData = [
       {
@@ -106,46 +140,6 @@ export async function GET() {
       };
     });
 
-    // Calculate key funnel metrics
-    const newLeads = statusMap.get("NEW") || 0;
-    const contacted = statusMap.get("CONTACTED") || 0;
-    const callScheduled = statusMap.get("CALL_SCHEDULED") || 0;
-    const callCompleted = statusMap.get("CALL_COMPLETED") || 0;
-    const applicationStarted = statusMap.get("APPLICATION_STARTED") || 0;
-    const converted = statusMap.get("CONVERTED") || 0;
-    const dealsWon = statusMap.get("DEALS_WON") || 0;
-
-    // Calculate active leads (excluding LOST)
-    const activeLostNurturing = totalLeads - (statusMap.get("LOST") || 0);
-
-    // CRITICAL FIX: Engaged = leads who actually REPLIED to Holly (not just status-based)
-    const leadsWhoReplied = await prisma.lead.count({
-      where: {
-        communications: {
-          some: {
-            direction: "INBOUND",
-          },
-        },
-      },
-    });
-
-    const metrics = {
-      // Contact Rate = % of total leads that were contacted (moved beyond NEW)
-      contactRate: totalLeads > 0 ? ((activeLostNurturing - newLeads) / totalLeads * 100).toFixed(2) : "0",
-
-      // Engagement Rate = % of leads who actually replied to Holly
-      engagementRate: totalLeads > 0 ? ((leadsWhoReplied / totalLeads) * 100).toFixed(2) : "0",
-
-      // Booking Rate = % of leads who replied that booked a call
-      bookingRate: leadsWhoReplied > 0 ? ((callScheduled / leadsWhoReplied) * 100).toFixed(2) : "0",
-
-      // Conversion Rate = % of total leads that converted to application
-      conversionRate: totalLeads > 0 ? ((converted / totalLeads) * 100).toFixed(2) : "0",
-
-      // Deals Won Rate = % of converted leads that closed (funded)
-      dealsWonRate: converted > 0 ? ((dealsWon / converted) * 100).toFixed(2) : "0",
-    };
-
     // Fetch targets
     let targets = await prisma.analyticsTarget.findFirst();
     if (!targets) {
@@ -165,7 +159,22 @@ export async function GET() {
       success: true,
       data: {
         funnel: funnelWithRates,
-        metrics,
+        metrics: {
+          contactRate: metrics.contactRate,
+          engagementRate: metrics.engagementRate,
+          bookingRate: metrics.bookingRate,
+          conversionRate: metrics.conversionRate,
+          dealsWonRate: metrics.dealsWonRate,
+          // Additional counts
+          totalLeads: metrics.totalLeads,
+          contacted: metrics.contacted,
+          engaged: metrics.engaged,
+          booked: metrics.booked,
+          callCompleted: metrics.callCompleted,
+          applicationStarted: metrics.applicationStarted,
+          converted: metrics.converted,
+          dealsWon: metrics.dealsWon,
+        },
         targets: {
           contactRate: targets.contactRateTarget,
           engagementRate: targets.engagementRateTarget,
@@ -173,8 +182,13 @@ export async function GET() {
           conversionRate: targets.conversionRateTarget,
           dealsWonRate: targets.dealsWonRateTarget,
         },
-        totalLeads,
+        totalLeads: metrics.totalLeads,
         lostLeads: statusMap.get("LOST") || 0,
+        filters: {
+          cohort: cohort || "all",
+          startDate: startDateParam,
+          endDate: endDateParam,
+        },
       },
     });
   } catch (error) {

@@ -31,6 +31,8 @@ model Lead {
   nextReviewAt           DateTime?          // For autonomous agent smart scheduling
   managedByAutonomous    Boolean            @default(false) // True if managed by new autonomous agent
   hollyDisabled          Boolean            @default(false) // True = Holly won't send any messages (manual relationship mode)
+  cohort                 String?            // Cohort identifier (e.g., "COHORT_1", "COHORT_2", "COHORT_3")
+  cohortStartDate        DateTime?          // When this cohort began (for analytics reference)
   appointments           Appointment[]
   communications         Communication[]
   activities             LeadActivity[]
@@ -49,6 +51,7 @@ model Lead {
   @@index([nextReviewAt])
   @@index([managedByAutonomous])
   @@index([hollyDisabled])
+  @@index([cohort])
 }
 
 model LeadActivity {
@@ -374,4 +377,15 @@ enum DevCardPriority {
   MEDIUM
   HIGH
   CRITICAL
+}
+
+model CohortConfig {
+  id                String   @id @default(cuid())
+  currentCohortName String   // e.g., "COHORT_2", "COHORT_3", etc.
+  cohortNumber      Int      // Numeric version: 1, 2, 3, etc.
+  cohortStartDate   DateTime // When this cohort started
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("cohort_config")
 }

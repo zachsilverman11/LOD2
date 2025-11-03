@@ -121,6 +121,11 @@ export async function POST(req: NextRequest) {
 
       console.log(`[Leads on Demand] Updated existing lead: ${lead.id}`);
     } else {
+      // Get current cohort config
+      const cohortConfig = await prisma.cohortConfig.findFirst({
+        orderBy: { createdAt: "desc" }, // Get most recent config
+      });
+
       // Create new lead
       lead = await prisma.lead.create({
         data: {
@@ -135,6 +140,8 @@ export async function POST(req: NextRequest) {
           consentEmail: payload.consent === "TRUE" || payload.consent === true,
           consentCall: payload.consent === "TRUE" || payload.consent === true,
           managedByAutonomous: true, // Use new Autonomous Holly agent
+          cohort: cohortConfig?.currentCohortName || "COHORT_1", // Assign current cohort
+          cohortStartDate: cohortConfig?.cohortStartDate || new Date(),
         },
       });
 
