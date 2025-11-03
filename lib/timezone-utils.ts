@@ -3,6 +3,41 @@
  * Used to enforce 8am-9pm SMS hours in lead's local time
  */
 
+/**
+ * Calculate if DST is active for a given date in North America
+ * DST runs from 2nd Sunday of March at 2 AM to 1st Sunday of November at 2 AM
+ */
+function isDSTActive(date: Date): boolean {
+  const year = date.getUTCFullYear();
+  const month = date.getUTCMonth(); // 0-11
+  const day = date.getUTCDate();
+
+  // Find second Sunday of March
+  const marchFirst = new Date(Date.UTC(year, 2, 1)); // March 1st
+  const marchFirstDay = marchFirst.getUTCDay(); // 0 = Sunday
+  const secondSundayMarch = marchFirstDay === 0 ? 8 : (7 - marchFirstDay + 8);
+
+  // Find first Sunday of November
+  const novemberFirst = new Date(Date.UTC(year, 10, 1)); // November 1st
+  const novemberFirstDay = novemberFirst.getUTCDay();
+  const firstSundayNovember = novemberFirstDay === 0 ? 1 : (7 - novemberFirstDay + 1);
+
+  // Check if current date is within DST period
+  if (month < 2 || month > 10) {
+    // January, February, December - no DST
+    return false;
+  } else if (month > 2 && month < 10) {
+    // April through October - always DST
+    return true;
+  } else if (month === 2) {
+    // March - check if past second Sunday
+    return day >= secondSundayMarch;
+  } else {
+    // November - check if before first Sunday
+    return day < firstSundayNovember;
+  }
+}
+
 export function getLocalTime(province: string): Date {
   const now = new Date();
 
@@ -24,24 +59,7 @@ export function getLocalTime(province: string): Date {
 
   // Adjust for DST (add 1 hour from second Sunday of March to first Sunday of November)
   // Saskatchewan doesn't observe DST
-  const year = now.getUTCFullYear();
-  const month = now.getUTCMonth();
-  const day = now.getUTCDate();
-
-  // DST is active from March to early November in North America
-  // Simple approximation: March 10 - November 3
-  let isDST = false;
-  if (month > 2 && month < 10) {
-    // April through October - always DST
-    isDST = true;
-  } else if (month === 2 && day >= 10) {
-    // Mid-March onward - usually DST
-    isDST = true;
-  } else if (month === 10 && day < 3) {
-    // Early November - still DST
-    isDST = true;
-  }
-
+  const isDST = isDSTActive(now);
   const finalOffset = province === 'Saskatchewan' ? offset : offset + (isDST ? 1 : 0);
 
   // Calculate local time from UTC
@@ -89,16 +107,7 @@ export function getLocalTimeString(province: string): string {
   };
 
   const offset = timezoneOffsets[province] || -8;
-  const month = localTime.getUTCMonth();
-  const day = localTime.getUTCDate();
-  let isDST = false;
-  if (month > 2 && month < 10) {
-    isDST = true;
-  } else if (month === 2 && day >= 10) {
-    isDST = true;
-  } else if (month === 10 && day < 3) {
-    isDST = true;
-  }
+  const isDST = isDSTActive(localTime);
 
   const timezoneName = province === 'British Columbia' ? (isDST ? 'PDT' : 'PST') :
                        province === 'Alberta' ? (isDST ? 'MDT' : 'MST') :
@@ -144,17 +153,7 @@ export function getNext8AM(province: string): Date {
   const offset = timezoneOffsets[province] || -8;
 
   // Check if DST is active for the target date
-  const month = next8AM.getUTCMonth();
-  const day = next8AM.getUTCDate();
-  let isDST = false;
-  if (month > 2 && month < 10) {
-    isDST = true;
-  } else if (month === 2 && day >= 10) {
-    isDST = true;
-  } else if (month === 10 && day < 3) {
-    isDST = true;
-  }
-
+  const isDST = isDSTActive(next8AM);
   const finalOffset = province === 'Saskatchewan' ? offset : offset + (isDST ? 1 : 0);
 
   // Convert local 8 AM back to UTC

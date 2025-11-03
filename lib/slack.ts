@@ -1,3 +1,5 @@
+import { prisma } from './db';
+
 const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL || "";
 const DASHBOARD_URL = process.env.NEXT_PUBLIC_APP_URL || "https://lod2.vercel.app";
 
@@ -126,10 +128,29 @@ export async function sendSlackNotification(notification: SlackNotification) {
     });
 
     if (!response.ok) {
-      console.error("Slack notification failed:", await response.text());
+      const errorText = await response.text();
+      console.error("Slack notification failed:", errorText);
+
+      // Log to database as fallback
+      await logFailedSlackAlert({
+        type: 'notification',
+        title,
+        leadId,
+        payload: JSON.stringify(payload),
+        error: `Slack API returned ${response.status}: ${errorText}`,
+      });
     }
   } catch (error) {
     console.error("Failed to send Slack notification:", error);
+
+    // Log to database as fallback
+    await logFailedSlackAlert({
+      type: 'notification',
+      title,
+      leadId,
+      payload: JSON.stringify(payload),
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 }
 
@@ -184,7 +205,7 @@ export async function sendDevCardNotification(card: {
                   text: "View Dev Board",
                   emoji: true,
                 },
-                url: "https://lod2.vercel.app/dev-board",
+                url: `${DASHBOARD_URL}/dev-board`,
                 style: card.priority === "CRITICAL" ? "danger" : "primary",
               },
             ],
@@ -202,10 +223,29 @@ export async function sendDevCardNotification(card: {
     });
 
     if (!response.ok) {
-      console.error("Slack dev card notification failed:", await response.text());
+      const errorText = await response.text();
+      console.error("Slack dev card notification failed:", errorText);
+
+      // Log to database as fallback
+      await logFailedSlackAlert({
+        type: 'dev_card',
+        title: card.title,
+        leadId: null,
+        payload: JSON.stringify(payload),
+        error: `Slack API returned ${response.status}: ${errorText}`,
+      });
     }
   } catch (error) {
     console.error("Failed to send Slack dev card notification:", error);
+
+    // Log to database as fallback
+    await logFailedSlackAlert({
+      type: 'dev_card',
+      title: card.title,
+      leadId: null,
+      payload: JSON.stringify(payload),
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 }
 
@@ -286,9 +326,63 @@ export async function sendErrorAlert({ error, context }: ErrorAlert) {
     });
 
     if (!response.ok) {
-      console.error("Slack error alert failed:", await response.text());
+      const errorText = await response.text();
+      console.error("Slack error alert failed:", errorText);
+
+      // Log to database as fallback
+      await logFailedSlackAlert({
+        type: 'error_alert',
+        title: `Error in ${location}`,
+        leadId: leadId || null,
+        payload: JSON.stringify(payload),
+        error: `Slack API returned ${response.status}: ${errorText}`,
+      });
     }
   } catch (sendError) {
     console.error("Failed to send Slack error alert:", sendError);
+
+    // Log to database as fallback - use try/catch to prevent recursive errors
+    try {
+      await logFailedSlackAlert({
+        type: 'error_alert',
+        title: `Error in ${location}`,
+        leadId: leadId || null,
+        payload: JSON.stringify(payload),
+        error: sendError instanceof Error ? sendError.message : String(sendError),
+      });
+    } catch (dbError) {
+      console.error("Failed to log Slack alert failure to database:", dbError);
+    }
+  }
+}
+
+/**
+ * Log failed Slack alerts to database as fallback
+ * This ensures we don't lose important notifications if Slack is down
+ */
+async function logFailedSlackAlert(data: {
+  type: string;
+  title: string;
+  leadId: string | null;
+  payload: string;
+  error: string;
+}) {
+  try {
+    await prisma.leadActivity.create({
+      data: {
+        leadId: data.leadId || undefined,
+        type: 'NOTE_ADDED',
+        channel: 'SYSTEM',
+        subject: `⚠️ Failed Slack Alert: ${data.title}`,
+        content: `Slack notification failed to send.\n\n**Type:** ${data.type}\n**Error:** ${data.error}\n\n**Payload:**\n\`\`\`\n${data.payload.substring(0, 500)}${data.payload.length > 500 ? '...' : ''}\n\`\`\``,
+        metadata: {
+          slackAlertFailed: true,
+          slackAlertType: data.type,
+          slackError: data.error,
+        },
+      },
+    });
+  } catch (dbError) {
+    console.error("Failed to log Slack alert failure to database:", dbError);
   }
 }

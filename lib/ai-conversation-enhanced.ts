@@ -761,7 +761,7 @@ Greg knows BC lenders inside out and can tell you exactly what you'd get. Takes 
 4. DO NOT send further automated messages
 
 **Example message:**
-"No worries at all! If you change your mind and want to chat, here's Greg's calendar: ${process.env.NEXT_PUBLIC_CAL_LINK || "https://cal.com/inspired-mortgage"}
+"No worries at all! If you change your mind and want to chat, here's Greg's calendar: ${process.env.CAL_COM_BOOKING_URL || "https://cal.com/inspired-mortgage"}
 
 Otherwise, I'll leave you be. Good luck with everything! 👍"
 

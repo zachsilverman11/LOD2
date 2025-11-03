@@ -17,6 +17,16 @@ const ENABLE_AUTONOMOUS_AGENT = process.env.ENABLE_AUTONOMOUS_AGENT === 'true';
 const DRY_RUN_MODE = process.env.DRY_RUN_MODE === 'true';
 const AUTONOMOUS_LEAD_PERCENTAGE = parseInt(process.env.AUTONOMOUS_LEAD_PERCENTAGE || '0');
 
+// Rate limiting configuration
+const RATE_LIMIT_DELAY_MS = 500; // 500ms delay between Claude API calls (max 120 calls/min)
+
+/**
+ * Sleep utility for rate limiting
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 /**
  * Process a single lead through autonomous Holly agent
  * Used for instant responses (SMS replies, new leads)
@@ -568,6 +578,11 @@ export async function runHollyAgentLoop() {
         });
 
         results.skipped++;
+      }
+
+      // Rate limiting: Add small delay between leads to prevent Claude API quota exhaustion
+      if (leadsToReview.indexOf(lead) < leadsToReview.length - 1) {
+        await sleep(RATE_LIMIT_DELAY_MS);
       }
     }
 

@@ -37,7 +37,11 @@ export async function sendEmail(params: SendEmailParams) {
 }
 
 async function sendEmailViaSendGrid(params: SendEmailParams, apiKey: string) {
-  const fromEmail = params.from || process.env.FROM_EMAIL || "noreply@example.com";
+  const fromEmail = params.from || process.env.FROM_EMAIL;
+
+  if (!fromEmail) {
+    throw new Error("FROM_EMAIL environment variable is required");
+  }
 
   const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
     method: "POST",
@@ -74,7 +78,11 @@ async function sendEmailViaSendGrid(params: SendEmailParams, apiKey: string) {
 }
 
 async function sendEmailViaResend(params: SendEmailParams, apiKey: string) {
-  const fromEmail = params.from || process.env.FROM_EMAIL || "noreply@example.com";
+  const fromEmail = params.from || process.env.FROM_EMAIL;
+
+  if (!fromEmail) {
+    throw new Error("FROM_EMAIL environment variable is required");
+  }
 
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
