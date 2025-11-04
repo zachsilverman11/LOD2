@@ -15,8 +15,9 @@ export interface ValidationResult {
 
 export interface HollyDecision {
   thinking: string;
-  action: 'send_sms' | 'send_booking_link' | 'send_application_link' | 'wait' | 'escalate';
+  action: 'send_sms' | 'send_booking_link' | 'send_application_link' | 'move_stage' | 'wait' | 'escalate';
   message?: string;
+  newStage?: 'CONTACTED' | 'ENGAGED' | 'NURTURING' | 'WAITING_FOR_APPLICATION' | 'LOST';
   waitHours?: number;
   nextCheckCondition?: string;
   suggestedAction?: string;
@@ -42,6 +43,14 @@ export function validateDecision(
   // === HARD RULE: Opt-out check ===
   if (!context.lead.consentSms) {
     errors.push('Lead opted out of SMS - cannot send messages');
+  }
+
+  // === HARD RULE: Finmo Handoff - Do NOT contact leads after application started ===
+  // Once a lead reaches APPLICATION_STARTED status, Finmo's system takes over ALL communication
+  if (['APPLICATION_STARTED', 'CONVERTED', 'DEALS_WON'].includes(context.lead.status)) {
+    errors.push(
+      `Lead is ${context.lead.status} - Finmo system is handling communication. Holly should NEVER contact these leads.`
+    );
   }
 
   // === HARD RULE: Time-of-day check (8am-9pm local) ===

@@ -30,7 +30,7 @@ async function main() {
     await prisma.lead.update({
       where: { id: greg.id },
       data: {
-        status: "CALL_COMPLETED",
+        status: "WAITING_FOR_APPLICATION",
         rawData: rawData,
       },
     });

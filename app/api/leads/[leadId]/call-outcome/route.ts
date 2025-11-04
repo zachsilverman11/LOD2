@@ -113,13 +113,13 @@ export async function POST(
 
     switch (outcome) {
       case "READY_FOR_APP":
-        // Move to CALL_COMPLETED (they're ready for app, skip formal discovery)
-        newStatus = "CALL_COMPLETED";
-        actionTaken = "Moved to CALL_COMPLETED. Holly sending application link now...";
+        // Move to WAITING_FOR_APPLICATION (they're ready for app, skip formal discovery)
+        newStatus = "WAITING_FOR_APPLICATION";
+        actionTaken = "Moved to WAITING_FOR_APPLICATION. Holly sending application link now...";
 
         await prisma.lead.update({
           where: { id: leadId },
-          data: { status: "CALL_COMPLETED" },
+          data: { status: "WAITING_FOR_APPLICATION" },
         });
 
         // 🚀 SEND APPLICATION LINK IMMEDIATELY via SMS + EMAIL
@@ -143,7 +143,7 @@ export async function POST(
           if (recentAppLink) {
             const minutesAgo = Math.floor((Date.now() - recentAppLink.createdAt.getTime()) / 60000);
             console.log(`[Call Outcome] ⚠️  Application link already sent ${minutesAgo} minutes ago, skipping duplicate`);
-            actionTaken = `Moved to CALL_COMPLETED. Holly already sent application link ${minutesAgo} min ago.`;
+            actionTaken = `Moved to WAITING_FOR_APPLICATION. Holly already sent application link ${minutesAgo} min ago.`;
           } else {
             // No recent app link, safe to send
             const applicationContext = `The advisor ${advisorName} just completed a discovery call with this lead and marked them as READY FOR APPLICATION.
@@ -215,13 +215,13 @@ DO NOT mention "Finmo" or any technical platform names - customers don't need to
             // Send immediately
             await executeDecision(leadId, decision);
 
-            actionTaken = "Moved to CALL_COMPLETED. Holly sent application link! ✅";
+            actionTaken = "Moved to WAITING_FOR_APPLICATION. Holly sent application link! ✅";
 
             console.log(`[Call Outcome] ✅ Application link sent successfully to lead ${leadId}`);
           }
         } catch (error) {
           console.error(`[Call Outcome] Error sending application link:`, error);
-          actionTaken = "Moved to CALL_COMPLETED. Holly will send application link on next automation run.";
+          actionTaken = "Moved to WAITING_FOR_APPLICATION. Holly will send application link on next automation run.";
         }
         break;
 
@@ -309,14 +309,14 @@ Email Body: More detailed with HTML formatting, include the link prominently`;
         break;
 
       default:
-        // For any other outcome (or successful calls without specific outcome), move to CALL_COMPLETED
+        // For any other outcome (or successful calls without specific outcome), move to WAITING_FOR_APPLICATION
         if (reached) {
-          newStatus = "CALL_COMPLETED";
-          actionTaken = "Moved to CALL_COMPLETED. Holly will follow up based on call notes.";
+          newStatus = "WAITING_FOR_APPLICATION";
+          actionTaken = "Moved to WAITING_FOR_APPLICATION. Holly will follow up based on call notes.";
 
           await prisma.lead.update({
             where: { id: leadId },
-            data: { status: "CALL_COMPLETED" },
+            data: { status: "WAITING_FOR_APPLICATION" },
           });
         }
         break;

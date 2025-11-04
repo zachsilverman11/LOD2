@@ -98,10 +98,10 @@ async function validateConversionStatus() {
 async function validateCallCompletionData() {
   console.log('\n🔍 Validating Call Completion Data...');
 
-  // Issue: Leads with CALL_COMPLETED status but no CallOutcome with reached=true
+  // Issue: Leads with WAITING_FOR_APPLICATION status but no CallOutcome with reached=true
   const callCompletedNoOutcome = await prisma.lead.findMany({
     where: {
-      status: 'CALL_COMPLETED',
+      status: 'WAITING_FOR_APPLICATION',
     },
     include: {
       callOutcomes: true,
@@ -109,17 +109,17 @@ async function validateCallCompletionData() {
   });
 
   callCompletedNoOutcome.forEach((lead) => {
-    const hasReachedOutcome = lead.callOutcomes.some((outcome) => outcome.reached === true);
+    const hasReachedOutcome = lead.callOutcomes!.some((outcome) => outcome.reached === true);
 
     if (!hasReachedOutcome) {
       issues.push({
         leadId: lead.id,
         leadEmail: lead.email,
         issueType: 'CALL_COMPLETION_MISMATCH',
-        description: 'Lead has status=CALL_COMPLETED but no CallOutcome with reached=true',
+        description: 'Lead has status=WAITING_FOR_APPLICATION but no CallOutcome with reached=true',
         currentState: {
           status: lead.status,
-          callOutcomesCount: lead.callOutcomes.length,
+          callOutcomesCount: lead.callOutcomes!.length,
         },
         suggestedFix: {
           status: 'CALL_SCHEDULED', // Revert to scheduled if no outcome logged
@@ -129,7 +129,7 @@ async function validateCallCompletionData() {
   });
 
   console.log(
-    `   Found ${callCompletedNoOutcome.filter((l) => !l.callOutcomes.some((o) => o.reached)).length} call completion issues`
+    `   Found ${callCompletedNoOutcome.filter((l) => !l.callOutcomes!.some((o: any) => o.reached)).length} call completion issues`
   );
 }
 

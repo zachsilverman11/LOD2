@@ -295,12 +295,13 @@ enum LeadStatus {
   NEW
   CONTACTED
   ENGAGED
+  QUALIFIED
+  NURTURING
   CALL_SCHEDULED
-  CALL_COMPLETED
-  APPLICATION_STARTED
+  WAITING_FOR_APPLICATION  // Renamed from CALL_COMPLETED - Lead had call, waiting for app submission
+  APPLICATION_STARTED      // Finmo takes over from here
   CONVERTED
   DEALS_WON
-  NURTURING
   LOST
 }
 

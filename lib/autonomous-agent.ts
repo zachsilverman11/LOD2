@@ -247,6 +247,106 @@ export async function processLeadWithAutonomousAgent(
       }
 
       return { success: true, action: 'wait', waitHours: decision.waitHours };
+    } else if (decision.action === 'move_stage') {
+      // Stage movement - Holly is moving the lead to a new status
+      console.log(
+        `[Holly Agent] 🚦 ${lead.firstName}: MOVING ${lead.status} → ${decision.newStage} - ${decision.thinking}`
+      );
+
+      if (!decision.newStage) {
+        console.error(`[Holly Agent] ❌ move_stage action missing newStage field`);
+        return { success: false, action: 'move_stage', error: 'Missing newStage' };
+      }
+
+      // CRITICAL: Prevent Holly from moving leads to Finmo-managed statuses
+      // These statuses are controlled by external systems, not Holly
+      if (['APPLICATION_STARTED', 'CONVERTED', 'DEALS_WON'].includes(decision.newStage)) {
+        console.error(
+          `[Holly Agent] 🚨 BLOCKED: Attempted to move ${lead.firstName} to ${decision.newStage}. This status is managed by Finmo/external systems.`
+        );
+
+        // Escalate to team
+        await sendSlackNotification({
+          type: 'lead_escalated',
+          leadName: `${lead.firstName} ${lead.lastName}`,
+          leadId: lead.id,
+          details: `🚨 Holly tried to move lead to ${decision.newStage}\n\nThis status is reserved for Finmo/external systems. Holly's reasoning: ${decision.thinking}\n\nPlease review and manually update if needed.`,
+        });
+
+        return { success: false, action: 'move_stage', error: 'Invalid status transition' };
+      }
+
+      if (!DRY_RUN_MODE) {
+        // Validate transition is allowed
+        const validTransitions: Record<string, string[]> = {
+          CONTACTED: ['ENGAGED', 'NURTURING', 'LOST'],
+          ENGAGED: ['NURTURING', 'CALL_SCHEDULED', 'LOST'],
+          CALL_SCHEDULED: ['WAITING_FOR_APPLICATION', 'NURTURING', 'LOST'],
+          WAITING_FOR_APPLICATION: ['NURTURING', 'LOST'],
+          NURTURING: ['ENGAGED', 'CALL_SCHEDULED', 'LOST'],
+        };
+
+        const allowedMoves = validTransitions[lead.status] || [];
+        if (!allowedMoves.includes(decision.newStage)) {
+          console.error(
+            `[Holly Agent] ❌ Invalid transition: ${lead.status} → ${decision.newStage}. Allowed: ${allowedMoves.join(', ')}`
+          );
+          return { success: false, action: 'move_stage', error: 'Invalid transition' };
+        }
+
+        // Update lead status
+        await prisma.lead.update({
+          where: { id: lead.id },
+          data: { status: decision.newStage as LeadStatus },
+        });
+
+        // Log the stage change
+        await prisma.leadActivity.create({
+          data: {
+            leadId: lead.id,
+            type: 'NOTE_ADDED',
+            channel: 'SYSTEM',
+            subject: `🚦 Stage Changed: ${lead.status} → ${decision.newStage}`,
+            content: `Holly moved this lead from ${lead.status} to ${decision.newStage}.\n\nReasoning: ${decision.thinking}\n\nCustomer mindset: ${decision.customerMindset || 'N/A'}`,
+            metadata: {
+              automated: true,
+              autonomous: true,
+              previousStatus: lead.status,
+              newStatus: decision.newStage,
+              hollyReasoning: decision.thinking,
+            },
+          },
+        });
+
+        // Set next review time based on new stage
+        let nextReviewHours = 24; // Default
+        if (decision.newStage === 'LOST') {
+          nextReviewHours = 24 * 365; // 1 year (never)
+        } else if (decision.newStage === 'NURTURING') {
+          nextReviewHours = 24 * 14; // 14 days for nurturing
+        } else if (decision.newStage === 'WAITING_FOR_APPLICATION') {
+          nextReviewHours = 48; // Check in 2 days
+        }
+
+        const nextReview = new Date(now.getTime() + nextReviewHours * 60 * 60 * 1000);
+        await prisma.lead.update({
+          where: { id: lead.id },
+          data: { nextReviewAt: nextReview },
+        });
+
+        // Send Slack notification for LOST transitions
+        if (decision.newStage === 'LOST') {
+          await sendSlackNotification({
+            type: 'lead_rotting',
+            leadName: `${lead.firstName} ${lead.lastName}`,
+            leadId: lead.id,
+            details: `Holly marked this lead as LOST.\n\nReason: ${decision.thinking}`,
+          });
+        }
+      }
+
+      results.acted++;
+      return { success: true, action: 'move_stage', newStage: decision.newStage };
     } else {
       // Send message
       console.log(

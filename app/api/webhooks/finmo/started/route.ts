@@ -119,12 +119,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Update lead to APPLICATION_STARTED with Pipedrive deal ID
+    // CRITICAL: Set nextReviewAt to far future (1 year) to prevent Holly from ever contacting again
+    // Finmo system handles ALL communication from this point forward
+    const oneYearFromNow = new Date();
+    oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
+
     await prisma.lead.update({
       where: { id: lead.id },
       data: {
         applicationStartedAt: new Date(),
         status: LeadStatus.APPLICATION_STARTED,
         pipedriveDealId: pipedriveDealId,
+        nextReviewAt: oneYearFromNow, // Holly will never review this lead again
         updatedAt: new Date(),
       },
     });
@@ -135,13 +141,14 @@ export async function POST(request: NextRequest) {
         leadId: lead.id,
         type: ActivityType.NOTE_ADDED,
         channel: CommunicationChannel.SYSTEM,
-        subject: "Application Started",
-        content: "Lead started mortgage application via Finmo\n\n✅ Holly's autonomous messaging is now disabled - application communication handled by Finmo system",
+        subject: "🚦 APPLICATION STARTED - Finmo Handoff Complete",
+        content: "Lead started mortgage application via Finmo.\n\n🛑 HOLLY PERMANENTLY DISABLED 🛑\n\nAll communication from this point forward is handled by the Finmo automated system.\n\nHolly will NOT:\n- Send any messages\n- Follow up or nurture\n- Move stages\n- Take any automated actions\n\nFinmo owns this relationship until application is completed or abandoned.",
         metadata: {
           finmoDealId: payload.finmoDealId || payload.dealId,
           finmoId: payload.id,
           event: "application.started",
           hollyDisabled: true,
+          hollyNextReviewAt: oneYearFromNow.toISOString(),
           pipedriveDealId: pipedriveDealId,
         },
       },
@@ -152,16 +159,13 @@ export async function POST(request: NextRequest) {
       type: "lead_updated",
       leadName: `${lead.firstName} ${lead.lastName}`,
       leadId: lead.id,
-      details: `🎉 Started mortgage application via Finmo!${pipedriveDealId ? ` | Pipedrive deal: ${pipedriveDealId}` : ''}`,
+      details: `🎉 Started mortgage application via Finmo!${pipedriveDealId ? ` | Pipedrive deal: ${pipedriveDealId}` : ''}\n\n🛑 Holly's messaging is now PERMANENTLY DISABLED. Finmo system has taken over all communication.`,
     });
 
-    // Holly sends encouragement message
-    try {
-      const decision = await handleConversation(lead.id);
-      await executeDecision(lead.id, decision);
-    } catch (error) {
-      console.error("[Finmo - Started] Error sending Holly message:", error);
-    }
+    // 🚫 DO NOT send Holly message - Finmo handles all communication from this point
+    // Previous behavior: Holly would send encouragement message
+    // NEW behavior: Complete handoff - Holly stops all contact
+    console.log(`[Finmo - Started] 🚫 Holly messaging disabled - Finmo has taken over communication`);
 
     console.log(`[Finmo - Started] ✅ Lead ${lead.id} moved to APPLICATION_STARTED`);
     console.log("[Finmo - Started] ========== WEBHOOK PROCESSED SUCCESSFULLY ==========");

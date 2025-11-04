@@ -17,7 +17,7 @@ export const PIPELINE_STAGES: { id: LeadStatus; label: string; color: string }[]
   { id: "CONTACTED", label: "Contacted", color: "bg-[#8B88FF]" }, // Lighter purple - initial engagement
   { id: "ENGAGED", label: "Engaged", color: "bg-[#FFB6E1]" }, // Bright pink - active conversation
   { id: "CALL_SCHEDULED", label: "Call Scheduled", color: "bg-[#D9F36E]" }, // Lime - action pending
-  { id: "CALL_COMPLETED", label: "Call Completed", color: "bg-[#B8E986]" }, // Olive green - action complete
+  { id: "WAITING_FOR_APPLICATION", label: "Waiting for Application", color: "bg-[#B8E986]" }, // Olive green - waiting for app submission
   { id: "APPLICATION_STARTED", label: "Application Started", color: "bg-[#A8E86E]" }, // Bright green - in progress
   { id: "CONVERTED", label: "Converted", color: "bg-[#76C63E]" }, // Success green - application completed
   { id: "DEALS_WON", label: "Deals Won", color: "bg-[#2E7D32]" }, // Dark green - funded & commissioned

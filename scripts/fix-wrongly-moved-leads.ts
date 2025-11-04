@@ -10,10 +10,10 @@ async function fixWronglyMovedLeads() {
   try {
     console.log("Finding leads that should be CONVERTED or LOST...\n");
 
-    // Find leads in CALL_COMPLETED that have applicationCompletedAt (should be CONVERTED)
+    // Find leads in WAITING_FOR_APPLICATION that have applicationCompletedAt (should be CONVERTED)
     const shouldBeConverted = await prisma.lead.findMany({
       where: {
-        status: LeadStatus.CALL_COMPLETED,
+        status: LeadStatus.WAITING_FOR_APPLICATION,
         applicationCompletedAt: {
           not: null,
         },
@@ -31,10 +31,10 @@ async function fixWronglyMovedLeads() {
       console.log(`    ✅ Moved to CONVERTED`);
     }
 
-    // Find leads in CALL_COMPLETED with call outcome NOT_INTERESTED (should be LOST)
+    // Find leads in WAITING_FOR_APPLICATION with call outcome NOT_INTERESTED (should be LOST)
     const shouldBeLost = await prisma.lead.findMany({
       where: {
-        status: LeadStatus.CALL_COMPLETED,
+        status: LeadStatus.WAITING_FOR_APPLICATION,
         callOutcomes: {
           some: {
             outcome: "NOT_INTERESTED",
