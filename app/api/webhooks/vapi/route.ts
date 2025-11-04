@@ -77,6 +77,38 @@ async function handleFunctionCall(payload: any) {
       return;
     }
 
+    // CRITICAL: Check if lead is in a prohibited status (LOST, CONVERTED, DEALS_WON)
+    // These leads should NOT be reactivated by voice AI bookings
+    const prohibitedStatuses = [LeadStatus.LOST, LeadStatus.CONVERTED, LeadStatus.DEALS_WON];
+
+    if (prohibitedStatuses.includes(lead.status)) {
+      console.warn(`[Vapi] BLOCKED booking for ${lead.status} lead:`, lead.id, lead.firstName, lead.lastName);
+
+      // Log the blocked booking attempt
+      await prisma.leadActivity.create({
+        data: {
+          leadId: lead.id,
+          type: ActivityType.NOTE_ADDED,
+          channel: CommunicationChannel.VOICE,
+          subject: `⚠️ Voice AI Booking Blocked - Lead is ${lead.status}`,
+          content: `A voice AI booking attempt was BLOCKED because this lead is ${lead.status}.\n\nCall ID: ${call.id}\nRequested date: ${preferredDate || "Not specified"}\n\nThis lead should not be reactivated automatically. Manual review required.`,
+          metadata: { callId: call.id, blockedStatus: lead.status, functionCall },
+        },
+      });
+
+      // Alert team via Slack
+      await sendSlackNotification({
+        type: "lead_escalated",
+        leadName: `${lead.firstName} ${lead.lastName}`,
+        leadId: lead.id,
+        details: `⚠️ ${lead.status} lead tried to book via Voice AI\n\nStatus: ${lead.status}\nCall ID: ${call.id}\n\nBooking was BLOCKED - please review manually and decide if this lead should be reactivated.`,
+      });
+
+      return {
+        result: "I apologize, but I'm unable to schedule an appointment at this time. Please contact our team directly for assistance."
+      };
+    }
+
     try {
       // Book appointment via Cal.com
       const eventTypeId = parseInt(process.env.CALCOM_EVENT_TYPE_ID || "");

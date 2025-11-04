@@ -100,8 +100,65 @@ async function handleBookingCreated(payload: any) {
   }
 
   if (!lead) {
-    console.log("Lead not found for booking. Email:", attendeeEmail, "Phone:", attendeePhone);
+    console.error("Lead not found for booking. Email:", attendeeEmail, "Phone:", attendeePhone);
+
+    // Log to database for investigation
+    await prisma.webhookEvent.create({
+      data: {
+        source: "cal_com",
+        eventType: "BOOKING_CREATED_ORPHAN",
+        payload: {
+          error: "Lead not found",
+          attendeeEmail,
+          attendeePhone,
+          bookingUid: uid,
+          bookingId: id,
+          startTime,
+        },
+        processed: false,
+        error: "No matching lead in database",
+      },
+    });
+
+    // Alert via Slack
+    await sendSlackNotification({
+      type: "lead_escalated",
+      leadName: `Unknown Lead (${attendeeEmail || attendeePhone})`,
+      leadId: "unknown",
+      details: `❌ Cal.com booking for unknown lead\n\nEmail: ${attendeeEmail || "N/A"}\nPhone: ${attendeePhone || "N/A"}\nBooking UID: ${uid}\n\nThis booking exists in Cal.com but no matching lead in LOD2!`,
+    });
+
     return;
+  }
+
+  // CRITICAL: Check if lead is in a prohibited status (LOST, CONVERTED, DEALS_WON)
+  // These leads should NOT be reactivated by bookings
+  const prohibitedStatuses = [LeadStatus.LOST, LeadStatus.CONVERTED, LeadStatus.DEALS_WON];
+
+  if (prohibitedStatuses.includes(lead.status)) {
+    console.warn(`[Cal.com] BLOCKED booking for ${lead.status} lead:`, lead.id, lead.firstName, lead.lastName);
+
+    // Log the blocked booking attempt
+    await prisma.leadActivity.create({
+      data: {
+        leadId: lead.id,
+        type: ActivityType.NOTE_ADDED,
+        channel: CommunicationChannel.SYSTEM,
+        subject: `⚠️ Booking Blocked - Lead is ${lead.status}`,
+        content: `A Cal.com booking was received but BLOCKED because this lead is ${lead.status}.\n\nBooking UID: ${uid}\nScheduled for: ${new Date(startTime).toLocaleString()}\n\nThis lead should not be reactivated automatically. Manual review required.`,
+        metadata: { bookingUid: uid, bookingPayload: payload, blockedStatus: lead.status },
+      },
+    });
+
+    // Alert team via Slack
+    await sendSlackNotification({
+      type: "lead_escalated",
+      leadName: `${lead.firstName} ${lead.lastName}`,
+      leadId: lead.id,
+      details: `⚠️ ${lead.status} lead tried to book a call\n\nStatus: ${lead.status}\nBooking: ${new Date(startTime).toLocaleString()}\n\nBooking was BLOCKED - please review manually and decide if this lead should be reactivated.`,
+    });
+
+    return; // Don't create appointment or change status
   }
 
   // Create appointment record
