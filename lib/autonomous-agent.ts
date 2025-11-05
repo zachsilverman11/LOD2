@@ -345,7 +345,6 @@ export async function processLeadWithAutonomousAgent(
         }
       }
 
-      results.acted++;
       return { success: true, action: 'move_stage', newStage: decision.newStage };
     } else {
       // Send message
