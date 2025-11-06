@@ -1347,6 +1347,42 @@ export async function executeDecision(
 
           await updateLeadAfterContact(leadId, lead.status);
         } catch (error) {
+          // Check if this is a Twilio opt-out error (error 21610)
+          const err = error as any;
+          if (err?.isTwilioOptOut && err?.twilioErrorCode === 21610) {
+            // Lead opted out - mark them as such and move to LOST
+            console.log(`[AI Conversation] Lead ${leadId} opted out via Twilio (error 21610) - marking as opted-out and LOST`);
+
+            await prisma.lead.update({
+              where: { id: leadId },
+              data: {
+                consentSms: false,
+                status: "LOST",
+                nextReviewAt: new Date("2099-12-31"), // Never review again
+              },
+            });
+
+            await prisma.leadActivity.create({
+              data: {
+                leadId,
+                type: "NOTE_ADDED",
+                channel: "SYSTEM",
+                subject: "🚫 Lead Opted Out - Twilio Block",
+                content: "Lead has been blocked by Twilio from receiving SMS (Error 21610: Unsubscribed recipient). This typically means they replied STOP or have a carrier-level opt-out. Lead marked as LOST and will not be contacted again.",
+                metadata: {
+                  twilioError: "21610",
+                  errorMessage: err.message,
+                  phone: lead.phone,
+                },
+              },
+            });
+
+            // Don't send error alert for opt-outs - this is expected behavior
+            console.log(`[AI Conversation] ✅ Lead ${leadId} successfully marked as opted-out`);
+            return; // Exit without throwing - this is handled
+          }
+
+          // For all other errors, send alert and rethrow
           await sendErrorAlert({
             error: error instanceof Error ? error : new Error(String(error)),
             context: {

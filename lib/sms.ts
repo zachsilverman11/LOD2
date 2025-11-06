@@ -35,8 +35,25 @@ export async function sendSms(params: SendSmsParams) {
   });
 
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Twilio API error: ${error}`);
+    const errorText = await response.text();
+
+    // Parse Twilio error to check for specific error codes
+    try {
+      const errorJson = JSON.parse(errorText);
+
+      // Error 21610: Attempt to send to unsubscribed recipient
+      // This means the lead opted out via STOP message or carrier block
+      if (errorJson.code === 21610) {
+        const error = new Error(`Twilio API error: ${errorText}`) as any;
+        error.isTwilioOptOut = true;
+        error.twilioErrorCode = 21610;
+        throw error;
+      }
+    } catch (parseError) {
+      // If JSON parsing fails, continue with original error
+    }
+
+    throw new Error(`Twilio API error: ${errorText}`);
   }
 
   return response.json();
