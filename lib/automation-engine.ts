@@ -890,11 +890,25 @@ async function processPostCallConfirmations() {
     },
     include: {
       lead: true,
+      callOutcomes: true, // CRITICAL FIX: Include call outcomes to check if already logged
     },
   });
 
   for (const appointment of appointments) {
     try {
+      // CRITICAL FIX: Skip if call outcome already logged for this appointment
+      if (appointment.callOutcomes && appointment.callOutcomes.length > 0) {
+        console.log(`[Automation] Skipping appointment ${appointment.id} - call outcome already logged (${appointment.callOutcomes.length} outcome(s))`);
+
+        // Update appointment status to completed since call happened
+        await prisma.appointment.update({
+          where: { id: appointment.id },
+          data: { status: "completed" },
+        });
+
+        continue; // Skip Slack notification
+      }
+
       // Send Slack alert to confirm if call happened
       const appointmentTime = appointment.scheduledFor || appointment.scheduledAt;
       await sendSlackNotification({

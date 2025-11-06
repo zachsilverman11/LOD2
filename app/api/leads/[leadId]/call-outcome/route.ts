@@ -72,6 +72,16 @@ export async function POST(
       },
     });
 
+    // CRITICAL FIX: Update appointment status to completed if this call outcome is linked to an appointment
+    // This prevents automation from sending false "Call Time Passed" notifications
+    if (appointmentId) {
+      await prisma.appointment.update({
+        where: { id: appointmentId },
+        data: { status: "completed" },
+      });
+      console.log(`[Call Outcome] Updated appointment ${appointmentId} status to completed`);
+    }
+
     // Save call outcome to lead.rawData so Holly has full context
     const currentRawData = (lead.rawData as any) || {};
     await prisma.lead.update({
