@@ -65,7 +65,8 @@ export async function GET(request: NextRequest) {
 
       // Trigger Holly manually by calling the cron endpoint
       try {
-        const cronUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://lod2.vercel.app'}/api/cron/autonomous-holly`;
+        // Use hardcoded production URL to avoid NEXT_PUBLIC_APP_URL build-time issues
+        const cronUrl = 'https://lod2.vercel.app/api/cron/autonomous-holly';
         console.log(`[Holly Health Check] 🔧 Triggering Holly manually: ${cronUrl}`);
 
         const response = await fetch(cronUrl, {
