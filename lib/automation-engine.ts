@@ -910,13 +910,13 @@ async function processPostCallConfirmations() {
         data: { status: "completed" },
       });
 
-      // CRITICAL FIX: Only move lead to CALL_COMPLETED if they haven't progressed further
+      // CRITICAL FIX: Only move lead to WAITING_FOR_APPLICATION if they haven't progressed further
       // Don't overwrite CONVERTED, LOST, DEALS_WON, APPLICATION_STARTED, or NURTURING
       const finalStatuses = ["CONVERTED", "LOST", "DEALS_WON", "APPLICATION_STARTED", "NURTURING"];
       if (!finalStatuses.includes(appointment.lead.status)) {
         await prisma.lead.update({
           where: { id: appointment.lead.id },
-          data: { status: "CALL_COMPLETED" },
+          data: { status: "WAITING_FOR_APPLICATION" },
         });
       } else {
         console.log(`[Automation] Skipping status update for ${appointment.lead.id} - already in ${appointment.lead.status}`);
@@ -992,10 +992,10 @@ async function processApplicationNudges() {
     },
   });
 
-  // 3. Find leads with CALL_COMPLETED for 24+ hours (no app started) - CRITICAL FIX: Changed from 72h to 24h
+  // 3. Find leads with WAITING_FOR_APPLICATION for 24+ hours (no app started) - CRITICAL FIX: Changed from 72h to 24h
   const callsWithoutApp = await prisma.lead.findMany({
     where: {
-      status: LeadStatus.CALL_COMPLETED,
+      status: LeadStatus.WAITING_FOR_APPLICATION,
       updatedAt: {
         lte: twentyFourHoursAgo,
       },
@@ -1104,7 +1104,7 @@ async function processNurturingTransitions() {
   const activeLeadsToNurture = await prisma.lead.findMany({
     where: {
       status: {
-        in: [LeadStatus.CONTACTED, LeadStatus.ENGAGED, LeadStatus.CALL_COMPLETED],
+        in: [LeadStatus.CONTACTED, LeadStatus.ENGAGED, LeadStatus.WAITING_FOR_APPLICATION],
       },
       createdAt: {
         lte: fourteenDaysAgo,
@@ -1256,7 +1256,7 @@ async function processNurturingTransitions() {
   // 4. Auto-move "long_timeline" call outcomes to NURTURING
   const callCompletedLeads = await prisma.lead.findMany({
     where: {
-      status: LeadStatus.CALL_COMPLETED,
+      status: LeadStatus.WAITING_FOR_APPLICATION,
     },
   });
 
