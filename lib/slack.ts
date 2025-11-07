@@ -1,7 +1,8 @@
 import { prisma } from './db';
 
 const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL || "";
-const DASHBOARD_URL = process.env.NEXT_PUBLIC_APP_URL || "https://lod2.vercel.app";
+// Use hardcoded production URL to avoid NEXT_PUBLIC_APP_URL build-time issues (localhost in production)
+const DASHBOARD_URL = "https://lod2.vercel.app";
 
 interface SlackNotification {
   type: "new_lead" | "no_response" | "lead_rotting" | "hot_lead_going_cold" | "call_booked" | "call_missed" | "converted" | "lead_escalated";

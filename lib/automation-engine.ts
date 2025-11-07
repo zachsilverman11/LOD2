@@ -1167,10 +1167,11 @@ async function processNurturingTransitions() {
     }
   }
 
-  // 2. Move leads from NURTURING back to ENGAGED when they reply
+  // 2. Move leads from NURTURING back to ENGAGED when they reply (with smart sentiment detection)
   const nurturingLeads = await prisma.lead.findMany({
     where: {
       status: LeadStatus.NURTURING,
+      hollyDisabled: false, // Don't auto-move leads with Holly disabled
     },
     include: {
       communications: {
@@ -1185,28 +1186,81 @@ async function processNurturingTransitions() {
   for (const lead of nurturingLeads) {
     const lastComm = lead.communications[0];
 
-    // If their last communication was inbound (they replied), re-engage them
-    if (lastComm?.direction === "INBOUND") {
-      try {
-        await prisma.lead.update({
-          where: { id: lead.id },
-          data: { status: LeadStatus.ENGAGED },
-        });
+    // If their last communication was inbound (they replied), check if it shows interest
+    if (lastComm?.direction === "INBOUND" && lastComm.content) {
+      const messageContent = lastComm.content.toLowerCase();
 
-        await prisma.leadActivity.create({
-          data: {
-            leadId: lead.id,
-            type: ActivityType.STATUS_CHANGE,
-            channel: CommunicationChannel.SYSTEM,
-            content: "Re-engaged from NURTURING - Lead replied!",
-            metadata: { automated: true, reason: "lead_replied" },
-          },
-        });
+      // Negative signals - DON'T re-engage
+      const negativeSignals = [
+        'too early',
+        'not ready',
+        'not interested',
+        'no thanks',
+        'stop',
+        'remove me',
+        'unsubscribe',
+        'leave me alone',
+        'not now',
+        'maybe later',
+        'in a few months',
+        'next year',
+        'call me in',
+        'touch base later'
+      ];
 
-        reEngaged++;
-        console.log(`[Automation] Re-engaged lead ${lead.id} from NURTURING`);
-      } catch (error) {
-        console.error(`[Automation] Error re-engaging lead ${lead.id}:`, error);
+      const hasNegativeSignal = negativeSignals.some(signal => messageContent.includes(signal));
+
+      if (hasNegativeSignal) {
+        console.log(`[Automation] Skipping lead ${lead.id} - reply shows lack of interest: "${lastComm.content.substring(0, 50)}..."`);
+        continue; // Stay in NURTURING
+      }
+
+      // Positive signals or questions - re-engage
+      const positiveSignals = [
+        '?', // Any question
+        'yes',
+        'interested',
+        'tell me',
+        'how',
+        'what',
+        'when',
+        'where',
+        'info',
+        'details',
+        'rate',
+        'cost',
+        'price',
+        'available',
+        'can you',
+        'could you'
+      ];
+
+      const hasPositiveSignal = positiveSignals.some(signal => messageContent.includes(signal));
+
+      if (hasPositiveSignal) {
+        try {
+          await prisma.lead.update({
+            where: { id: lead.id },
+            data: { status: LeadStatus.ENGAGED },
+          });
+
+          await prisma.leadActivity.create({
+            data: {
+              leadId: lead.id,
+              type: ActivityType.STATUS_CHANGE,
+              channel: CommunicationChannel.SYSTEM,
+              content: "Re-engaged from NURTURING - Lead replied with interest!",
+              metadata: { automated: true, reason: "lead_replied_positive", message: lastComm.content.substring(0, 100) },
+            },
+          });
+
+          reEngaged++;
+          console.log(`[Automation] Re-engaged lead ${lead.id} from NURTURING (positive signal detected)`);
+        } catch (error) {
+          console.error(`[Automation] Error re-engaging lead ${lead.id}:`, error);
+        }
+      } else {
+        console.log(`[Automation] Lead ${lead.id} replied but no clear positive signal, staying in NURTURING: "${lastComm.content.substring(0, 50)}..."`);
       }
     }
   }
