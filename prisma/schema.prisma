@@ -29,7 +29,7 @@ model Lead {
   applicationCompletedAt DateTime?          // When lead completed/submitted application
   pipedriveDealId        String?            // Pipedrive deal ID after conversion
   nextReviewAt           DateTime?          // For autonomous agent smart scheduling
-  managedByAutonomous    Boolean            @default(false) // True if managed by new autonomous agent
+  managedByAutonomous    Boolean            @default(true) // True if managed by new autonomous agent (Holly)
   hollyDisabled          Boolean            @default(false) // True = Holly won't send any messages (manual relationship mode)
   cohort                 String?            // Cohort identifier (e.g., "COHORT_1", "COHORT_2", "COHORT_3")
   cohortStartDate        DateTime?          // When this cohort began (for analytics reference)
@@ -52,6 +52,11 @@ model Lead {
   @@index([managedByAutonomous])
   @@index([hollyDisabled])
   @@index([cohort])
+  @@index([lastContactedAt])
+  // Compound indexes for critical automation queries
+  @@index([managedByAutonomous, nextReviewAt, status, hollyDisabled], name: "idx_holly_agent_query")
+  @@index([managedByAutonomous, status, lastContactedAt, consentSms], name: "idx_smart_followups")
+  @@index([status, consentSms, hollyDisabled], name: "idx_active_leads")
 }
 
 model LeadActivity {
@@ -94,6 +99,9 @@ model Appointment {
   @@index([scheduledAt])
   @@index([scheduledFor])
   @@index([advisorEmail])
+  @@index([status])
+  // Compound index for appointment reminder queries
+  @@index([status, scheduledFor, reminder24hSent, reminder1hSent], name: "idx_appointment_reminders")
 }
 
 model EmailTemplate {

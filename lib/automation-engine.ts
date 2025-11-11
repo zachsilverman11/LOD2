@@ -695,7 +695,10 @@ async function processSmartFollowUps() {
         // 60+ days, no response ever -> archive to LOST
         await prisma.lead.update({
           where: { id: lead.id },
-          data: { status: "LOST" },
+          data: {
+            status: "LOST",
+            nextReviewAt: new Date("2099-12-31"), // Never review terminal status leads
+          },
         });
 
         await sendSlackNotification({
@@ -1090,6 +1093,23 @@ async function processApplicationNudges() {
   for (const lead of callsWithoutApp) {
     if (lead.communications.length > 0) continue; // Already messaged in last 24h
 
+    // 🛡️ DEDUPLICATION: Don't send if application link was already sent recently (within 24 hours)
+    const appUrl = process.env.MORTGAGE_APPLICATION_URL || "https://stressfree.mtg-app.com/";
+    const recentAppLink = await prisma.communication.findFirst({
+      where: {
+        leadId: lead.id,
+        direction: "OUTBOUND",
+        content: { contains: appUrl },
+        createdAt: { gte: twentyFourHoursAgo },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (recentAppLink) {
+      console.log(`[Automation] Skipping app start prompt for lead ${lead.id} - application link sent ${Math.floor((now.getTime() - recentAppLink.createdAt.getTime()) / 3600000)}h ago`);
+      continue;
+    }
+
     try {
       console.log(`[Automation] Sending app start prompt to lead ${lead.id} (call completed 24h ago)`);
 
@@ -1304,7 +1324,10 @@ async function processNurturingTransitions() {
       try {
         await prisma.lead.update({
           where: { id: lead.id },
-          data: { status: LeadStatus.LOST },
+          data: {
+            status: LeadStatus.LOST,
+            nextReviewAt: new Date("2099-12-31"), // Never review terminal status leads
+          },
         });
 
         await prisma.leadActivity.create({

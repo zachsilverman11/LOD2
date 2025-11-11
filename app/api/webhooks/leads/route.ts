@@ -104,7 +104,12 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 4. Create new lead
+    // 4. Get current cohort config for new lead assignment
+    const cohortConfig = await prisma.cohortConfig.findFirst({
+      orderBy: { createdAt: "desc" }, // Get most recent config
+    });
+
+    // 5. Create new lead
     const newLead = await prisma.lead.create({
       data: {
         email: leadData.email.toLowerCase(),
@@ -117,6 +122,9 @@ export async function POST(request: NextRequest) {
         consentSms: leadData.consentSms,
         consentCall: leadData.consentCall,
         rawData: leadData.metadata,
+        managedByAutonomous: true, // Use Holly autonomous agent for all new leads
+        cohort: cohortConfig?.currentCohortName || "COHORT_1", // Assign current cohort
+        cohortStartDate: cohortConfig?.cohortStartDate || new Date(),
         activities: {
           create: {
             type: ActivityType.WEBHOOK_RECEIVED,
