@@ -725,25 +725,29 @@ async function processSmartFollowUps() {
 
           // 🚨 HOT LEAD ALERT: Send Slack notification at 24h mark for manual outreach
           // This alert helps catch leads before they go completely cold
-          const loanAmount = (lead.rawData as any)?.loanAmount || (lead.rawData as any)?.loan_amount;
-          const loanType = (lead.rawData as any)?.loanType || (lead.rawData as any)?.loan_type;
-          const creditScore = (lead.rawData as any)?.creditScore || (lead.rawData as any)?.credit_score;
-          const propertyType = (lead.rawData as any)?.propertyType || (lead.rawData as any)?.property_type;
+          // Only send once by checking if we're within first 3 hours of day 1
+          const hoursIntoDayMilestone = hoursSinceContact - (daysSinceContact * 24);
+          if (hoursIntoDayMilestone < 3) {
+            const loanAmount = (lead.rawData as any)?.loanAmount || (lead.rawData as any)?.loan_amount;
+            const loanType = (lead.rawData as any)?.loanType || (lead.rawData as any)?.loan_type;
+            const creditScore = (lead.rawData as any)?.creditScore || (lead.rawData as any)?.credit_score;
+            const propertyType = (lead.rawData as any)?.propertyType || (lead.rawData as any)?.property_type;
 
-          const leadDetails = [
-            loanAmount ? `$${parseInt(loanAmount).toLocaleString()} ${loanType || 'loan'}` : null,
-            creditScore ? `${creditScore} credit` : null,
-            propertyType ? propertyType : null,
-          ].filter(Boolean).join(', ');
+            const leadDetails = [
+              loanAmount ? `$${parseInt(loanAmount).toLocaleString()} ${loanType || 'loan'}` : null,
+              creditScore ? `${creditScore} credit` : null,
+              propertyType ? propertyType : null,
+            ].filter(Boolean).join(', ');
 
-          await sendSlackNotification({
-            type: "hot_lead_going_cold",
-            leadName: `${lead.firstName} ${lead.lastName}`,
-            leadId: lead.id,
-            details: leadDetails || "New lead inquiry",
-          });
+            await sendSlackNotification({
+              type: "hot_lead_going_cold",
+              leadName: `${lead.firstName} ${lead.lastName}`,
+              leadId: lead.id,
+              details: leadDetails || "New lead inquiry",
+            });
 
-          console.log(`[Automation] 🚨 Sent hot lead alert for ${lead.id} - 24h no response`);
+            console.log(`[Automation] 🚨 Sent hot lead alert for ${lead.id} - 24h no response`);
+          }
         }
       } else if (daysSinceContact === 2) {
         // Day 3: Keep momentum going
@@ -811,14 +815,21 @@ async function processSmartFollowUps() {
       }
 
       // Send Slack alerts at key milestones
+      // Only send once per milestone day by checking if we're within the first few hours
       if ([3, 7, 10, 15, 21, 28, 35, 45, 55].includes(daysSinceContact)) {
-        const phase = daysSinceContact <= 14 ? "Active Pursuit" : daysSinceContact <= 30 ? "Nurturing" : "Long-term";
-        await sendSlackNotification({
-          type: daysSinceContact >= 30 ? "lead_rotting" : "no_response",
-          leadName: `${lead.firstName} ${lead.lastName}`,
-          leadId: lead.id,
-          details: `Day ${daysSinceContact} | ${outboundCount} messages sent | ${phase} phase | ${hasReplied ? "Has replied before" : "Never replied"}`,
-        });
+        const hoursIntoDayMilestone = hoursSinceContact - (daysSinceContact * 24);
+
+        // Only send alert if we're in the first 3 hours of the milestone day
+        // This prevents sending the same alert every 15 minutes all day long
+        if (hoursIntoDayMilestone < 3) {
+          const phase = daysSinceContact <= 14 ? "Active Pursuit" : daysSinceContact <= 30 ? "Nurturing" : "Long-term";
+          await sendSlackNotification({
+            type: daysSinceContact >= 30 ? "lead_rotting" : "no_response",
+            leadName: `${lead.firstName} ${lead.lastName}`,
+            leadId: lead.id,
+            details: `Day ${daysSinceContact} | ${outboundCount} messages sent | ${phase} phase | ${hasReplied ? "Has replied before" : "Never replied"}`,
+          });
+        }
       }
 
       // Send AI follow-up if it's time
