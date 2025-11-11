@@ -1393,7 +1393,8 @@ async function processStaleLeadAlerts() {
     const daysSinceUpdate = Math.floor((now.getTime() - lead.updatedAt.getTime()) / 86400000);
     const lastComm = lead.communications[0];
 
-    if (daysSinceUpdate >= 5) {
+    // Only alert on specific milestone days to prevent duplicate notifications every 15 minutes
+    if ([5, 10, 15, 20, 25, 30].includes(daysSinceUpdate)) {
       await sendSlackNotification({
         type: "lead_rotting",
         leadName: `${lead.firstName} ${lead.lastName}`,
