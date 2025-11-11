@@ -1401,11 +1401,13 @@ async function processStaleLeadAlerts() {
   });
 
   for (const lead of staleLeads) {
-    const daysSinceUpdate = Math.floor((now.getTime() - lead.updatedAt.getTime()) / 86400000);
+    const hoursIntoMilestone = (now.getTime() - lead.updatedAt.getTime()) / (1000 * 60 * 60);
+    const daysSinceUpdate = Math.floor(hoursIntoMilestone / 24);
+    const hoursIntoDayMilestone = hoursIntoMilestone - (daysSinceUpdate * 24);
     const lastComm = lead.communications[0];
 
-    // Only alert on specific milestone days to prevent duplicate notifications every 15 minutes
-    if ([5, 10, 15, 20, 25, 30].includes(daysSinceUpdate)) {
+    // Only alert on specific milestone days AND within first 3 hours to prevent duplicate notifications every 15 minutes
+    if ([5, 10, 15, 20, 25, 30].includes(daysSinceUpdate) && hoursIntoDayMilestone < 3) {
       await sendSlackNotification({
         type: "lead_rotting",
         leadName: `${lead.firstName} ${lead.lastName}`,
