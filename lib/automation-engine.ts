@@ -986,6 +986,7 @@ async function processApplicationNudges() {
   const fortyEightHoursAgo = new Date(now.getTime() - 48 * 3600000);
 
   // 1. Find leads with APPLICATION_STARTED for 24+ hours (first nudge)
+  // CRITICAL: Only process leads NOT managed by Holly
   const incompleteApps24h = await prisma.lead.findMany({
     where: {
       status: LeadStatus.APPLICATION_STARTED,
@@ -993,6 +994,8 @@ async function processApplicationNudges() {
         lte: twentyFourHoursAgo,
         gte: fortyEightHoursAgo, // Only those between 24-48h
       },
+      managedByAutonomous: false, // Only process non-Holly leads
+      hollyDisabled: false, // Skip manually-managed leads
     },
     include: {
       communications: {
@@ -1004,12 +1007,15 @@ async function processApplicationNudges() {
   });
 
   // 2. Find leads with APPLICATION_STARTED for 48+ hours (urgent nudge)
+  // CRITICAL: Only process leads NOT managed by Holly
   const incompleteApps48h = await prisma.lead.findMany({
     where: {
       status: LeadStatus.APPLICATION_STARTED,
       applicationStartedAt: {
         lte: fortyEightHoursAgo,
       },
+      managedByAutonomous: false, // Only process non-Holly leads
+      hollyDisabled: false, // Skip manually-managed leads
     },
     include: {
       communications: {
@@ -1021,12 +1027,15 @@ async function processApplicationNudges() {
   });
 
   // 3. Find leads with WAITING_FOR_APPLICATION for 24+ hours (no app started) - CRITICAL FIX: Changed from 72h to 24h
+  // CRITICAL: Only process leads NOT managed by Holly
   const callsWithoutApp = await prisma.lead.findMany({
     where: {
       status: LeadStatus.WAITING_FOR_APPLICATION,
       updatedAt: {
         lte: twentyFourHoursAgo,
       },
+      managedByAutonomous: false, // Only process non-Holly leads
+      hollyDisabled: false, // Skip manually-managed leads
     },
     include: {
       communications: {
@@ -1146,6 +1155,7 @@ async function processNurturingTransitions() {
   const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 3600000);
 
   // 1. Move active leads to NURTURING after 14 days with no inbound reply
+  // CRITICAL: Only process leads NOT managed by Holly to avoid duplicate operations
   const activeLeadsToNurture = await prisma.lead.findMany({
     where: {
       status: {
@@ -1154,6 +1164,8 @@ async function processNurturingTransitions() {
       createdAt: {
         lte: fourteenDaysAgo,
       },
+      managedByAutonomous: false, // Only process non-Holly leads
+      hollyDisabled: false, // Skip manually-managed leads
     },
     include: {
       communications: {
@@ -1406,6 +1418,7 @@ async function processStaleLeadAlerts() {
   const threeDaysAgo = new Date(now.getTime() - 72 * 3600000);
 
   // Find leads that haven't been updated in 3+ days and aren't lost/converted
+  // CRITICAL: Only process leads NOT managed by Holly to avoid duplicate notifications
   const staleLeads = await prisma.lead.findMany({
     where: {
       status: {
@@ -1414,6 +1427,8 @@ async function processStaleLeadAlerts() {
       updatedAt: {
         lte: threeDaysAgo,
       },
+      managedByAutonomous: false, // Only process non-Holly leads
+      hollyDisabled: false, // Skip manually-managed leads
     },
     include: {
       communications: {
