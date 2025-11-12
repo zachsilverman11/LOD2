@@ -71,6 +71,34 @@ export async function processLeadWithAutonomousAgent(
       return { success: false, reason: 'Lead not found' };
     }
 
+    // 🚨 CRITICAL SAFETY CHECK #1: Holly Disabled Flag
+    // Prevents Holly from contacting leads where user wants manual relationship only
+    if (lead.hollyDisabled) {
+      console.log(`[Holly Agent] ⏸️  Skipping ${lead.firstName} ${lead.lastName} - Holly disabled (manual relationship mode)`);
+      return { success: false, reason: 'Holly disabled for this lead' };
+    }
+
+    // 🚨 CRITICAL SAFETY CHECK #2: Upcoming Appointments
+    // Prevents Holly from contacting leads who have scheduled calls
+    if (lead.appointments && lead.appointments.length > 0) {
+      const now = new Date();
+      const upcomingAppointment = lead.appointments.find(apt => {
+        const appointmentTime = apt.scheduledFor || apt.scheduledAt;
+        return appointmentTime >= now;
+      });
+
+      if (upcomingAppointment) {
+        const appointmentTime = upcomingAppointment.scheduledFor || upcomingAppointment.scheduledAt;
+        const appointmentDate = appointmentTime.toLocaleString('en-US', {
+          timeZone: 'America/Vancouver',
+          dateStyle: 'medium',
+          timeStyle: 'short'
+        });
+        console.log(`[Holly Agent] ⏸️  Skipping ${lead.firstName} ${lead.lastName} - has upcoming appointment scheduled for ${appointmentDate}`);
+        return { success: false, reason: `Lead has scheduled appointment at ${appointmentTime.toISOString()}` };
+      }
+    }
+
     // Skip processing leads that have completed their journey (proactive mode only)
     // Allow reactive responses when leads text us, even if CONVERTED
     const excludedStatuses = ['CONVERTED', 'DEALS_WON', 'LOST'];
