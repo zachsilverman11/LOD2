@@ -54,11 +54,19 @@ export function validateDecision(
     errors.push('Lead opted out of SMS - cannot send messages');
   }
 
-  // === HARD RULE: Finmo Handoff - Do NOT contact leads after application started ===
-  // Once a lead reaches APPLICATION_STARTED status, Finmo's system takes over ALL communication
-  if (['APPLICATION_STARTED', 'CONVERTED', 'DEALS_WON'].includes(context.lead.status)) {
+  // === HARD RULE: Advisor/Finmo Handoff - Do NOT contact leads after handoff ===
+  // Once a lead reaches CALL_SCHEDULED, APPLICATION_STARTED, CONVERTED, or DEALS_WON, Holly is disabled
+  // - CALL_SCHEDULED: Advisor owns the relationship until call happens
+  // - APPLICATION_STARTED: Finmo system owns communication
+  // - CONVERTED: Journey complete, no more Holly
+  // - DEALS_WON: Journey complete, no more Holly
+  if (['CALL_SCHEDULED', 'APPLICATION_STARTED', 'CONVERTED', 'DEALS_WON'].includes(context.lead.status)) {
     errors.push(
-      `Lead is ${context.lead.status} - Finmo system is handling communication. Holly should NEVER contact these leads.`
+      `Lead status is ${context.lead.status} - Holly is disabled. ${
+        context.lead.status === 'CALL_SCHEDULED'
+          ? 'Advisor owns this lead until their scheduled call.'
+          : 'Finmo system is handling communication. Holly should NEVER contact these leads.'
+      }`
     );
   }
 

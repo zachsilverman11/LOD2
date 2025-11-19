@@ -182,10 +182,16 @@ async function handleBookingCreated(payload: any) {
     },
   });
 
-  // Update lead status
+  // Update lead status and disable Holly
+  // 🛑 CRITICAL: Disable Holly when appointment is booked
+  // Advisor now owns the relationship until the call happens
   await prisma.lead.update({
     where: { id: lead.id },
-    data: { status: LeadStatus.CALL_SCHEDULED },
+    data: {
+      status: LeadStatus.CALL_SCHEDULED,
+      hollyDisabled: true, // Stop Holly from messaging - advisor owns this lead now
+      managedByAutonomous: false, // Turn off all automation
+    },
   });
 
   // Log activity
@@ -229,11 +235,29 @@ async function handleBookingCreated(payload: any) {
 
   if (recentCommunications.length === 0) {
     try {
+      // 🛑 TEMPORARY: Re-enable Holly briefly to send booking confirmation
+      // Then disable again immediately after
+      await prisma.lead.update({
+        where: { id: lead.id },
+        data: { hollyDisabled: false },
+      });
+
       const decision = await handleConversation(lead.id);
       await executeDecision(lead.id, decision);
+
+      // 🛑 Disable Holly again - advisor owns the relationship from here
+      await prisma.lead.update({
+        where: { id: lead.id },
+        data: { hollyDisabled: true },
+      });
     } catch (error) {
       console.error("Failed to send appointment confirmation via Holly:", error);
       // Don't throw - appointment is already created, this is just a nice-to-have
+      // Make sure Holly is disabled even if confirmation fails
+      await prisma.lead.update({
+        where: { id: lead.id },
+        data: { hollyDisabled: true },
+      });
     }
   } else {
     console.log(`[Cal.com] Skipping booking confirmation - lead contacted within last hour`);
