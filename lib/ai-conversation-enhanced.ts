@@ -1339,6 +1339,30 @@ export async function executeDecision(
   const lead = await prisma.lead.findUnique({ where: { id: leadId } });
   if (!lead || !lead.phone) throw new Error("Lead not found or no phone");
 
+  // 🛑 CRITICAL: FINAL SAFETY CHECK - Respect manual Holly disable
+  // This is the LAST line of defense before any action is taken
+  // If an advisor manually disabled Holly, we MUST respect that
+  if (lead.hollyDisabled) {
+    console.error(
+      `[Execute Decision] 🛑 BLOCKED: Holly is DISABLED for lead ${leadId} (${lead.firstName} ${lead.lastName}). ` +
+      `Action "${decision.action}" will NOT be executed. This lead is manually managed.`
+    );
+
+    // Log the blocked attempt for debugging
+    await prisma.leadActivity.create({
+      data: {
+        leadId,
+        type: "NOTE_ADDED",
+        channel: "SYSTEM",
+        subject: "🛑 Holly Action Blocked - Manual Disable",
+        content: `Holly attempted to ${decision.action} but was blocked because Holly is manually disabled for this lead.\n\nBlocked action: ${decision.action}\nReasoning: ${decision.reasoning}\n\nThis lead is being managed manually by an advisor.`,
+        metadata: { blockedDecision: decision },
+      },
+    });
+
+    return; // EXIT - do nothing
+  }
+
   console.log(`[AI Decision] ${decision.action}: ${decision.reasoning}`);
 
   switch (decision.action) {
