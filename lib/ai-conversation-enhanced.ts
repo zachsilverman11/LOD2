@@ -930,6 +930,21 @@ export async function handleConversation(
 ): Promise<AIDecision> {
   const context = await buildLeadContext(leadId);
 
+  // 🛑 CRITICAL: Check if Holly is disabled for this lead FIRST
+  // This prevents messaging APPLICATION_STARTED, CONVERTED, or DEALS_WON leads
+  if (context.lead.hollyDisabled) {
+    console.error(
+      `[Holly] 🛑 BLOCKED: Holly is DISABLED for lead ${leadId} (${context.lead.firstName} ${context.lead.lastName}). ` +
+      `Status: ${context.lead.status}. This lead should NOT be contacted by Holly!`
+    );
+
+    // Return a do_nothing decision
+    return {
+      action: "do_nothing",
+      reasoning: `Holly is disabled for this lead (status: ${context.lead.status}). No action should be taken.`,
+    };
+  }
+
   // Check for existing appointments
   const existingAppointment = await prisma.appointment.findFirst({
     where: {

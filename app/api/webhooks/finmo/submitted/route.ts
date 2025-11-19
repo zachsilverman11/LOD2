@@ -172,13 +172,14 @@ export async function POST(request: NextRequest) {
       details: `🚀 COMPLETED mortgage application! CONVERTED!${pipedriveDealId ? ` | Pipedrive deal: ${pipedriveDealId}` : ''}`,
     });
 
-    // Holly sends congratulations message
-    try {
-      const decision = await handleConversation(lead.id);
-      await executeDecision(lead.id, decision);
-    } catch (error) {
-      console.error("[Finmo - Submitted] Error sending Holly message:", error);
-    }
+    // 🛑 CRITICAL: DO NOT call Holly here!
+    // Holly is DISABLED for CONVERTED leads (set on line 145)
+    // Finmo system handles all communication from this point forward
+    // Any Holly calls here would bypass safety guardrails and message completed leads!
+    //
+    // REMOVED (was causing Stephanie Buchanan issue):
+    // const decision = await handleConversation(lead.id);
+    // await executeDecision(lead.id, decision);
 
     console.log(`[Finmo - Submitted] ✅ Lead ${lead.id} moved to CONVERTED`);
     console.log("[Finmo - Submitted] ========== WEBHOOK PROCESSED SUCCESSFULLY ==========");

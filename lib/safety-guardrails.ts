@@ -28,6 +28,7 @@ interface DecisionContext {
   lead: Lead & {
     communications?: any[];
     appointments?: any[];
+    hollyDisabled?: boolean;
   };
   signals: DealSignals;
 }
@@ -39,6 +40,14 @@ export function validateDecision(
   const errors: string[] = [];
   const warnings: string[] = [];
   const now = new Date();
+
+  // === HARD RULE: Holly Disabled Check ===
+  // This is the MOST IMPORTANT check - if hollyDisabled is true, NOTHING should happen
+  if (context.lead.hollyDisabled) {
+    errors.push(
+      '🛑 CRITICAL: Holly is DISABLED for this lead. This lead is managed by Finmo or has completed their journey. Holly must NOT send any messages, move stages, or take ANY automated actions.'
+    );
+  }
 
   // === HARD RULE: Opt-out check ===
   if (!context.lead.consentSms) {
