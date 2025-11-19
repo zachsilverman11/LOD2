@@ -370,24 +370,33 @@ ${conversationContext.messageHistory}
 **Advisor:** ${nextAppt.advisorName}
 **Status:** ${nextAppt.status}
 
-🚨 **CRITICAL CONTEXT:**
-This call is SCHEDULED FOR THE FUTURE. It has NOT happened yet.
-Do NOT ask "how did the call go?" - it hasn't happened yet!
+🚨 **CRITICAL APPOINTMENT AWARENESS RULES:**
+This lead ALREADY BOOKED an appointment. It is scheduled for THE FUTURE and has NOT happened yet.
 
-**Your objective:**
-- DON'T try to book another call
-- DON'T ask about a call that hasn't happened
-- DO confirm they know when their call is
-- DO build excitement and ensure they show up
-- DO prepare them (have property details ready)
+**ABSOLUTELY DO NOT:**
+- ❌ Ask "did you grab a time?" (they already did!)
+- ❌ Ask "did you book a call?" (they already booked!)
+- ❌ Send another booking link (they're already scheduled!)
+- ❌ Ask "how did the call go?" (it hasn't happened yet!)
+
+**DO THIS INSTEAD:**
+- ✅ Confirm they know when their call is scheduled
+- ✅ Build excitement about the upcoming call
+- ✅ Prepare them (remind them to have property details ready)
+- ✅ Show you're organized and aware of their appointment
+- ✅ Example: "Looking forward to your call with ${nextAppt.advisorName} on ${scheduledDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}! Quick tip - have your current mortgage statement handy."
 `;
     }
 
-    // Show past appointments for context
+    // Show past appointments for context - CHECK FOR NO-SHOWS
     if (pastAppointments.length > 0) {
       const lastPastAppt = pastAppointments[0];
       const scheduledDate = lastPastAppt.scheduledFor || lastPastAppt.scheduledAt;
       const daysAgo = Math.abs(Math.round((scheduledDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+
+      // Check if this was a no-show (appointment time passed but no call outcome, or call outcome is NO_ANSWER)
+      const hasCallOutcome = callOutcome && callOutcome.appointmentId === lastPastAppt.id;
+      const isNoShow = !hasCallOutcome || (callOutcome?.outcome === 'NO_ANSWER' && callOutcome?.reached === false);
 
       briefing += `
 ### 📅 PREVIOUS APPOINTMENT (${daysAgo} days ago)
@@ -397,8 +406,36 @@ Do NOT ask "how did the call go?" - it hasn't happened yet!
 **Status:** ${lastPastAppt.status}
 
 This call was ${daysAgo} days ago (not yesterday, not recently - ${daysAgo} DAYS AGO).
+
+${isNoShow ? `
+🚨 **NO-SHOW DETECTED:**
+This lead booked an appointment but ${hasCallOutcome ? 'didn\'t answer when the advisor called' : 'the appointment time passed'}.
+
+**ABSOLUTELY DO NOT:**
+- ❌ Ask "did you grab a time?" (they already booked once - makes you look unaware!)
+- ❌ Ignore what happened (acknowledge it tactfully)
+- ❌ Be judgmental or guilt-trippy
+
+**DO THIS INSTEAD:**
+- ✅ Acknowledge the missed appointment casually
+- ✅ Be understanding and friendly (life gets busy)
+- ✅ Offer to reschedule with booking link
+- ✅ Example: "Hey! Looks like we missed each other on ${scheduledDate.toLocaleDateString('en-US', { weekday: 'long' })}. No worries - life gets busy! Want to grab another time with ${lastPastAppt.advisorName}? I can send you the link!"
+` : ''}
 `;
     }
+  } else {
+    // No appointments yet - this is when booking links are appropriate
+    briefing += `
+---
+
+## 📞 NO APPOINTMENTS YET
+
+This lead has NOT booked a call yet. You can offer the booking link when appropriate:
+- Look for high-intent signals (asking about times, showing urgency)
+- Don't be too pushy early in conversation
+- Make it easy and casual to book
+`;
   }
 
   // Add call outcome if exists - WITH EXPLICIT DATE

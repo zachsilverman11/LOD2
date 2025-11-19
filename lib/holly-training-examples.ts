@@ -472,6 +472,111 @@ export const TRAINING_EXAMPLES: TrainingExample[] = [
       ],
     },
   },
+
+  // ============================================
+  // SCENARIO 9: LEAD WITH UPCOMING APPOINTMENT
+  // ============================================
+  {
+    scenario: 'Lead has upcoming appointment booked - confirming and preparing them',
+    leadContext: {
+      name: 'Sarah',
+      type: 'renewal',
+      engagement: 'booked_appointment',
+      touchNumber: 3,
+    },
+    goodApproach: {
+      message: `Hey Sarah! Looking forward to your call with Greg on Wednesday at 2pm. Quick tip - have your current mortgage statement handy so we can pull the best numbers for your February renewal. See you then!`,
+      reasoning: 'Confirms appointment, provides value through preparation tip, shows organization',
+      whyItWorks: [
+        'Acknowledges their existing appointment (shows awareness)',
+        'Confirms specific date and time (organized)',
+        'Provides helpful preparation tip (value-add)',
+        'References their specific situation (February renewal)',
+        'Doesn\'t ask redundant questions like "did you book?"',
+        'Builds confidence in the process',
+      ],
+    },
+    badApproach: {
+      message: `Hey Sarah! Did you get a chance to grab a time with Greg? Let me know if you need the booking link!`,
+      whyItFails: [
+        'She already booked - makes you look disorganized!',
+        'Asking if she booked damages credibility',
+        'Shows you\'re not tracking appointments',
+        'Wastes her time with redundant questions',
+        'Looks unprofessional and robotic',
+      ],
+    },
+  },
+
+  // ============================================
+  // SCENARIO 10: LEAD NO-SHOWED THEIR APPOINTMENT
+  // ============================================
+  {
+    scenario: 'Lead booked appointment but no-showed - offering to reschedule',
+    leadContext: {
+      name: 'Mike',
+      type: 'purchase',
+      engagement: 'no_show',
+      touchNumber: 4,
+    },
+    goodApproach: {
+      message: `Hey Mike! Looks like we missed each other on Tuesday. No worries - life gets busy! Want to grab another time with Greg this week? I can send you the link if that helps!`,
+      reasoning: 'Tactfully acknowledges missed appointment, stays casual and understanding, makes rescheduling easy',
+      whyItWorks: [
+        'Acknowledges what happened without being judgmental',
+        'Uses understanding language ("life gets busy")',
+        'Stays casual and friendly (not formal or guilt-trippy)',
+        'Makes rescheduling easy (offers link)',
+        'Doesn\'t ask "did you book?" - acknowledges they already did',
+        'Maintains relationship despite no-show',
+      ],
+    },
+    badApproach: {
+      message: `Hey Mike! Did you get a chance to book a time with Greg yet?`,
+      whyItFails: [
+        'He already booked and no-showed - completely unaware!',
+        'Doesn\'t acknowledge the missed appointment',
+        'Makes you look disorganized and robotic',
+        'Wastes opportunity to be understanding',
+        'Damages trust by showing you don\'t track appointments',
+      ],
+    },
+  },
+
+  // ============================================
+  // SCENARIO 11: LEAD REPLIED AFTER BOOKING
+  // ============================================
+  {
+    scenario: 'Lead booked appointment and then replied with a question',
+    leadContext: {
+      name: 'Jennifer',
+      type: 'refinance',
+      engagement: 'booked_and_replied',
+      touchNumber: 2,
+    },
+    goodApproach: {
+      message: `Great question, Jennifer! The rate hold locks in the rate for 120 days, so you're protected even if rates go up before you close. We'll cover all the details on your call with Greg tomorrow at 10am. Anything else you're wondering about before then?`,
+      reasoning: 'Answers their question, references upcoming appointment naturally, stays helpful',
+      whyItWorks: [
+        'Directly answers their question (helpful)',
+        'Naturally references their upcoming appointment',
+        'Shows you know when their call is scheduled',
+        'Positions the call as continuation of conversation',
+        'Doesn\'t ask "did you book?" - you already know!',
+        'Invites more questions (builds engagement)',
+      ],
+    },
+    badApproach: {
+      message: `Good question! Did you grab a time on the calendar yet? Greg can explain everything in detail when you book.`,
+      whyItFails: [
+        'She already booked - shows you\'re not paying attention!',
+        'Deflects her question instead of answering',
+        'Makes booking sound like it hasn\'t happened',
+        'Damages credibility by appearing disorganized',
+        'Misses opportunity to build value before call',
+      ],
+    },
+  },
 ];
 
 /**
@@ -481,9 +586,30 @@ export function getRelevantExamples(
   leadType: 'purchase' | 'refinance' | 'renewal',
   urgency?: string,
   lastReply?: string,
-  touchNumber?: number
+  touchNumber?: number,
+  appointmentContext?: {
+    hasUpcomingAppointment?: boolean;
+    hasPastNoShow?: boolean;
+    hasRepliedAfterBooking?: boolean;
+  }
 ): TrainingExample[] {
   const examples: TrainingExample[] = [];
+
+  // HIGHEST PRIORITY: Match appointment-related scenarios
+  if (appointmentContext?.hasUpcomingAppointment) {
+    const example = TRAINING_EXAMPLES.find(e => e.leadContext.engagement === 'booked_appointment');
+    if (example) examples.push(example);
+  }
+
+  if (appointmentContext?.hasPastNoShow) {
+    const example = TRAINING_EXAMPLES.find(e => e.leadContext.engagement === 'no_show');
+    if (example) examples.push(example);
+  }
+
+  if (appointmentContext?.hasRepliedAfterBooking) {
+    const example = TRAINING_EXAMPLES.find(e => e.leadContext.engagement === 'booked_and_replied');
+    if (example) examples.push(example);
+  }
 
   // Priority 1: Match urgency
   if (urgency === 'I have made an offer to purchase') {

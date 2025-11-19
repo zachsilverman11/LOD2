@@ -1529,6 +1529,45 @@ export async function executeDecision(
     case "send_booking_link":
       if (decision.message) {
         try {
+          // 🛡️ DEDUPLICATION: Check if we already sent a booking link recently (within 2 hours)
+          const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+
+          const recentBookingLink = await prisma.communication.findFirst({
+            where: {
+              leadId,
+              direction: "OUTBOUND",
+              intent: "booking_link_sent",
+              createdAt: { gte: twoHoursAgo },
+            },
+            orderBy: { createdAt: "desc" },
+          });
+
+          if (recentBookingLink) {
+            const minutesAgo = Math.floor((Date.now() - recentBookingLink.createdAt.getTime()) / 60000);
+            console.log(
+              `[Booking Link] ⚠️  Duplicate detected - booking link already sent ${minutesAgo} minutes ago to lead ${leadId}, skipping`
+            );
+
+            // Log the blocked attempt
+            await prisma.leadActivity.create({
+              data: {
+                leadId,
+                type: "NOTE_ADDED",
+                channel: "SYSTEM",
+                subject: "⚠️ Duplicate Booking Link Blocked",
+                content: `Holly attempted to send another booking link, but one was already sent ${minutesAgo} minutes ago. This duplicate was automatically blocked to prevent spam.`,
+                metadata: {
+                  blockedMessage: decision.message,
+                  lastBookingLinkSent: recentBookingLink.createdAt,
+                  minutesAgo,
+                },
+              },
+            });
+
+            // Don't throw error - just skip and continue
+            break;
+          }
+
           const bookingUrl = process.env.CAL_COM_BOOKING_URL || "https://cal.com/your-link";
 
           // Send clean link without pre-filled parameters for better aesthetics

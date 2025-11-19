@@ -156,11 +156,27 @@ export async function askHollyToDecide(
   const conversationGuidance = getConversationGuidance(outboundCount + 1);
 
   // === LAYER 4: TRAINING EXAMPLES ===
+  // Calculate appointment context for better example selection
+  const nowForAppts = new Date();
+  const hasUpcomingAppointment = lead.appointments?.some(
+    (a: any) => (a.scheduledFor || a.scheduledAt) > nowForAppts && a.status === 'scheduled'
+  );
+  const hasPastNoShow = lead.appointments?.some((a: any) => {
+    const scheduledDate = a.scheduledFor || a.scheduledAt;
+    return scheduledDate < nowForAppts && a.status === 'scheduled'; // No-show = past time but still "scheduled"
+  });
+  const hasRepliedAfterBooking = inboundCount > 0 && lead.appointments && lead.appointments.length > 0;
+
   const relevantExamples = getRelevantExamples(
     leadType,
     rawData?.motivation_level,
     lastReply,
-    outboundCount + 1
+    outboundCount + 1,
+    {
+      hasUpcomingAppointment,
+      hasPastNoShow,
+      hasRepliedAfterBooking,
+    }
   );
 
   // Build training examples section

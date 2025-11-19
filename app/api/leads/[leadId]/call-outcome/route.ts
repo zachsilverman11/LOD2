@@ -310,12 +310,85 @@ Email Body: More detailed with HTML formatting, include the link prominently`;
       case "NO_ANSWER":
         // Move to NURTURING - voicemail left, Holly will continue nurturing
         newStatus = "NURTURING";
-        actionTaken = "Moved to NURTURING. Holly will continue nurturing schedule.";
+        actionTaken = "Moved to NURTURING. Holly will acknowledge missed call and offer rescheduling.";
 
+        // Get appointment details if this was a scheduled call
+        let appointmentDetails = null;
+        if (appointmentId) {
+          const appointment = await prisma.appointment.findUnique({
+            where: { id: appointmentId },
+          });
+          appointmentDetails = appointment;
+        }
+
+        // Add no-show metadata to rawData so Holly knows this is a no-show scenario
+        const currentRawDataNoShow = (lead.rawData as any) || {};
         await prisma.lead.update({
           where: { id: leadId },
-          data: { status: "NURTURING" },
+          data: {
+            status: "NURTURING",
+            rawData: {
+              ...currentRawDataNoShow,
+              lastNoShow: {
+                appointmentId,
+                scheduledFor: appointmentDetails?.scheduledFor,
+                timestamp: new Date().toISOString(),
+                advisorName,
+              },
+            },
+          },
         });
+
+        // 📞 SEND RESCHEDULING MESSAGE IMMEDIATELY via Holly
+        // Only if this was a scheduled appointment (not a random cold call)
+        if (appointmentId && appointmentDetails) {
+          try {
+            console.log(`[No-Show] Triggering immediate rescheduling message for lead ${leadId}`);
+
+            const rescheduleContext = `The lead no-showed their appointment with ${advisorName} on ${appointmentDetails.scheduledFor?.toLocaleString()}.
+
+Your job is to:
+1. Tactfully acknowledge the missed appointment (don't be judgmental)
+2. Offer to reschedule
+3. Make it easy with the booking link
+
+**IMPORTANT CONTEXT:**
+- Lead name: ${lead.firstName}
+- Advisor who tried calling: ${advisorName}
+- Missed appointment was on: ${appointmentDetails.scheduledFor?.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+- Cal.com booking URL: ${process.env.CAL_COM_BOOKING_URL || "https://cal.com/inspired-mortgage"}
+
+The message should:
+- Acknowledge the missed call casually (no guilt-tripping!)
+- Be understanding ("life gets busy", "no worries", etc.)
+- Offer to reschedule with the booking link
+- Sound warm and human, NOT robotic
+
+🚨 CRITICAL RULES:
+1. DO NOT say "did you grab a time?" - they already booked once and no-showed!
+2. DO acknowledge what happened briefly
+3. DO make it easy to reschedule
+4. BE casual and understanding, not formal
+
+EXAMPLE GOOD MESSAGE:
+"Hey ${lead.firstName}! Looks like we missed each other on ${appointmentDetails.scheduledFor?.toLocaleDateString('en-US', { weekday: 'long' })}. No worries - life gets busy! Want to grab another time with ${advisorName}? I can send you the link!"
+
+Use the send_booking_link tool to include the Cal.com link automatically.`;
+
+            // Generate AI message with rescheduling offer
+            const decision = await handleConversation(leadId, undefined, rescheduleContext);
+
+            // Send immediately
+            await executeDecision(leadId, decision);
+
+            actionTaken = "Moved to NURTURING. Holly sent rescheduling message! ✅";
+
+            console.log(`[No-Show] ✅ Rescheduling message sent successfully to lead ${leadId}`);
+          } catch (error) {
+            console.error(`[No-Show] Error sending rescheduling message:`, error);
+            actionTaken = "Moved to NURTURING. Holly will send rescheduling message on next automation run.";
+          }
+        }
         break;
 
       default:

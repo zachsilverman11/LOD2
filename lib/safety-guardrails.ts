@@ -108,6 +108,31 @@ export function validateDecision(
     errors.push('Lead already has an appointment scheduled - cannot double-book');
   }
 
+  // === HARD RULE: Don't ask about booking when appointment already exists ===
+  if (decision.message && context.lead.appointments && context.lead.appointments.length > 0) {
+    const message = decision.message.toLowerCase();
+
+    // Phrases that ask if they booked
+    const bookingQuestionPatterns = [
+      /did you (get a chance to |)grab a time/i,
+      /did you (get a chance to |)book/i,
+      /have you (grabbed|booked) a time/i,
+      /were you able to (grab|book)/i,
+      /did you schedule/i,
+      /have you scheduled/i,
+      /did the booking link work/i,
+      /trouble with the booking/i,
+    ];
+
+    const asksAboutBooking = bookingQuestionPatterns.some(pattern => pattern.test(decision.message!));
+
+    if (asksAboutBooking) {
+      errors.push(
+        'CRITICAL: Message asks if lead booked, but they already have an appointment! This makes Holly look disorganized. Instead, acknowledge their existing appointment or offer to reschedule if they no-showed.'
+      );
+    }
+  }
+
   // === HARD RULE: Don't send booking/application links to CONVERTED leads ===
   if (
     context.lead.status === 'CONVERTED' ||
