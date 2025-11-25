@@ -420,8 +420,8 @@ async function createPipedriveDeal(leadId: string) {
           value: rawData.loanAmount || 0,
           currency: "CAD",
           status: "open",
-          pipeline_id: 22, // Active Mortgage Pipeline
-          stage_id: 152, // Doc Collection stage
+          pipeline_id: 33, // Leads on Demand (Engaged)
+          stage_id: 239, // App Started (first stage)
           ...(assignedUserId && { user_id: assignedUserId }), // Assign to advisor if found
         }),
       }
