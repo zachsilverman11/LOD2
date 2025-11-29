@@ -116,6 +116,26 @@ export function validateDecision(
     }
   }
 
+  // === HARD RULE: Race Condition Prevention ===
+  // Check for very recent outbound messages (within 30 seconds) to catch parallel processing
+  if (context.lead.communications && context.lead.communications.length > 0) {
+    const mostRecentOutbound = context.lead.communications.find(
+      (c: any) => c.direction === 'OUTBOUND'
+    );
+
+    if (mostRecentOutbound) {
+      const secondsSinceLastOutbound =
+        (now.getTime() - new Date(mostRecentOutbound.createdAt).getTime()) / 1000;
+
+      if (secondsSinceLastOutbound < 30 && decision.action !== 'wait' && decision.action !== 'escalate') {
+        errors.push(
+          `🔒 Race condition block: Message was sent ${Math.round(secondsSinceLastOutbound)}s ago. ` +
+          `Wait at least 30 seconds to prevent duplicate messages.`
+        );
+      }
+    }
+  }
+
   // === HARD RULE: Don't double-book ===
   if (
     context.lead.appointments &&

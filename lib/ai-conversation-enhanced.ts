@@ -1363,6 +1363,44 @@ export async function executeDecision(
     return; // EXIT - do nothing
   }
 
+  // 🔒 RACE CONDITION PREVENTION: Check for very recent outbound messages
+  // This catches duplicate sends that slip through the processing lock
+  const RACE_CONDITION_WINDOW_MS = 30000; // 30 seconds
+  const recentOutbound = await prisma.communication.findFirst({
+    where: {
+      leadId,
+      direction: "OUTBOUND",
+      createdAt: { gte: new Date(Date.now() - RACE_CONDITION_WINDOW_MS) }
+    },
+    orderBy: { createdAt: 'desc' }
+  });
+
+  if (recentOutbound) {
+    const secondsAgo = Math.round((Date.now() - recentOutbound.createdAt.getTime()) / 1000);
+    console.log(
+      `[Execute Decision] ⏸️ BLOCKED: Race condition detected! Message sent ${secondsAgo}s ago. ` +
+      `Skipping duplicate for lead ${leadId} (${lead.firstName} ${lead.lastName}).`
+    );
+
+    // Log the blocked duplicate for debugging
+    await prisma.leadActivity.create({
+      data: {
+        leadId,
+        type: "NOTE_ADDED",
+        channel: "SYSTEM",
+        subject: "🔒 Duplicate Message Blocked",
+        content: `Race condition prevention blocked a duplicate message.\n\nBlocked action: ${decision.action}\nRecent message (${secondsAgo}s ago): "${recentOutbound.content.substring(0, 100)}..."`,
+        metadata: {
+          blockedDecision: decision,
+          recentMessageId: recentOutbound.id,
+          secondsSinceLastMessage: secondsAgo
+        },
+      },
+    });
+
+    return; // EXIT - don't send duplicate
+  }
+
   console.log(`[AI Decision] ${decision.action}: ${decision.reasoning}`);
 
   switch (decision.action) {

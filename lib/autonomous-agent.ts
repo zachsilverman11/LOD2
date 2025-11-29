@@ -46,6 +46,34 @@ export async function processLeadWithAutonomousAgent(
   }
 
   const now = new Date();
+  const PROCESSING_LOCK_TIMEOUT_MS = 60000; // 60 seconds - stale lock timeout
+
+  // 🔒 RACE CONDITION PREVENTION: Atomically claim this lead for processing
+  // This prevents duplicate messages when multiple cron instances run in parallel
+  try {
+    const claimResult = await prisma.lead.updateMany({
+      where: {
+        id: leadId,
+        OR: [
+          { processingStartedAt: null },
+          { processingStartedAt: { lt: new Date(now.getTime() - PROCESSING_LOCK_TIMEOUT_MS) } } // Stale lock (>60s)
+        ]
+      },
+      data: {
+        processingStartedAt: now
+      }
+    });
+
+    if (claimResult.count === 0) {
+      console.log(`[Holly Agent] ⏸️  Lead ${leadId} already being processed by another instance, skipping`);
+      return { success: false, reason: 'Already being processed by another instance' };
+    }
+
+    console.log(`[Holly Agent] 🔒 Claimed lead ${leadId} for processing`);
+  } catch (claimError) {
+    console.error(`[Holly Agent] ❌ Failed to claim lead ${leadId}:`, claimError);
+    return { success: false, reason: 'Failed to claim lead for processing' };
+  }
 
   try {
     // Fetch lead with related data
@@ -422,6 +450,18 @@ export async function processLeadWithAutonomousAgent(
     });
 
     return { success: false, reason: error instanceof Error ? error.message : 'Unknown error' };
+  } finally {
+    // 🔓 ALWAYS release the processing lock when done (success or failure)
+    try {
+      await prisma.lead.update({
+        where: { id: leadId },
+        data: { processingStartedAt: null },
+      });
+      console.log(`[Holly Agent] 🔓 Released lock for lead ${leadId}`);
+    } catch (unlockError) {
+      // Don't fail the whole operation if unlock fails - lock will auto-expire after 60s
+      console.error(`[Holly Agent] ⚠️  Failed to release lock for lead ${leadId}:`, unlockError);
+    }
   }
 }
 
@@ -505,6 +545,25 @@ export async function runHollyAgentLoop() {
 
     for (const lead of leadsToReview) {
       try {
+        // 🔒 RACE CONDITION PREVENTION: Try to claim this lead before processing
+        const PROCESSING_LOCK_TIMEOUT_MS = 60000; // 60 seconds
+        const claimResult = await prisma.lead.updateMany({
+          where: {
+            id: lead.id,
+            OR: [
+              { processingStartedAt: null },
+              { processingStartedAt: { lt: new Date(now.getTime() - PROCESSING_LOCK_TIMEOUT_MS) } }
+            ]
+          },
+          data: { processingStartedAt: now }
+        });
+
+        if (claimResult.count === 0) {
+          console.log(`[Holly Agent] ⏸️  ${lead.firstName} ${lead.lastName}: Already being processed, skipping`);
+          results.skipped++;
+          continue;
+        }
+
         // === ANALYZE DEAL HEALTH ===
         const signals = analyzeDealHealth(lead);
 
@@ -705,6 +764,17 @@ export async function runHollyAgentLoop() {
         });
 
         results.skipped++;
+      } finally {
+        // 🔓 Always release the processing lock
+        try {
+          await prisma.lead.update({
+            where: { id: lead.id },
+            data: { processingStartedAt: null },
+          });
+        } catch (unlockError) {
+          // Don't fail if unlock fails - lock will auto-expire
+          console.error(`[Holly Agent] ⚠️  Failed to release lock for ${lead.firstName}:`, unlockError);
+        }
       }
 
       // Rate limiting: Add small delay between leads to prevent Claude API quota exhaustion

@@ -31,6 +31,7 @@ model Lead {
   nextReviewAt           DateTime?          // For autonomous agent smart scheduling
   managedByAutonomous    Boolean            @default(true) // True if managed by new autonomous agent (Holly)
   hollyDisabled          Boolean            @default(false) // True = Holly won't send any messages (manual relationship mode)
+  processingStartedAt    DateTime?          // Lock timestamp to prevent race conditions (parallel cron processing)
   cohort                 String?            // Cohort identifier (e.g., "COHORT_1", "COHORT_2", "COHORT_3")
   cohortStartDate        DateTime?          // When this cohort began (for analytics reference)
   appointments           Appointment[]
@@ -53,6 +54,7 @@ model Lead {
   @@index([hollyDisabled])
   @@index([cohort])
   @@index([lastContactedAt])
+  @@index([processingStartedAt])
   // Compound indexes for critical automation queries
   @@index([managedByAutonomous, nextReviewAt, status, hollyDisabled], name: "idx_holly_agent_query")
   @@index([managedByAutonomous, status, lastContactedAt, consentSms], name: "idx_smart_followups")
