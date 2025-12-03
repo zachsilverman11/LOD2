@@ -10,6 +10,7 @@ const openai = new OpenAI({
 });
 
 interface LeadContext {
+  lead: any;
   leadId: string;
   leadData: any;
   conversationHistory: Array<{
@@ -96,6 +97,7 @@ export async function buildLeadContext(leadId: string): Promise<LeadContext> {
   }));
 
   return {
+    lead,
     leadId: lead.id,
     leadData: lead.rawData || {},
     conversationHistory,
