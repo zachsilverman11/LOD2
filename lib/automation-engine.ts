@@ -3,9 +3,10 @@ import { sendEmail, interpolateTemplate, EMAIL_TEMPLATES } from "@/lib/email";
 import { sendSms, SMS_TEMPLATES, normalizePhoneNumber } from "@/lib/sms";
 import { initiateCall } from "@/lib/voice-ai";
 import { LeadStatus, ActivityType, CommunicationChannel } from "@/app/generated/prisma";
-import { handleConversation, executeDecision } from "@/lib/ai-conversation-enhanced";
+import { executeDecision } from "@/lib/ai-conversation-enhanced";
 import { askHollyToDecide } from "@/lib/claude-decision";
 import { analyzeDealHealth } from "@/lib/deal-intelligence";
+import { validateDecision, HollyDecision } from "@/lib/safety-guardrails";
 import { sendSlackNotification, sendErrorAlert } from "@/lib/slack";
 
 /**
@@ -33,6 +34,95 @@ export interface AutomationAction {
     status?: LeadStatus;
     note?: string;
     variables?: Record<string, string>;
+  };
+}
+
+/**
+ * Get Holly's decision using the Claude AI system with full context and guardrails
+ * This is the proper way to get decisions from Holly for automation-engine
+ */
+async function getHollyDecision(leadId: string): Promise<{
+  action: string;
+  message?: string;
+  reasoning: string;
+  newStage?: string;
+  followupHours?: number;
+}> {
+  // 1. Load lead with full context (communications, appointments, callOutcomes)
+  const lead = await prisma.lead.findUnique({
+    where: { id: leadId },
+    include: {
+      communications: {
+        orderBy: { createdAt: "desc" },
+        take: 20,
+      },
+      appointments: {
+        orderBy: { createdAt: "desc" },
+      },
+      callOutcomes: {
+        orderBy: { createdAt: "desc" },
+        take: 5,
+      },
+    },
+  });
+
+  if (!lead) {
+    throw new Error(`Lead ${leadId} not found`);
+  }
+
+  // 2. Check if Holly is disabled for this lead FIRST
+  if (lead.hollyDisabled) {
+    console.log(`[getHollyDecision] Holly disabled for lead ${leadId}, returning do_nothing`);
+    return {
+      action: "do_nothing",
+      reasoning: `Holly is disabled for this lead (${lead.firstName} ${lead.lastName})`,
+    };
+  }
+
+  // 3. Analyze deal health for signals
+  const signals = analyzeDealHealth(lead);
+
+  // 4. Ask Holly (Claude) to decide
+  const hollyDecision = await askHollyToDecide(lead, signals);
+
+  // 5. Validate the decision with safety guardrails
+  const validation = validateDecision(hollyDecision, { lead, signals });
+
+  if (!validation.isValid) {
+    console.log(`[getHollyDecision] Decision blocked by guardrails: ${validation.errors.join(", ")}`);
+
+    // Log the blocked decision
+    await prisma.leadActivity.create({
+      data: {
+        leadId,
+        type: "NOTE_ADDED",
+        channel: "SYSTEM",
+        content: `⛔ Holly decision blocked by safety guardrails\n\nErrors: ${validation.errors.join(", ")}\n\nHolly's attempted action: ${hollyDecision.action}\nReasoning: ${hollyDecision.thinking}`,
+        metadata: {
+          automated: true,
+          guardrailBlock: true,
+          blockedAction: hollyDecision.action,
+          errors: validation.errors,
+        },
+      },
+    });
+
+    return {
+      action: "do_nothing",
+      reasoning: `Blocked by guardrails: ${validation.errors.join(", ")}`,
+    };
+  }
+
+  // 6. Convert HollyDecision to AIDecision format
+  // Map 'wait' action to 'do_nothing' (executeDecision doesn't support 'wait')
+  const action = hollyDecision.action === "wait" ? "do_nothing" : hollyDecision.action;
+
+  return {
+    action,
+    message: hollyDecision.message,
+    reasoning: hollyDecision.thinking,
+    newStage: hollyDecision.newStage,
+    followupHours: hollyDecision.waitHours,
   };
 }
 
@@ -841,7 +931,7 @@ async function processSmartFollowUps() {
         console.log(`[Automation] ${followUpReason} - Sending to lead ${lead.id} (Day ${daysSinceContact}, Hour ${hoursSinceContact}, Message #${outboundCount + 1})`);
 
         try {
-          const decision = await handleConversation(lead.id);
+          const decision = await getHollyDecision(lead.id);
           await executeDecision(lead.id, decision);
 
           await prisma.lead.update({
@@ -1054,7 +1144,7 @@ async function processApplicationNudges() {
     try {
       console.log(`[Automation] Sending 24h app nudge to lead ${lead.id}`);
 
-      const decision = await handleConversation(lead.id);
+      const decision = await getHollyDecision(lead.id);
       await executeDecision(lead.id, decision);
 
       await prisma.lead.update({
@@ -1080,7 +1170,7 @@ async function processApplicationNudges() {
     try {
       console.log(`[Automation] Sending 48h URGENT app nudge to lead ${lead.id}`);
 
-      const decision = await handleConversation(lead.id);
+      const decision = await getHollyDecision(lead.id);
       await executeDecision(lead.id, decision);
 
       await prisma.lead.update({
@@ -1123,7 +1213,7 @@ async function processApplicationNudges() {
     try {
       console.log(`[Automation] Sending app start prompt to lead ${lead.id} (call completed 24h ago)`);
 
-      const decision = await handleConversation(lead.id);
+      const decision = await getHollyDecision(lead.id);
       await executeDecision(lead.id, decision);
 
       await prisma.lead.update({
