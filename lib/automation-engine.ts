@@ -3,7 +3,7 @@ import { sendEmail, interpolateTemplate, EMAIL_TEMPLATES } from "@/lib/email";
 import { sendSms, SMS_TEMPLATES, normalizePhoneNumber } from "@/lib/sms";
 import { initiateCall } from "@/lib/voice-ai";
 import { LeadStatus, ActivityType, CommunicationChannel } from "@/app/generated/prisma";
-import { executeDecision } from "@/lib/ai-conversation-enhanced";
+import { handleConversation, executeDecision } from "@/lib/ai-conversation-enhanced";
 import { askHollyToDecide } from "@/lib/claude-decision";
 import { analyzeDealHealth } from "@/lib/deal-intelligence";
 import { sendSlackNotification, sendErrorAlert } from "@/lib/slack";
@@ -841,7 +841,7 @@ async function processSmartFollowUps() {
         console.log(`[Automation] ${followUpReason} - Sending to lead ${lead.id} (Day ${daysSinceContact}, Hour ${hoursSinceContact}, Message #${outboundCount + 1})`);
 
         try {
-          const decision = await getHollyDecision(lead.id);
+          const decision = await handleConversation(lead.id);
           await executeDecision(lead.id, decision);
 
           await prisma.lead.update({
@@ -1054,7 +1054,7 @@ async function processApplicationNudges() {
     try {
       console.log(`[Automation] Sending 24h app nudge to lead ${lead.id}`);
 
-      const decision = await getHollyDecision(lead.id);
+      const decision = await handleConversation(lead.id);
       await executeDecision(lead.id, decision);
 
       await prisma.lead.update({
@@ -1080,7 +1080,7 @@ async function processApplicationNudges() {
     try {
       console.log(`[Automation] Sending 48h URGENT app nudge to lead ${lead.id}`);
 
-      const decision = await getHollyDecision(lead.id);
+      const decision = await handleConversation(lead.id);
       await executeDecision(lead.id, decision);
 
       await prisma.lead.update({
