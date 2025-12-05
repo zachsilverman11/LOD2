@@ -19,7 +19,7 @@
     "@prisma/client": "^6.1.0",
     "date-fns": "^4.1.0",
     "inngest": "^3.44.3",
-    "next": "^15.0.0",
+    "next": "^15.5.7",
     "openai": "^6.1.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
