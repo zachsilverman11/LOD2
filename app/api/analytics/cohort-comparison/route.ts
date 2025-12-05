@@ -1,13 +1,19 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import {
-  calculateCohortMetrics,
+  calculateAllCohortMetrics,
+  calculateCohortTotals,
   type LeadWithRelations,
 } from "@/lib/analytics-helpers";
 
 /**
  * GET /api/analytics/cohort-comparison
- * Returns side-by-side comparison of all cohorts
+ * Returns side-by-side comparison of all cohorts with key metrics:
+ * - Total leads
+ * - Booked (unique leads with appointments)
+ * - Apps Submitted
+ * - Deals Won
+ * - Conversion rates
  */
 export async function GET() {
   try {
@@ -20,31 +26,23 @@ export async function GET() {
       },
     }) as LeadWithRelations[];
 
-    // Get all unique cohorts
-    const uniqueCohorts = [...new Set(allLeads.map((l) => l.cohort).filter(Boolean))];
+    // Calculate metrics for ALL cohorts using the new helper
+    const cohortMetrics = calculateAllCohortMetrics(allLeads);
 
-    // Sort cohorts (COHORT_1, COHORT_2, etc.)
-    uniqueCohorts.sort();
+    // Calculate totals row
+    const totals = calculateCohortTotals(cohortMetrics);
 
-    // Calculate metrics for each cohort
-    const cohortComparison = await calculateCohortMetrics(allLeads);
-
-    // Filter to only cohorts that exist
-    const existingCohorts = cohortComparison.filter((c) =>
-      uniqueCohorts.includes(c.cohort)
-    );
-
-    // Get cohort start dates from CohortConfig
+    // Get cohort start dates from CohortConfig for enrichment
     const cohortConfigs = await prisma.cohortConfig.findMany({
       orderBy: { cohortNumber: "asc" },
     });
 
-    // Enrich with start dates
-    const enrichedCohorts = existingCohorts.map((cohort) => {
+    // Enrich with start dates from CohortConfig if available
+    const enrichedCohorts = cohortMetrics.map((cohort) => {
       const config = cohortConfigs.find((c) => c.currentCohortName === cohort.cohort);
       return {
         ...cohort,
-        startDate: config?.cohortStartDate || null,
+        startDate: config?.cohortStartDate || cohort.startDate,
       };
     });
 
@@ -52,6 +50,7 @@ export async function GET() {
       success: true,
       data: {
         cohorts: enrichedCohorts,
+        totals,
         totalCohorts: enrichedCohorts.length,
       },
     });

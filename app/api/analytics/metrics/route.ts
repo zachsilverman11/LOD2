@@ -85,47 +85,53 @@ export async function GET(request: NextRequest) {
       : 0;
 
     // 4. COHORT PERFORMANCE
-    // Group leads by creation month and track conversion rates
-    // CRITICAL FIX: Use CallOutcome records for completed calls, not appointment status
-    const cohortMap = new Map<string, { total: number; converted: number; called: number; dealsWon: number; }>();
+    // Group leads by NAMED cohorts (COHORT_1, COHORT_2, etc.) - NOT by month
+    const cohortMap = new Map<string, {
+      total: number;
+      booked: number;
+      appsSubmitted: number;
+      dealsWon: number;
+    }>();
 
     leads.forEach((lead) => {
-      const monthKey = `${lead.createdAt.getFullYear()}-${String(lead.createdAt.getMonth() + 1).padStart(2, "0")}`;
+      const cohortName = lead.cohort || 'NO_COHORT';
 
-      if (!cohortMap.has(monthKey)) {
-        cohortMap.set(monthKey, { total: 0, converted: 0, called: 0, dealsWon: 0 });
+      if (!cohortMap.has(cohortName)) {
+        cohortMap.set(cohortName, { total: 0, booked: 0, appsSubmitted: 0, dealsWon: 0 });
       }
 
-      const cohort = cohortMap.get(monthKey)!;
+      const cohort = cohortMap.get(cohortName)!;
       cohort.total += 1;
 
-      if (lead.status === "CONVERTED" || lead.applicationCompletedAt) {
-        cohort.converted += 1;
+      // Count booked leads (any appointment)
+      if (lead.appointments && lead.appointments.length > 0) {
+        cohort.booked += 1;
       }
 
-      // Track deals won by origin cohort (even if won in a later month)
+      // Count apps submitted
+      if (lead.status === "CONVERTED" || lead.status === "DEALS_WON" || lead.applicationCompletedAt) {
+        cohort.appsSubmitted += 1;
+      }
+
+      // Track deals won
       if (lead.status === "DEALS_WON") {
         cohort.dealsWon += 1;
-      }
-
-      // FIXED: Use CallOutcome with reached=true instead of appointment.status
-      if (lead.callOutcomes && lead.callOutcomes.some((outcome) => outcome.reached === true)) {
-        cohort.called += 1;
       }
     });
 
     const cohortPerformance = Array.from(cohortMap.entries())
-      .map(([month, data]) => ({
-        month,
+      .filter(([name]) => name !== 'NO_COHORT')
+      .map(([cohortName, data]) => ({
+        cohort: cohortName,
         totalLeads: data.total,
-        completedCalls: data.called,
-        conversions: data.converted,
+        booked: data.booked,
+        appsSubmitted: data.appsSubmitted,
         dealsWon: data.dealsWon,
-        callRate: data.total > 0 ? (data.called / data.total) * 100 : 0,
-        conversionRate: data.total > 0 ? (data.converted / data.total) * 100 : 0,
-        dealsWonRate: data.converted > 0 ? (data.dealsWon / data.converted) * 100 : 0,
+        leadToCallRate: data.total > 0 ? (data.booked / data.total) * 100 : 0,
+        leadToAppRate: data.total > 0 ? (data.appsSubmitted / data.total) * 100 : 0,
+        leadToDealsWonRate: data.total > 0 ? (data.dealsWon / data.total) * 100 : 0,
       }))
-      .sort((a, b) => a.month.localeCompare(b.month));
+      .sort((a, b) => a.cohort.localeCompare(b.cohort));
 
     // 5. SHOW-UP RATE (INVERSE - LOWER IS BETTER)
     // Of all scheduled appointments, % marked as no-show

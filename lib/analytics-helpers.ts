@@ -38,6 +38,24 @@ export function hasCompletedApplication(lead: Lead): boolean {
 }
 
 /**
+ * Has submitted application (for analytics)
+ * A lead has submitted an app if:
+ * - status is CONVERTED (app was submitted) OR
+ * - applicationCompletedAt is set
+ */
+export function hasAppSubmitted(lead: Lead): boolean {
+  return lead.status === 'CONVERTED' || lead.status === 'DEALS_WON' || lead.applicationCompletedAt !== null;
+}
+
+/**
+ * DEALS WON TRACKING
+ * This is the TRUE conversion - when mortgage is funded
+ */
+export function isLeadDealsWon(lead: Lead): boolean {
+  return lead.status === 'DEALS_WON';
+}
+
+/**
  * CALL COMPLETION TRACKING
  * A call is completed if there's a CallOutcome with reached=true
  */
@@ -171,6 +189,55 @@ export function calculateNoShowRate(appointments: Appointment[]): number {
   const pastAppointments = getPastAppointments(appointments);
   const noShows = getNoShowAppointments(pastAppointments);
   return calculateRate(noShows.length, pastAppointments.length);
+}
+
+/**
+ * KEY CONVERSION METRICS
+ * These are the 4 primary metrics for the mortgage business:
+ * 1. Lead → Call Booked
+ * 2. Call Booked → Application
+ * 3. Lead → Application
+ * 4. Lead → Deals Won (TRUE conversion)
+ */
+
+export interface KeyMetrics {
+  totalLeads: number;
+  leadsBooked: number;
+  appsSubmitted: number;
+  dealsWon: number;
+  // Rates
+  leadToCallBookedRate: number;
+  callBookedToAppRate: number;
+  leadToAppRate: number;
+  leadToDealsWonRate: number;
+}
+
+export function calculateKeyMetrics(leads: LeadWithRelations[]): KeyMetrics {
+  const totalLeads = leads.length;
+
+  // Count unique leads who have EVER booked (don't double-count cancellations)
+  const leadsBooked = leads.filter(hasEverBooked).length;
+
+  // Count leads with app submitted
+  const appsSubmitted = leads.filter(hasAppSubmitted).length;
+
+  // Count deals won
+  const dealsWon = leads.filter(isLeadDealsWon).length;
+
+  return {
+    totalLeads,
+    leadsBooked,
+    appsSubmitted,
+    dealsWon,
+    // Lead → Call Booked: leads with appointments / total
+    leadToCallBookedRate: calculateRate(leadsBooked, totalLeads),
+    // Call Booked → Application: apps submitted / leads with appointments
+    callBookedToAppRate: calculateRate(appsSubmitted, leadsBooked),
+    // Lead → Application: apps submitted / total
+    leadToAppRate: calculateRate(appsSubmitted, totalLeads),
+    // Lead → Deals Won: deals won / total (TRUE conversion)
+    leadToDealsWonRate: calculateRate(dealsWon, totalLeads),
+  };
 }
 
 /**
@@ -345,6 +412,80 @@ export function calculateCohortMetrics(leads: LeadWithRelations[], cohortName: s
     cohortStartDate,
     averageDaysToConversion,
     directBookingRate,
+  };
+}
+
+/**
+ * Simplified cohort metrics for the new analytics dashboard
+ */
+export interface SimplifiedCohortMetrics {
+  cohort: string;
+  totalLeads: number;
+  booked: number;
+  appsSubmitted: number;
+  dealsWon: number;
+  leadToCallRate: number;
+  leadToAppRate: number;
+  leadToDealsWonRate: number;
+  startDate: Date | null;
+}
+
+/**
+ * Calculate metrics for ALL cohorts at once
+ * Returns an array of cohort metrics sorted by cohort name
+ */
+export function calculateAllCohortMetrics(leads: LeadWithRelations[]): SimplifiedCohortMetrics[] {
+  // Get all unique cohort names
+  const cohortGroups = groupByCohort(leads as Lead[]);
+  const cohortNames = Object.keys(cohortGroups).filter(name => name !== 'NO_COHORT').sort();
+
+  return cohortNames.map(cohortName => {
+    const cohortLeads = cohortGroups[cohortName] as LeadWithRelations[];
+
+    // Count unique leads with any appointment (not double-counting)
+    const booked = cohortLeads.filter(hasEverBooked).length;
+
+    // Count apps submitted
+    const appsSubmitted = cohortLeads.filter(hasAppSubmitted).length;
+
+    // Count deals won
+    const dealsWon = cohortLeads.filter(isLeadDealsWon).length;
+
+    const totalLeads = cohortLeads.length;
+
+    return {
+      cohort: cohortName,
+      totalLeads,
+      booked,
+      appsSubmitted,
+      dealsWon,
+      leadToCallRate: calculateRate(booked, totalLeads),
+      leadToAppRate: calculateRate(appsSubmitted, totalLeads),
+      leadToDealsWonRate: calculateRate(dealsWon, totalLeads),
+      startDate: cohortLeads[0]?.cohortStartDate || null,
+    };
+  });
+}
+
+/**
+ * Calculate totals across all cohorts
+ */
+export function calculateCohortTotals(cohortMetrics: SimplifiedCohortMetrics[]): SimplifiedCohortMetrics {
+  const totalLeads = cohortMetrics.reduce((sum, c) => sum + c.totalLeads, 0);
+  const booked = cohortMetrics.reduce((sum, c) => sum + c.booked, 0);
+  const appsSubmitted = cohortMetrics.reduce((sum, c) => sum + c.appsSubmitted, 0);
+  const dealsWon = cohortMetrics.reduce((sum, c) => sum + c.dealsWon, 0);
+
+  return {
+    cohort: 'TOTALS',
+    totalLeads,
+    booked,
+    appsSubmitted,
+    dealsWon,
+    leadToCallRate: calculateRate(booked, totalLeads),
+    leadToAppRate: calculateRate(appsSubmitted, totalLeads),
+    leadToDealsWonRate: calculateRate(dealsWon, totalLeads),
+    startDate: null,
   };
 }
 

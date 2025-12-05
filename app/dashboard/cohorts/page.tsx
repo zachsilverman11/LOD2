@@ -7,20 +7,18 @@ import { LogoutButton } from "../logout-button";
 interface CohortMetrics {
   cohort: string;
   totalLeads: number;
-  convertedLeads: number;
-  conversionRate: number;
-  bookedLeads: number;
-  bookingRate: number;
-  completedCalls: number;
-  callCompletionRate: number;
-  avgDaysToConversion: number | null;
-  directBookingCount: number;
-  directBookingRate: number;
+  booked: number;
+  appsSubmitted: number;
+  dealsWon: number;
+  leadToCallRate: number;
+  leadToAppRate: number;
+  leadToDealsWonRate: number;
   startDate: string | null;
 }
 
 interface CohortComparisonData {
   cohorts: CohortMetrics[];
+  totals: CohortMetrics;
   totalCohorts: number;
 }
 
@@ -47,6 +45,8 @@ export default function CohortComparisonPage() {
     }
   };
 
+  const formatPercent = (value: number) => `${value.toFixed(1)}%`;
+
   const exportToCSV = () => {
     if (!data) return;
 
@@ -54,31 +54,40 @@ export default function CohortComparisonPage() {
       "Cohort",
       "Start Date",
       "Total Leads",
-      "Booked Leads",
-      "Booking Rate (%)",
-      "Completed Calls",
-      "Call Completion Rate (%)",
-      "Converted Leads",
-      "Conversion Rate (%)",
-      "Avg Days to Conversion",
-      "Direct Bookings",
-      "Direct Booking Rate (%)",
+      "Booked",
+      "Lead→Call %",
+      "Apps Submitted",
+      "Lead→App %",
+      "Deals Won",
+      "Lead→Deal %",
     ];
 
     const rows = data.cohorts.map((c) => [
       c.cohort,
       c.startDate ? new Date(c.startDate).toLocaleDateString() : "N/A",
       c.totalLeads,
-      c.bookedLeads,
-      c.bookingRate.toFixed(1),
-      c.completedCalls,
-      c.callCompletionRate.toFixed(1),
-      c.convertedLeads,
-      c.conversionRate.toFixed(1),
-      c.avgDaysToConversion ? c.avgDaysToConversion.toFixed(1) : "N/A",
-      c.directBookingCount,
-      c.directBookingRate.toFixed(1),
+      c.booked,
+      c.leadToCallRate.toFixed(1),
+      c.appsSubmitted,
+      c.leadToAppRate.toFixed(1),
+      c.dealsWon,
+      c.leadToDealsWonRate.toFixed(1),
     ]);
+
+    // Add totals row
+    if (data.totals) {
+      rows.push([
+        "TOTALS",
+        "—",
+        data.totals.totalLeads,
+        data.totals.booked,
+        data.totals.leadToCallRate.toFixed(1),
+        data.totals.appsSubmitted,
+        data.totals.leadToAppRate.toFixed(1),
+        data.totals.dealsWon,
+        data.totals.leadToDealsWonRate.toFixed(1),
+      ]);
+    }
 
     const csvContent = [
       headers.join(","),
@@ -169,32 +178,26 @@ export default function CohortComparisonPage() {
                   <th className="text-left py-4 px-4 text-sm font-semibold text-[#55514D]">
                     Start Date
                   </th>
-                  <th className="text-left py-4 px-4 text-sm font-semibold text-[#55514D]">
+                  <th className="text-right py-4 px-4 text-sm font-semibold text-[#55514D]">
                     Total Leads
                   </th>
-                  <th className="text-left py-4 px-4 text-sm font-semibold text-[#55514D]">
+                  <th className="text-right py-4 px-4 text-sm font-semibold text-[#55514D]">
                     Booked
                   </th>
-                  <th className="text-left py-4 px-4 text-sm font-semibold text-[#55514D]">
-                    Booking Rate
+                  <th className="text-right py-4 px-4 text-sm font-semibold text-[#55514D]">
+                    Lead→Call %
                   </th>
-                  <th className="text-left py-4 px-4 text-sm font-semibold text-[#55514D]">
-                    Calls Done
+                  <th className="text-right py-4 px-4 text-sm font-semibold text-[#55514D]">
+                    Apps Submitted
                   </th>
-                  <th className="text-left py-4 px-4 text-sm font-semibold text-[#55514D]">
-                    Call Rate
+                  <th className="text-right py-4 px-4 text-sm font-semibold text-[#55514D]">
+                    Lead→App %
                   </th>
-                  <th className="text-left py-4 px-4 text-sm font-semibold text-[#55514D]">
-                    Converted
+                  <th className="text-right py-4 px-4 text-sm font-semibold text-green-700">
+                    Deals Won
                   </th>
-                  <th className="text-left py-4 px-4 text-sm font-semibold text-[#55514D]">
-                    Conv. Rate
-                  </th>
-                  <th className="text-left py-4 px-4 text-sm font-semibold text-[#55514D]">
-                    Avg Days
-                  </th>
-                  <th className="text-left py-4 px-4 text-sm font-semibold text-[#55514D]">
-                    Direct Book
+                  <th className="text-right py-4 px-4 text-sm font-semibold text-green-700">
+                    Lead→Deal %
                   </th>
                 </tr>
               </thead>
@@ -218,37 +221,53 @@ export default function CohortComparisonPage() {
                           })
                         : "N/A"}
                     </td>
-                    <td className="py-3 px-4 text-sm font-semibold text-[#1C1B1A]">
+                    <td className="py-3 px-4 text-sm text-right font-semibold text-[#1C1B1A]">
                       {cohort.totalLeads}
                     </td>
-                    <td className="py-3 px-4 text-sm text-[#55514D]">
-                      {cohort.bookedLeads}
+                    <td className="py-3 px-4 text-sm text-right text-[#55514D]">
+                      {cohort.booked}
                     </td>
-                    <td className="py-3 px-4 text-sm font-semibold text-[#625FFF]">
-                      {cohort.bookingRate.toFixed(1)}%
+                    <td className="py-3 px-4 text-sm text-right font-semibold text-[#625FFF]">
+                      {formatPercent(cohort.leadToCallRate)}
                     </td>
-                    <td className="py-3 px-4 text-sm text-[#55514D]">
-                      {cohort.completedCalls}
+                    <td className="py-3 px-4 text-sm text-right text-[#55514D]">
+                      {cohort.appsSubmitted}
                     </td>
-                    <td className="py-3 px-4 text-sm font-semibold text-[#625FFF]">
-                      {cohort.callCompletionRate.toFixed(1)}%
+                    <td className="py-3 px-4 text-sm text-right font-semibold text-[#625FFF]">
+                      {formatPercent(cohort.leadToAppRate)}
                     </td>
-                    <td className="py-3 px-4 text-sm text-[#2E7D32] font-semibold">
-                      {cohort.convertedLeads}
+                    <td className="py-3 px-4 text-sm text-right text-green-600 font-semibold">
+                      {cohort.dealsWon}
                     </td>
-                    <td className="py-3 px-4 text-sm font-bold text-[#2E7D32]">
-                      {cohort.conversionRate.toFixed(1)}%
-                    </td>
-                    <td className="py-3 px-4 text-sm text-[#55514D]">
-                      {cohort.avgDaysToConversion
-                        ? `${cohort.avgDaysToConversion.toFixed(1)} days`
-                        : "N/A"}
-                    </td>
-                    <td className="py-3 px-4 text-sm text-[#55514D]">
-                      {cohort.directBookingCount} ({cohort.directBookingRate.toFixed(1)}%)
+                    <td className="py-3 px-4 text-sm text-right font-bold text-green-700">
+                      {formatPercent(cohort.leadToDealsWonRate)}
                     </td>
                   </tr>
                 ))}
+                {/* Totals Row */}
+                {data?.totals && (
+                  <tr className="bg-[#1C1B1A] text-white font-bold">
+                    <td className="sticky left-0 bg-[#1C1B1A] py-3 px-4 text-sm border-r border-[#333]">
+                      TOTALS
+                    </td>
+                    <td className="py-3 px-4 text-sm">—</td>
+                    <td className="py-3 px-4 text-sm text-right">{data.totals.totalLeads}</td>
+                    <td className="py-3 px-4 text-sm text-right">{data.totals.booked}</td>
+                    <td className="py-3 px-4 text-sm text-right">
+                      {formatPercent(data.totals.leadToCallRate)}
+                    </td>
+                    <td className="py-3 px-4 text-sm text-right">{data.totals.appsSubmitted}</td>
+                    <td className="py-3 px-4 text-sm text-right">
+                      {formatPercent(data.totals.leadToAppRate)}
+                    </td>
+                    <td className="py-3 px-4 text-sm text-right text-green-400">
+                      {data.totals.dealsWon}
+                    </td>
+                    <td className="py-3 px-4 text-sm text-right text-green-400">
+                      {formatPercent(data.totals.leadToDealsWonRate)}
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -270,15 +289,17 @@ export default function CohortComparisonPage() {
             </h3>
             {data && data.cohorts.length > 0 && (
               <>
-                <div className="text-4xl font-bold text-[#2E7D32]">
-                  {[...data.cohorts].sort((a, b) => b.conversionRate - a.conversionRate)[0]
+                <div className="text-4xl font-bold text-green-600">
+                  {[...data.cohorts].sort((a, b) => b.leadToDealsWonRate - a.leadToDealsWonRate)[0]
                     .cohort}
                 </div>
                 <div className="text-xs text-[#55514D] mt-2">
-                  {[...data.cohorts].sort(
-                    (a, b) => b.conversionRate - a.conversionRate
-                  )[0].conversionRate.toFixed(1)}
-                  % conversion rate
+                  {formatPercent(
+                    [...data.cohorts].sort(
+                      (a, b) => b.leadToDealsWonRate - a.leadToDealsWonRate
+                    )[0].leadToDealsWonRate
+                  )}{" "}
+                  Lead→Deal rate
                 </div>
               </>
             )}
@@ -286,13 +307,13 @@ export default function CohortComparisonPage() {
 
           <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-6">
             <h3 className="text-sm font-semibold text-[#55514D] mb-2">
-              Total Leads (All Cohorts)
+              Total Deals Won (All Cohorts)
             </h3>
-            <div className="text-4xl font-bold text-[#1C1B1A]">
-              {data?.cohorts.reduce((sum, c) => sum + c.totalLeads, 0) || 0}
+            <div className="text-4xl font-bold text-green-600">
+              {data?.totals?.dealsWon || 0}
             </div>
             <div className="text-xs text-[#55514D] mt-2">
-              {data?.cohorts.reduce((sum, c) => sum + c.convertedLeads, 0) || 0} converted
+              {data?.totals ? formatPercent(data.totals.leadToDealsWonRate) : "0%"} overall rate
             </div>
           </div>
         </div>

@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import {
   calculateFunnelMetrics,
+  calculateKeyMetrics,
   calculateShowUpRate,
   filterByCohort,
   filterByDateRange,
   getPastAppointments,
-  isLeadConverted,
+  isCallCompleted,
   type LeadWithRelations,
 } from "@/lib/analytics-helpers";
 
@@ -41,6 +42,9 @@ export async function GET(request: NextRequest) {
     // Calculate funnel metrics using standardized helpers
     const funnelMetrics = calculateFunnelMetrics(filteredLeads);
 
+    // Calculate key metrics (the 4 primary rates)
+    const keyMetrics = calculateKeyMetrics(filteredLeads);
+
     // Get leads by status for breakdown
     const leadsByStatus = filteredLeads.reduce((acc, lead) => {
       const existing = acc.find(s => s.status === lead.status);
@@ -52,28 +56,36 @@ export async function GET(request: NextRequest) {
       return acc;
     }, [] as Array<{ status: string; count: number }>);
 
-    // Calculate total pipeline value (sum of loan amounts for active leads)
+    // Calculate pipeline value - ACTIVE ONLY (excludes LOST and DEALS_WON)
     const activeLeads = filteredLeads.filter(
-      (lead) => !["LOST", "CONVERTED", "DEALS_WON"].includes(lead.status)
+      (lead) => !["LOST", "DEALS_WON"].includes(lead.status)
     );
 
     let totalPipelineValue = 0;
     let activePipelineValue = 0;
 
+    // Helper to extract mortgage balance from rawData
+    // LOD sends 'balance' field which is the mortgage amount
+    const extractValue = (rawData: any): number => {
+      if (!rawData) return 0;
+      const value = parseFloat(
+        rawData?.balance ||
+        rawData?.mortgage_amount ||
+        rawData?.loanAmount ||
+        rawData?.loan_amount ||
+        "0"
+      );
+      return isNaN(value) ? 0 : value;
+    };
+
     filteredLeads.forEach((lead) => {
-      const rawData = lead.rawData as any;
-      const loanAmount = parseFloat(rawData?.loanAmount || rawData?.loan_amount || "0");
-      if (!isNaN(loanAmount)) {
-        totalPipelineValue += loanAmount;
-      }
+      const value = extractValue(lead.rawData);
+      totalPipelineValue += value;
     });
 
     activeLeads.forEach((lead) => {
-      const rawData = lead.rawData as any;
-      const loanAmount = parseFloat(rawData?.loanAmount || rawData?.loan_amount || "0");
-      if (!isNaN(loanAmount)) {
-        activePipelineValue += loanAmount;
-      }
+      const value = extractValue(lead.rawData);
+      activePipelineValue += value;
     });
 
     // Get all appointments from filtered leads for show-up rate calculation
@@ -83,7 +95,8 @@ export async function GET(request: NextRequest) {
     // Get past appointments for call metrics
     const pastAppointments = getPastAppointments(allAppointments);
     const callsScheduled = pastAppointments.length;
-    const callsCompleted = pastAppointments.filter((appt) => appt.status === "completed").length;
+    // FIXED: Use isCallCompleted (CallOutcome.reached=true) instead of appointment status
+    const callsCompleted = filteredLeads.filter(isCallCompleted).length;
 
     // Get total appointments
     const totalAppointments = allAppointments.length;
@@ -146,6 +159,18 @@ export async function GET(request: NextRequest) {
         activePipelineValue: parseFloat(activePipelineValue.toFixed(2)),
         conversionRate: funnelMetrics.conversionRate,
 
+        // KEY METRICS (the 4 primary rates user cares about)
+        keyMetrics: {
+          totalLeads: keyMetrics.totalLeads,
+          leadsBooked: keyMetrics.leadsBooked,
+          appsSubmitted: keyMetrics.appsSubmitted,
+          dealsWon: keyMetrics.dealsWon,
+          leadToCallBookedRate: keyMetrics.leadToCallBookedRate,
+          callBookedToAppRate: keyMetrics.callBookedToAppRate,
+          leadToAppRate: keyMetrics.leadToAppRate,
+          leadToDealsWonRate: keyMetrics.leadToDealsWonRate,
+        },
+
         // Call metrics
         callsScheduled,
         callsCompleted,
@@ -173,7 +198,7 @@ export async function GET(request: NextRequest) {
         converted: funnelMetrics.converted,
         dealsWon: funnelMetrics.dealsWon,
 
-        // KPI rates
+        // KPI rates (legacy - keeping for backwards compatibility)
         contactRate: funnelMetrics.contactRate,
         engagementRate: funnelMetrics.engagementRate,
         bookingRate: funnelMetrics.bookingRate,

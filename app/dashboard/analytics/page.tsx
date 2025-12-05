@@ -4,203 +4,80 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { LogoutButton } from "../logout-button";
 
+interface KeyMetrics {
+  totalLeads: number;
+  leadsBooked: number;
+  appsSubmitted: number;
+  dealsWon: number;
+  leadToCallBookedRate: number;
+  callBookedToAppRate: number;
+  leadToAppRate: number;
+  leadToDealsWonRate: number;
+}
 
 interface OverviewData {
   totalLeads: number;
-  totalPipelineValue: number;
-  conversionRate: number;
-  callsScheduled: number;
-  callsCompleted: number;
-  showUpRate: number;
-  responseRate: number;
-  avgTimeToResponse: number;
-  convertedCount: number;
-  activeLeadsCount: number;
+  activePipelineValue: number;
+  keyMetrics: KeyMetrics;
   statusBreakdown: Array<{ status: string; count: number }>;
-  // New KPIs
+}
+
+interface CohortData {
+  cohort: string;
+  totalLeads: number;
+  booked: number;
+  appsSubmitted: number;
+  dealsWon: number;
   leadToCallRate: number;
   leadToAppRate: number;
-  callToAppRate: number;
+  leadToDealsWonRate: number;
+  startDate: string | null;
 }
 
-interface FunnelStage {
-  stage: string;
-  label: string;
-  count: number;
-  color: string;
-  conversionRate: number;
-  dropOff: number;
-}
-
-interface FunnelData {
-  funnel: FunnelStage[];
-  metrics: {
-    contactRate: string;
-    engagementRate: string;
-    bookingRate: string;
-    conversionRate: string;
-    dealsWonRate?: string;
-  };
-  targets?: {
-    contactRate: number;
-    engagementRate: number;
-    bookingRate: number;
-    conversionRate: number;
-    dealsWonRate: number;
-  };
-  totalLeads: number;
-  lostLeads: number;
-}
-
-interface TopLead {
-  id: string;
-  name: string;
-  status: string;
-  loanAmount: number;
-  loanType: string;
-  city: string;
-  lastContactedAt: Date | null;
-}
-
-interface TopLeadsData {
-  topLeads: TopLead[];
-  totalValue: number;
-  count: number;
-}
-
-interface WeeklyMetrics {
-  metrics: {
-    directBookingRate: { value: number; target: number; status: string; count: number; total: number };
-    hollyResponseRate: { value: number; target: number; status: string; count: number; total: number };
-    callToAppRate: { value: number; target: number; status: string; count: number; total: number };
-    noShowRate: { value: number; target: number; status: string; count: number; total: number };
-    cohortPerformance: Array<{
-      month: string;
-      totalLeads: number;
-      completedCalls: number;
-      conversions: number;
-      dealsWon: number;
-      callRate: number;
-      conversionRate: number;
-      dealsWonRate: number;
-    }>;
-  };
-  funnel: {
-    totalLeads: number;
-    contacted: number;
-    completedCalls: number;
-    appsStarted: number;
-    appsCompleted: number;
-    contactRate: number;
-    callBookingRate: number;
-    appStartRate: number;
-    appCompleteRate: number;
-    overallConversionRate: number;
-  };
+interface CohortComparisonData {
+  cohorts: CohortData[];
+  totals: CohortData;
+  totalCohorts: number;
 }
 
 export default function AnalyticsPage() {
   const [overview, setOverview] = useState<OverviewData | null>(null);
-  const [funnel, setFunnel] = useState<FunnelData | null>(null);
-  const [topLeads, setTopLeads] = useState<TopLeadsData | null>(null);
-  const [weeklyMetrics, setWeeklyMetrics] = useState<WeeklyMetrics | null>(null);
+  const [cohortData, setCohortData] = useState<CohortComparisonData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [editingTargets, setEditingTargets] = useState(false);
-  const [targets, setTargets] = useState({
-    contactRateTarget: 80,
-    engagementRateTarget: 60,
-    bookingRateTarget: 40,
-    conversionRateTarget: 20,
-    dealsWonRateTarget: 70,
-  });
-  const [saving, setSaving] = useState(false);
 
   // Cohort filtering
   const [selectedCohort, setSelectedCohort] = useState<string>("all");
   const [availableCohorts, setAvailableCohorts] = useState<string[]>([]);
 
   useEffect(() => {
-    fetchAvailableCohorts();
-  }, []);
-
-  useEffect(() => {
     fetchAnalytics();
   }, [selectedCohort]);
-
-  const fetchAvailableCohorts = async () => {
-    try {
-      const res = await fetch("/api/admin/cohorts");
-      const data = await res.json();
-      if (data.success && data.data.cohortStats) {
-        const cohorts = data.data.cohortStats.map((c: any) => c.cohort).sort();
-        setAvailableCohorts(cohorts);
-      }
-    } catch (error) {
-      console.error("Failed to fetch cohorts:", error);
-    }
-  };
 
   const fetchAnalytics = async () => {
     setLoading(true);
     try {
       const cohortParam = selectedCohort !== "all" ? `?cohort=${selectedCohort}` : "";
-      const [overviewRes, funnelRes, topLeadsRes, metricsRes] = await Promise.all([
+      const [overviewRes, cohortRes] = await Promise.all([
         fetch(`/api/analytics/overview${cohortParam}`),
-        fetch(`/api/analytics/funnel${cohortParam}`),
-        fetch("/api/analytics/top-leads"),
-        fetch("/api/analytics/metrics"),
+        fetch("/api/analytics/cohort-comparison"),
       ]);
 
       const overviewData = await overviewRes.json();
-      const funnelData = await funnelRes.json();
-      const topLeadsData = await topLeadsRes.json();
-      const metricsData = await metricsRes.json();
+      const cohortComparisonData = await cohortRes.json();
 
-      if (overviewData.success) setOverview(overviewData.data);
-      if (funnelData.success) {
-        setFunnel(funnelData.data);
-        // Set targets from API response
-        if (funnelData.data.targets) {
-          setTargets({
-            contactRateTarget: funnelData.data.targets.contactRate,
-            engagementRateTarget: funnelData.data.targets.engagementRate,
-            bookingRateTarget: funnelData.data.targets.bookingRate,
-            conversionRateTarget: funnelData.data.targets.conversionRate,
-            dealsWonRateTarget: funnelData.data.targets.dealsWonRate,
-          });
-        }
+      if (overviewData.success) {
+        setOverview(overviewData.data);
       }
-      if (topLeadsData.success) setTopLeads(topLeadsData.data);
-      if (metricsData) setWeeklyMetrics(metricsData);
+      if (cohortComparisonData.success) {
+        setCohortData(cohortComparisonData.data);
+        // Extract cohort names for filter dropdown
+        const cohortNames = cohortComparisonData.data.cohorts.map((c: CohortData) => c.cohort);
+        setAvailableCohorts(cohortNames);
+      }
     } catch (error) {
       console.error("Failed to fetch analytics:", error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const saveTargets = async () => {
-    setSaving(true);
-    try {
-      const res = await fetch("/api/analytics/targets", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(targets),
-      });
-
-      const data = await res.json();
-      if (data.success) {
-        setEditingTargets(false);
-        // Refresh analytics to show new targets
-        await fetchAnalytics();
-      } else {
-        alert("Failed to save targets: " + (data.error || "Unknown error"));
-      }
-    } catch (error) {
-      console.error("Failed to save targets:", error);
-      alert("Failed to save targets");
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -213,29 +90,8 @@ export default function AnalyticsPage() {
     }).format(value);
   };
 
-  // Helper to get color based on metric vs target
-  const getMetricColor = (value: number, target: number, higherIsBetter: boolean = true) => {
-    if (higherIsBetter) {
-      if (value >= target) return "text-green-600";
-      if (value >= target * 0.8) return "text-yellow-600";
-      return "text-red-600";
-    } else {
-      if (value <= target) return "text-green-600";
-      if (value <= target * 1.2) return "text-yellow-600";
-      return "text-red-600";
-    }
-  };
-
-  const getMetricBg = (value: number, target: number, higherIsBetter: boolean = true) => {
-    if (higherIsBetter) {
-      if (value >= target) return "bg-green-50 border-green-200";
-      if (value >= target * 0.8) return "bg-yellow-50 border-yellow-200";
-      return "bg-red-50 border-red-200";
-    } else {
-      if (value <= target) return "bg-green-50 border-green-200";
-      if (value <= target * 1.2) return "bg-yellow-50 border-yellow-200";
-      return "bg-red-50 border-red-200";
-    }
+  const formatPercent = (value: number) => {
+    return `${value.toFixed(1)}%`;
   };
 
   if (loading) {
@@ -245,6 +101,18 @@ export default function AnalyticsPage() {
       </div>
     );
   }
+
+  // Get key metrics from overview or calculate from cohort data
+  const keyMetrics = overview?.keyMetrics || {
+    totalLeads: 0,
+    leadsBooked: 0,
+    appsSubmitted: 0,
+    dealsWon: 0,
+    leadToCallBookedRate: 0,
+    callBookedToAppRate: 0,
+    leadToAppRate: 0,
+    leadToDealsWonRate: 0,
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#FBF3E7] via-[#B1AFFF]/20 to-[#F6D7FF]/30">
@@ -275,12 +143,6 @@ export default function AnalyticsPage() {
                   ))}
                 </select>
               </div>
-              <Link
-                href="/dashboard/cohorts"
-                className="px-4 py-2 text-sm text-white bg-[#625FFF] rounded-md hover:bg-[#524DD9] transition-colors"
-              >
-                Compare Cohorts
-              </Link>
               <Link
                 href="/dashboard/admin"
                 className="px-4 py-2 text-sm text-[#625FFF] border border-[#625FFF] rounded-md hover:bg-[#625FFF] hover:text-white transition-colors"
@@ -322,476 +184,248 @@ export default function AnalyticsPage() {
           </div>
         )}
 
-        {/* Weekly Performance Scorecard */}
-        {weeklyMetrics && (
-          <div className="mb-8">
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-[#1C1B1A] mb-2">Weekly Performance Scorecard</h2>
-              <p className="text-sm text-[#55514D]">Track the 5 key metrics that drive conversions</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-              {/* Direct Booking Rate */}
-              <div className={`backdrop-blur-sm rounded-xl shadow-sm border-2 p-6 ${getMetricBg(weeklyMetrics.metrics.directBookingRate.value, weeklyMetrics.metrics.directBookingRate.target)}`}>
-                <div className="text-sm text-[#55514D] font-medium mb-2">Direct Booking Rate</div>
-                <div className={`text-4xl font-bold ${getMetricColor(weeklyMetrics.metrics.directBookingRate.value, weeklyMetrics.metrics.directBookingRate.target)}`}>
-                  {weeklyMetrics.metrics.directBookingRate.value}%
-                </div>
-                <div className="text-xs text-[#55514D] mt-2">
-                  Target: {weeklyMetrics.metrics.directBookingRate.target}% • {weeklyMetrics.metrics.directBookingRate.count} of {weeklyMetrics.metrics.directBookingRate.total} leads
-                </div>
-              </div>
-
-              {/* Holly Response Rate */}
-              <div className={`backdrop-blur-sm rounded-xl shadow-sm border-2 p-6 ${getMetricBg(weeklyMetrics.metrics.hollyResponseRate.value, weeklyMetrics.metrics.hollyResponseRate.target)}`}>
-                <div className="text-sm text-[#55514D] font-medium mb-2">Holly Response Rate</div>
-                <div className={`text-4xl font-bold ${getMetricColor(weeklyMetrics.metrics.hollyResponseRate.value, weeklyMetrics.metrics.hollyResponseRate.target)}`}>
-                  {weeklyMetrics.metrics.hollyResponseRate.value}%
-                </div>
-                <div className="text-xs text-[#55514D] mt-2">
-                  Target: {weeklyMetrics.metrics.hollyResponseRate.target}% • {weeklyMetrics.metrics.hollyResponseRate.count} of {weeklyMetrics.metrics.hollyResponseRate.total} non-direct leads
-                </div>
-              </div>
-
-              {/* Call-to-App Rate */}
-              <div className={`backdrop-blur-sm rounded-xl shadow-sm border-2 p-6 ${getMetricBg(weeklyMetrics.metrics.callToAppRate.value, weeklyMetrics.metrics.callToAppRate.target)}`}>
-                <div className="text-sm text-[#55514D] font-medium mb-2">Call-to-App Rate</div>
-                <div className={`text-4xl font-bold ${getMetricColor(weeklyMetrics.metrics.callToAppRate.value, weeklyMetrics.metrics.callToAppRate.target)}`}>
-                  {weeklyMetrics.metrics.callToAppRate.value}%
-                </div>
-                <div className="text-xs text-[#55514D] mt-2">
-                  Target: {weeklyMetrics.metrics.callToAppRate.target}% • {weeklyMetrics.metrics.callToAppRate.count} of {weeklyMetrics.metrics.callToAppRate.total} completed calls
-                </div>
-              </div>
-
-              {/* No-Show Rate */}
-              <div className={`backdrop-blur-sm rounded-xl shadow-sm border-2 p-6 ${getMetricBg(weeklyMetrics.metrics.noShowRate.value, weeklyMetrics.metrics.noShowRate.target, false)}`}>
-                <div className="text-sm text-[#55514D] font-medium mb-2">No-Show Rate</div>
-                <div className={`text-4xl font-bold ${getMetricColor(weeklyMetrics.metrics.noShowRate.value, weeklyMetrics.metrics.noShowRate.target, false)}`}>
-                  {weeklyMetrics.metrics.noShowRate.value}%
-                </div>
-                <div className="text-xs text-[#55514D] mt-2">
-                  Target: &lt;{weeklyMetrics.metrics.noShowRate.target}% • {weeklyMetrics.metrics.noShowRate.count} of {weeklyMetrics.metrics.noShowRate.total} scheduled
-                </div>
+        {/* Section 1: Key Numbers (4 cards) */}
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold text-[#1C1B1A] mb-4">Key Numbers</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Total Leads */}
+            <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-6">
+              <div className="text-sm text-[#55514D] font-medium mb-2">Total Leads</div>
+              <div className="text-4xl font-bold text-[#1C1B1A]">{overview?.totalLeads || 0}</div>
+              <div className="text-xs text-[#55514D] mt-2">
+                {keyMetrics.leadsBooked} booked • {keyMetrics.dealsWon} won
               </div>
             </div>
 
-            {/* Cohort Performance Table */}
-            {weeklyMetrics.metrics.cohortPerformance.length > 0 && (
-              <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-6">
-                <h3 className="text-lg font-bold text-[#1C1B1A] mb-4">Cohort Performance by Month</h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-[#E4DDD3]">
-                        <th className="text-left py-3 px-4 text-sm font-semibold text-[#55514D]">Month</th>
-                        <th className="text-left py-3 px-4 text-sm font-semibold text-[#55514D]">Total Leads</th>
-                        <th className="text-left py-3 px-4 text-sm font-semibold text-[#55514D]">Completed Calls</th>
-                        <th className="text-left py-3 px-4 text-sm font-semibold text-[#55514D]">Call Rate</th>
-                        <th className="text-left py-3 px-4 text-sm font-semibold text-[#55514D]">Conversions</th>
-                        <th className="text-left py-3 px-4 text-sm font-semibold text-[#55514D]">Conversion Rate</th>
-                        <th className="text-left py-3 px-4 text-sm font-semibold text-[#55514D]">Deals Won</th>
-                        <th className="text-left py-3 px-4 text-sm font-semibold text-[#55514D]">Won Rate</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {weeklyMetrics.metrics.cohortPerformance.map((cohort) => (
-                        <tr key={cohort.month} className="border-b border-[#E4DDD3]/50 hover:bg-[#FBF3E7]/30">
-                          <td className="py-3 px-4 text-sm font-semibold text-[#1C1B1A]">{cohort.month}</td>
-                          <td className="py-3 px-4 text-sm text-[#55514D]">{cohort.totalLeads}</td>
-                          <td className="py-3 px-4 text-sm text-[#55514D]">{cohort.completedCalls}</td>
-                          <td className="py-3 px-4 text-sm font-semibold text-[#625FFF]">{cohort.callRate.toFixed(1)}%</td>
-                          <td className="py-3 px-4 text-sm text-[#55514D]">{cohort.conversions}</td>
-                          <td className="py-3 px-4 text-sm font-semibold text-[#625FFF]">{cohort.conversionRate.toFixed(1)}%</td>
-                          <td className="py-3 px-4 text-sm text-[#2E7D32] font-semibold">{cohort.dealsWon}</td>
-                          <td className="py-3 px-4 text-sm font-semibold text-[#2E7D32]">{cohort.dealsWonRate.toFixed(1)}%</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+            {/* Active Pipeline Value */}
+            <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-6">
+              <div className="text-sm text-[#55514D] font-medium mb-2">Active Pipeline Value</div>
+              <div className="text-4xl font-bold text-[#625FFF]">
+                {formatCurrency(overview?.activePipelineValue || 0)}
               </div>
-            )}
-          </div>
-        )}
+              <div className="text-xs text-[#55514D] mt-2">
+                Excludes Lost & Deals Won
+              </div>
+            </div>
 
-        {/* 5 Core Performance Metrics */}
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold text-[#1C1B1A] mb-2">Core Performance Metrics</h2>
-          <p className="text-sm text-[#55514D]">Key indicators of system health and conversion effectiveness</p>
-        </div>
+            {/* Lead → Call Booked Rate */}
+            <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-6">
+              <div className="text-sm text-[#55514D] font-medium mb-2">Lead → Call Booked</div>
+              <div className="text-4xl font-bold text-[#625FFF]">
+                {formatPercent(keyMetrics.leadToCallBookedRate)}
+              </div>
+              <div className="text-xs text-[#55514D] mt-2">
+                {keyMetrics.leadsBooked} of {keyMetrics.totalLeads} leads
+              </div>
+            </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
-          {/* KPI 1: Lead-to-Call Rate */}
-          <div className={`backdrop-blur-sm rounded-xl shadow-sm border-2 p-6 ${getMetricBg(overview?.leadToCallRate || 0, 18)}`}>
-            <div className="text-sm text-[#55514D] font-medium mb-2">Lead-to-Call</div>
-            <div className={`text-4xl font-bold ${getMetricColor(overview?.leadToCallRate || 0, 18)}`}>
-              {overview?.leadToCallRate || 0}%
-            </div>
-            <div className="text-xs text-[#55514D] mt-2">
-              Target: 18% • {overview?.callsScheduled || 0} of {overview?.totalLeads || 0}
-            </div>
-          </div>
-
-          {/* KPI 2: Response Rate */}
-          <div className={`backdrop-blur-sm rounded-xl shadow-sm border-2 p-6 ${getMetricBg(overview?.responseRate || 0, 35)}`}>
-            <div className="text-sm text-[#55514D] font-medium mb-2">Response Rate</div>
-            <div className={`text-4xl font-bold ${getMetricColor(overview?.responseRate || 0, 35)}`}>
-              {overview?.responseRate || 0}%
-            </div>
-            <div className="text-xs text-[#55514D] mt-2">
-              Target: 35% • Replied to Holly
-            </div>
-          </div>
-
-          {/* KPI 3: Call-to-App Rate */}
-          <div className={`backdrop-blur-sm rounded-xl shadow-sm border-2 p-6 ${getMetricBg(overview?.callToAppRate || 0, 45)}`}>
-            <div className="text-sm text-[#55514D] font-medium mb-2">Call-to-App</div>
-            <div className={`text-4xl font-bold ${getMetricColor(overview?.callToAppRate || 0, 45)}`}>
-              {overview?.callToAppRate || 0}%
-            </div>
-            <div className="text-xs text-[#55514D] mt-2">
-              Target: 45% • Apps from calls
-            </div>
-          </div>
-
-          {/* KPI 4: Direct Booking Rate */}
-          <div className={`backdrop-blur-sm rounded-xl shadow-sm border-2 p-6 ${weeklyMetrics ? getMetricBg(weeklyMetrics.metrics.directBookingRate.value, weeklyMetrics.metrics.directBookingRate.target) : 'bg-white/90 border-[#E4DDD3]'}`}>
-            <div className="text-sm text-[#55514D] font-medium mb-2">Direct Booking</div>
-            <div className={`text-4xl font-bold ${weeklyMetrics ? getMetricColor(weeklyMetrics.metrics.directBookingRate.value, weeklyMetrics.metrics.directBookingRate.target) : 'text-[#1C1B1A]'}`}>
-              {weeklyMetrics?.metrics.directBookingRate.value || 0}%
-            </div>
-            <div className="text-xs text-[#55514D] mt-2">
-              Target: {weeklyMetrics?.metrics.directBookingRate.target || 25}% • LOD bookings
-            </div>
-          </div>
-
-          {/* KPI 5: Holly Booking Rate */}
-          <div className={`backdrop-blur-sm rounded-xl shadow-sm border-2 p-6 ${weeklyMetrics ? getMetricBg(weeklyMetrics.metrics.hollyResponseRate.value, weeklyMetrics.metrics.hollyResponseRate.target) : 'bg-white/90 border-[#E4DDD3]'}`}>
-            <div className="text-sm text-[#55514D] font-medium mb-2">Holly Booking</div>
-            <div className={`text-4xl font-bold ${weeklyMetrics ? getMetricColor(weeklyMetrics.metrics.hollyResponseRate.value, weeklyMetrics.metrics.hollyResponseRate.target) : 'text-[#1C1B1A]'}`}>
-              {weeklyMetrics?.metrics.hollyResponseRate.value || 0}%
-            </div>
-            <div className="text-xs text-[#55514D] mt-2">
-              Target: {weeklyMetrics?.metrics.hollyResponseRate.target || 40}% • Non-direct
+            {/* Lead → Deals Won Rate (TRUE conversion) */}
+            <div className="bg-green-50 backdrop-blur-sm rounded-xl shadow-sm border-2 border-green-200 p-6">
+              <div className="text-sm text-green-700 font-medium mb-2">Lead → Deals Won</div>
+              <div className="text-4xl font-bold text-green-700">
+                {formatPercent(keyMetrics.leadToDealsWonRate)}
+              </div>
+              <div className="text-xs text-green-600 mt-2">
+                {keyMetrics.dealsWon} deals won • TRUE conversion
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Supporting Metrics */}
-        <div className="mb-6">
-          <h2 className="text-xl font-bold text-[#1C1B1A] mb-2">Supporting Metrics</h2>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {/* Section 2: Conversion Funnel Rates (4 key rates) */}
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold text-[#1C1B1A] mb-4">Conversion Funnel</h2>
           <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-6">
-            <div className="text-sm text-[#55514D] font-medium mb-2">Total Leads</div>
-            <div className="text-3xl font-bold text-[#1C1B1A]">{overview?.totalLeads || 0}</div>
-            <div className="text-xs text-[#55514D] mt-2">
-              {overview?.activeLeadsCount || 0} active, {overview?.convertedCount || 0} converted
-            </div>
-          </div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              {/* Lead → Call Booked */}
+              <div className="text-center p-4 bg-[#625FFF]/5 rounded-lg">
+                <div className="text-sm text-[#55514D] mb-2">Lead → Call Booked</div>
+                <div className="text-3xl font-bold text-[#625FFF]">
+                  {formatPercent(keyMetrics.leadToCallBookedRate)}
+                </div>
+                <div className="text-xs text-[#55514D] mt-1">
+                  {keyMetrics.leadsBooked} / {keyMetrics.totalLeads}
+                </div>
+              </div>
 
-          <div className={`backdrop-blur-sm rounded-xl shadow-sm border-2 p-6 ${getMetricBg(overview?.showUpRate || 0, 75)}`}>
-            <div className="text-sm text-[#55514D] font-medium mb-2">Show-Up Rate</div>
-            <div className={`text-3xl font-bold ${getMetricColor(overview?.showUpRate || 0, 75)}`}>
-              {overview?.showUpRate || 0}%
-            </div>
-            <div className="text-xs text-[#55514D] mt-2">
-              Target: 75% • {overview?.callsCompleted || 0} of {overview?.callsScheduled || 0} calls
-            </div>
-          </div>
+              {/* Call Booked → Application */}
+              <div className="text-center p-4 bg-[#625FFF]/5 rounded-lg">
+                <div className="text-sm text-[#55514D] mb-2">Call → Application</div>
+                <div className="text-3xl font-bold text-[#625FFF]">
+                  {formatPercent(keyMetrics.callBookedToAppRate)}
+                </div>
+                <div className="text-xs text-[#55514D] mt-1">
+                  {keyMetrics.appsSubmitted} / {keyMetrics.leadsBooked}
+                </div>
+              </div>
 
-          <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-6">
-            <div className="text-sm text-[#55514D] font-medium mb-2">Active Pipeline Value</div>
-            <div className="text-3xl font-bold text-[#625FFF]">
-              {formatCurrency((overview as any)?.activePipelineValue || overview?.totalPipelineValue || 0)}
-            </div>
-            <div className="text-xs text-[#55514D] mt-2">
-              {overview?.activeLeadsCount || 0} active leads (excludes lost/won)
-            </div>
-          </div>
+              {/* Lead → Application */}
+              <div className="text-center p-4 bg-[#625FFF]/5 rounded-lg">
+                <div className="text-sm text-[#55514D] mb-2">Lead → Application</div>
+                <div className="text-3xl font-bold text-[#625FFF]">
+                  {formatPercent(keyMetrics.leadToAppRate)}
+                </div>
+                <div className="text-xs text-[#55514D] mt-1">
+                  {keyMetrics.appsSubmitted} / {keyMetrics.totalLeads}
+                </div>
+              </div>
 
-          <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-6">
-            <div className="text-sm text-[#55514D] font-medium mb-2">Avg. Days in Stage</div>
-            <div className="text-3xl font-bold text-[#1C1B1A]">
-              {(overview as any)?.avgDaysInStage ? `${(overview as any).avgDaysInStage.toFixed(1)}` : "0.0"}
+              {/* Lead → Deals Won */}
+              <div className="text-center p-4 bg-green-100 rounded-lg border border-green-200">
+                <div className="text-sm text-green-700 mb-2">Lead → Deals Won</div>
+                <div className="text-3xl font-bold text-green-700">
+                  {formatPercent(keyMetrics.leadToDealsWonRate)}
+                </div>
+                <div className="text-xs text-green-600 mt-1">
+                  {keyMetrics.dealsWon} / {keyMetrics.totalLeads}
+                </div>
+              </div>
             </div>
-            <div className="text-xs text-[#55514D] mt-2">
-              {(overview as any)?.leadsStuck || 0} leads stuck (&gt;7 days)
-            </div>
-          </div>
 
-          <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-6">
-            <div className="text-sm text-[#55514D] font-medium mb-2">Avg. Time to Reply</div>
-            <div className="text-3xl font-bold text-[#1C1B1A]">
-              {overview?.avgTimeToResponse ? `${overview.avgTimeToResponse.toFixed(1)}h` : "N/A"}
-            </div>
-            <div className="text-xs text-[#55514D] mt-2">
-              Target: &lt;24h • Lead response speed
-            </div>
-          </div>
-        </div>
-
-
-        {/* Conversion Funnel */}
-        <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-8 mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-[#1C1B1A]">Conversion Funnel</h2>
-            <button
-              onClick={() => setEditingTargets(true)}
-              className="px-4 py-2 text-sm font-medium text-white bg-[#625FFF] rounded-md hover:bg-[#524DD9] transition-colors"
-            >
-              Edit Targets
-            </button>
-          </div>
-          <div className="space-y-4">
-            {funnel?.funnel.map((stage, index) => {
-              const maxCount = funnel.funnel[0]?.count || 1;
-              const widthPercent = (stage.count / maxCount) * 100;
-
-              return (
-                <div key={stage.stage} className="relative">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="font-semibold text-[#1C1B1A]">{stage.label}</div>
-                    <div className="text-sm text-[#55514D]">
-                      {stage.count} leads ({stage.conversionRate}%)
-                    </div>
+            {/* Visual Funnel */}
+            <div className="mt-8 pt-6 border-t border-[#E4DDD3]">
+              <div className="flex items-center justify-between gap-4">
+                {/* Total Leads */}
+                <div className="flex-1">
+                  <div className="bg-[#625FFF] text-white rounded-lg p-4 text-center">
+                    <div className="text-2xl font-bold">{keyMetrics.totalLeads}</div>
+                    <div className="text-xs opacity-80">Total Leads</div>
                   </div>
-                  <div className="w-full bg-[#E4DDD3] rounded-full h-8 relative overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all duration-500 flex items-center justify-end px-4"
-                      style={{
-                        width: `${widthPercent}%`,
-                        backgroundColor: stage.color,
-                      }}
-                    >
-                      {stage.count > 0 && (
-                        <span className="text-sm font-bold text-[#1C1B1A]">{stage.count}</span>
-                      )}
-                    </div>
-                  </div>
-                  {index > 0 && stage.dropOff > 0 && (
-                    <div className="text-xs text-red-600 mt-1">↓ {stage.dropOff.toFixed(1)}% drop-off</div>
-                  )}
                 </div>
-              );
-            })}
-          </div>
-
-          <div className="mt-8 grid grid-cols-2 md:grid-cols-5 gap-4 pt-6 border-t border-[#E4DDD3]">
-            <div>
-              <div className="text-xs text-[#55514D]">Contact Rate</div>
-              <div className="text-xl font-bold text-[#625FFF]">
-                {funnel?.metrics.contactRate || 0}%
-              </div>
-              <div className="text-xs text-[#55514D] mt-1">
-                Target: {funnel?.targets?.contactRate || 80}%
-              </div>
-            </div>
-            <div>
-              <div className="text-xs text-[#55514D]">Engagement Rate</div>
-              <div className="text-xl font-bold text-[#625FFF]">
-                {funnel?.metrics.engagementRate || 0}%
-              </div>
-              <div className="text-xs text-[#55514D] mt-1">
-                Target: {funnel?.targets?.engagementRate || 60}%
-              </div>
-            </div>
-            <div>
-              <div className="text-xs text-[#55514D]">Booking Rate</div>
-              <div className="text-xl font-bold text-[#625FFF]">
-                {funnel?.metrics.bookingRate || 0}%
-              </div>
-              <div className="text-xs text-[#55514D] mt-1">
-                Target: {funnel?.targets?.bookingRate || 40}%
-              </div>
-            </div>
-            <div>
-              <div className="text-xs text-[#55514D]">Conversion Rate</div>
-              <div className="text-xl font-bold text-[#625FFF]">
-                {funnel?.metrics.conversionRate || 0}%
-              </div>
-              <div className="text-xs text-[#55514D] mt-1">
-                Target: {funnel?.targets?.conversionRate || 20}%
-              </div>
-            </div>
-            <div>
-              <div className="text-xs text-[#55514D]">Deals Won Rate</div>
-              <div className="text-xl font-bold text-[#2E7D32]">
-                {funnel?.metrics.dealsWonRate || 0}%
-              </div>
-              <div className="text-xs text-[#55514D] mt-1">
-                Target: {funnel?.targets?.dealsWonRate || 70}%
+                <div className="text-[#55514D]">→</div>
+                {/* Booked */}
+                <div className="flex-1">
+                  <div className="bg-[#8B88FF] text-white rounded-lg p-4 text-center">
+                    <div className="text-2xl font-bold">{keyMetrics.leadsBooked}</div>
+                    <div className="text-xs opacity-80">Call Booked</div>
+                  </div>
+                </div>
+                <div className="text-[#55514D]">→</div>
+                {/* App Submitted */}
+                <div className="flex-1">
+                  <div className="bg-[#B8E986] text-[#1C1B1A] rounded-lg p-4 text-center">
+                    <div className="text-2xl font-bold">{keyMetrics.appsSubmitted}</div>
+                    <div className="text-xs opacity-80">App Submitted</div>
+                  </div>
+                </div>
+                <div className="text-[#55514D]">→</div>
+                {/* Deals Won */}
+                <div className="flex-1">
+                  <div className="bg-green-600 text-white rounded-lg p-4 text-center">
+                    <div className="text-2xl font-bold">{keyMetrics.dealsWon}</div>
+                    <div className="text-xs opacity-80">Deals Won</div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Edit Targets Modal */}
-        {editingTargets && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-              <h3 className="text-2xl font-bold text-[#1C1B1A] mb-4">Edit Conversion Targets</h3>
-              <p className="text-sm text-[#55514D] mb-6">
-                Set your target conversion rates for each stage of the funnel
-              </p>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-[#1C1B1A] mb-1">
-                    Contact Rate Target (%)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={targets.contactRateTarget}
-                    onChange={(e) =>
-                      setTargets({ ...targets, contactRateTarget: parseFloat(e.target.value) || 0 })
-                    }
-                    className="w-full px-3 py-2 border border-[#E4DDD3] rounded-md focus:outline-none focus:ring-2 focus:ring-[#625FFF]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-[#1C1B1A] mb-1">
-                    Engagement Rate Target (%)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={targets.engagementRateTarget}
-                    onChange={(e) =>
-                      setTargets({ ...targets, engagementRateTarget: parseFloat(e.target.value) || 0 })
-                    }
-                    className="w-full px-3 py-2 border border-[#E4DDD3] rounded-md focus:outline-none focus:ring-2 focus:ring-[#625FFF]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-[#1C1B1A] mb-1">
-                    Booking Rate Target (%)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={targets.bookingRateTarget}
-                    onChange={(e) =>
-                      setTargets({ ...targets, bookingRateTarget: parseFloat(e.target.value) || 0 })
-                    }
-                    className="w-full px-3 py-2 border border-[#E4DDD3] rounded-md focus:outline-none focus:ring-2 focus:ring-[#625FFF]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-[#1C1B1A] mb-1">
-                    Conversion Rate Target (%)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={targets.conversionRateTarget}
-                    onChange={(e) =>
-                      setTargets({ ...targets, conversionRateTarget: parseFloat(e.target.value) || 0 })
-                    }
-                    className="w-full px-3 py-2 border border-[#E4DDD3] rounded-md focus:outline-none focus:ring-2 focus:ring-[#625FFF]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-[#1C1B1A] mb-1">
-                    Deals Won Rate Target (%)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={targets.dealsWonRateTarget}
-                    onChange={(e) =>
-                      setTargets({ ...targets, dealsWonRateTarget: parseFloat(e.target.value) || 0 })
-                    }
-                    className="w-full px-3 py-2 border border-[#E4DDD3] rounded-md focus:outline-none focus:ring-2 focus:ring-[#625FFF]"
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-3 mt-6">
-                <button
-                  onClick={() => setEditingTargets(false)}
-                  disabled={saving}
-                  className="flex-1 px-4 py-2 text-sm font-medium text-[#55514D] border border-[#E4DDD3] rounded-md hover:bg-[#FBF3E7] transition-colors disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={saveTargets}
-                  disabled={saving}
-                  className="flex-1 px-4 py-2 text-sm font-medium text-white bg-[#625FFF] rounded-md hover:bg-[#524DD9] transition-colors disabled:opacity-50"
-                >
-                  {saving ? "Saving..." : "Save Targets"}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Top Leads by Value */}
-        <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-8">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-[#1C1B1A]">Top Leads by Value</h2>
-            <div className="text-sm text-[#55514D]">
-              Total: {formatCurrency(topLeads?.totalValue || 0)}
-            </div>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-[#E4DDD3]">
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-[#55514D]">Name</th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-[#55514D]">
-                    Loan Amount
-                  </th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-[#55514D]">Type</th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-[#55514D]">
-                    Location
-                  </th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-[#55514D]">
-                    Status
-                  </th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-[#55514D]">
-                    Last Contact
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {topLeads?.topLeads.slice(0, 10).map((lead) => (
-                  <tr key={lead.id} className="border-b border-[#E4DDD3]/50 hover:bg-[#FBF3E7]/30">
-                    <td className="py-3 px-4 text-sm text-[#1C1B1A] font-medium">{lead.name}</td>
-                    <td className="py-3 px-4 text-sm text-[#625FFF] font-bold">
-                      {formatCurrency(lead.loanAmount)}
-                    </td>
-                    <td className="py-3 px-4 text-sm text-[#55514D] capitalize">
-                      {lead.loanType}
-                    </td>
-                    <td className="py-3 px-4 text-sm text-[#55514D]">{lead.city}</td>
-                    <td className="py-3 px-4">
-                      <span className="inline-block px-2 py-1 text-xs font-semibold rounded-full bg-[#B1AFFF]/20 text-[#625FFF]">
-                        {lead.status}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-sm text-[#55514D]">
-                      {lead.lastContactedAt
-                        ? new Date(lead.lastContactedAt).toLocaleDateString()
-                        : "Never"}
-                    </td>
+        {/* Section 3: Cohort Performance Table */}
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold text-[#1C1B1A] mb-4">Cohort Performance</h2>
+          <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-[#FBF3E7]">
+                  <tr>
+                    <th className="text-left py-4 px-4 text-sm font-bold text-[#1C1B1A]">Cohort</th>
+                    <th className="text-left py-4 px-4 text-sm font-semibold text-[#55514D]">Start Date</th>
+                    <th className="text-right py-4 px-4 text-sm font-semibold text-[#55514D]">Total</th>
+                    <th className="text-right py-4 px-4 text-sm font-semibold text-[#55514D]">Booked</th>
+                    <th className="text-right py-4 px-4 text-sm font-semibold text-[#55514D]">Lead→Call %</th>
+                    <th className="text-right py-4 px-4 text-sm font-semibold text-[#55514D]">Apps</th>
+                    <th className="text-right py-4 px-4 text-sm font-semibold text-[#55514D]">Lead→App %</th>
+                    <th className="text-right py-4 px-4 text-sm font-semibold text-green-700">Deals Won</th>
+                    <th className="text-right py-4 px-4 text-sm font-semibold text-green-700">Lead→Deal %</th>
                   </tr>
+                </thead>
+                <tbody>
+                  {cohortData?.cohorts.map((cohort, index) => (
+                    <tr
+                      key={cohort.cohort}
+                      className={`border-b border-[#E4DDD3]/50 hover:bg-[#FBF3E7]/30 ${
+                        index % 2 === 0 ? "bg-white" : "bg-[#FBF3E7]/10"
+                      }`}
+                    >
+                      <td className="py-3 px-4 text-sm font-bold text-[#625FFF]">{cohort.cohort}</td>
+                      <td className="py-3 px-4 text-sm text-[#55514D]">
+                        {cohort.startDate
+                          ? new Date(cohort.startDate).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })
+                          : "N/A"}
+                      </td>
+                      <td className="py-3 px-4 text-sm text-right font-semibold text-[#1C1B1A]">
+                        {cohort.totalLeads}
+                      </td>
+                      <td className="py-3 px-4 text-sm text-right text-[#55514D]">{cohort.booked}</td>
+                      <td className="py-3 px-4 text-sm text-right font-semibold text-[#625FFF]">
+                        {formatPercent(cohort.leadToCallRate)}
+                      </td>
+                      <td className="py-3 px-4 text-sm text-right text-[#55514D]">{cohort.appsSubmitted}</td>
+                      <td className="py-3 px-4 text-sm text-right font-semibold text-[#625FFF]">
+                        {formatPercent(cohort.leadToAppRate)}
+                      </td>
+                      <td className="py-3 px-4 text-sm text-right font-semibold text-green-600">
+                        {cohort.dealsWon}
+                      </td>
+                      <td className="py-3 px-4 text-sm text-right font-bold text-green-700">
+                        {formatPercent(cohort.leadToDealsWonRate)}
+                      </td>
+                    </tr>
+                  ))}
+                  {/* Totals Row */}
+                  {cohortData?.totals && (
+                    <tr className="bg-[#1C1B1A] text-white font-bold">
+                      <td className="py-3 px-4 text-sm">TOTALS</td>
+                      <td className="py-3 px-4 text-sm">—</td>
+                      <td className="py-3 px-4 text-sm text-right">{cohortData.totals.totalLeads}</td>
+                      <td className="py-3 px-4 text-sm text-right">{cohortData.totals.booked}</td>
+                      <td className="py-3 px-4 text-sm text-right">
+                        {formatPercent(cohortData.totals.leadToCallRate)}
+                      </td>
+                      <td className="py-3 px-4 text-sm text-right">{cohortData.totals.appsSubmitted}</td>
+                      <td className="py-3 px-4 text-sm text-right">
+                        {formatPercent(cohortData.totals.leadToAppRate)}
+                      </td>
+                      <td className="py-3 px-4 text-sm text-right text-green-400">
+                        {cohortData.totals.dealsWon}
+                      </td>
+                      <td className="py-3 px-4 text-sm text-right text-green-400">
+                        {formatPercent(cohortData.totals.leadToDealsWonRate)}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* Section 4: Status Breakdown (simplified) */}
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold text-[#1C1B1A] mb-4">Lead Status Breakdown</h2>
+          <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-6">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              {overview?.statusBreakdown
+                ?.filter((s) => !["NURTURING"].includes(s.status)) // Hide less important statuses
+                .sort((a, b) => {
+                  // Sort by funnel order
+                  const order = ["NEW", "CONTACTED", "ENGAGED", "CALL_SCHEDULED", "CALL_COMPLETED", "WAITING_FOR_APPLICATION", "APPLICATION_STARTED", "CONVERTED", "DEALS_WON", "LOST"];
+                  return order.indexOf(a.status) - order.indexOf(b.status);
+                })
+                .map((status) => (
+                  <div key={status.status} className="text-center p-3 bg-[#FBF3E7]/50 rounded-lg">
+                    <div className="text-2xl font-bold text-[#1C1B1A]">{status.count}</div>
+                    <div className="text-xs text-[#55514D] capitalize">
+                      {status.status.replace(/_/g, " ").toLowerCase()}
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
+            </div>
           </div>
         </div>
       </main>
