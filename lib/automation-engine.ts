@@ -1014,8 +1014,42 @@ async function processPostCallConfirmations() {
         continue; // Skip Slack notification
       }
 
-      // Send Slack alert to confirm if call happened
+      // 🔎 FALLBACK: If advisor logged a call outcome but did NOT attach appointmentId,
+      // try to associate a recent lead-level call outcome to this appointment.
       const appointmentTime = appointment.scheduledFor || appointment.scheduledAt;
+      const twoHoursBeforeAppt = new Date(appointmentTime.getTime() - 2 * 3600000);
+      const recentUnlinkedOutcome = await prisma.callOutcome.findFirst({
+        where: {
+          leadId: appointment.leadId,
+          appointmentId: null,
+          createdAt: {
+            gte: twoHoursBeforeAppt,
+            lte: now,
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      if (recentUnlinkedOutcome) {
+        console.log(
+          `[Automation] Linking recent unlinked call outcome ${recentUnlinkedOutcome.id} to appointment ${appointment.id} (created ${recentUnlinkedOutcome.createdAt.toISOString()})`
+        );
+
+        // Best-effort link + mark appointment completed
+        await prisma.callOutcome.update({
+          where: { id: recentUnlinkedOutcome.id },
+          data: { appointmentId: appointment.id },
+        });
+
+        await prisma.appointment.update({
+          where: { id: appointment.id },
+          data: { status: "completed" },
+        });
+
+        continue; // Skip Slack notification
+      }
+
+      // Send Slack alert to confirm if call happened
       await sendSlackNotification({
         type: "call_missed",
         leadName: `${appointment.lead.firstName} ${appointment.lead.lastName}`,

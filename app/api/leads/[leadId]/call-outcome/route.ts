@@ -59,11 +59,42 @@ export async function POST(
       );
     }
 
+    // If appointmentId wasn't provided (common when using the generic "Log Call" button),
+    // try to auto-associate to the most likely recently-passed appointment.
+    // This prevents false "Call Time Passed" alerts which key off appointment-linked outcomes.
+    let resolvedAppointmentId: string | null = appointmentId || null;
+    if (!resolvedAppointmentId) {
+      const now = new Date();
+      const sixHoursAgo = new Date(now.getTime() - 6 * 3600000);
+
+      const candidateAppointment = await prisma.appointment.findFirst({
+        where: {
+          leadId,
+          status: "scheduled",
+          OR: [
+            { scheduledFor: { gte: sixHoursAgo, lte: now } },
+            {
+              AND: [
+                { scheduledFor: null },
+                { scheduledAt: { gte: sixHoursAgo, lte: now } },
+              ],
+            },
+          ],
+        },
+        orderBy: { scheduledAt: "desc" },
+      });
+
+      if (candidateAppointment) {
+        resolvedAppointmentId = candidateAppointment.id;
+        console.log(`[Call Outcome] Auto-associated call outcome to appointment ${resolvedAppointmentId}`);
+      }
+    }
+
     // Create the call outcome record
     const callOutcome = await prisma.callOutcome.create({
       data: {
         leadId,
-        appointmentId: appointmentId || null,
+        appointmentId: resolvedAppointmentId,
         advisorName,
         reached,
         outcome,
@@ -74,12 +105,12 @@ export async function POST(
 
     // CRITICAL FIX: Update appointment status to completed if this call outcome is linked to an appointment
     // This prevents automation from sending false "Call Time Passed" notifications
-    if (appointmentId) {
+    if (resolvedAppointmentId) {
       await prisma.appointment.update({
-        where: { id: appointmentId },
+        where: { id: resolvedAppointmentId },
         data: { status: "completed" },
       });
-      console.log(`[Call Outcome] Updated appointment ${appointmentId} status to completed`);
+      console.log(`[Call Outcome] Updated appointment ${resolvedAppointmentId} status to completed`);
     }
 
     // Save call outcome to lead.rawData so Holly has full context

@@ -1,8 +1,8 @@
 "use client";
 
-import { LeadWithRelations, TEAM_MEMBERS } from "@/types/lead";
+import { LeadWithRelations, TEAM_MEMBERS, TeamMember } from "@/types/lead";
 import { format } from "date-fns";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import CallSummaryModal from "./call-summary-modal";
 
 // Helper function to format source names
@@ -129,10 +129,10 @@ interface LeadDetailModalProps {
 
 export function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
   const [newNote, setNewNote] = useState("");
-  const [noteAuthor, setNoteAuthor] = useState(TEAM_MEMBERS[0]);
+  const [noteAuthor, setNoteAuthor] = useState<TeamMember>(TEAM_MEMBERS[0]);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskDescription, setNewTaskDescription] = useState("");
-  const [taskAssignedTo, setTaskAssignedTo] = useState(TEAM_MEMBERS[0]);
+  const [taskAssignedTo, setTaskAssignedTo] = useState<TeamMember>(TEAM_MEMBERS[0]);
   const [taskDueDate, setTaskDueDate] = useState("");
   const [isAddingNote, setIsAddingNote] = useState(false);
   const [isAddingTask, setIsAddingTask] = useState(false);
@@ -146,6 +146,15 @@ export function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
   const [editedFirstName, setEditedFirstName] = useState(lead?.firstName || "");
   const [editedLastName, setEditedLastName] = useState(lead?.lastName || "");
   const [isSavingName, setIsSavingName] = useState(false);
+
+  const smsConversationRef = useRef<HTMLDivElement>(null);
+
+  // Scroll SMS conversation to bottom (most recent messages) when modal opens
+  useEffect(() => {
+    if (smsConversationRef.current) {
+      smsConversationRef.current.scrollTop = smsConversationRef.current.scrollHeight;
+    }
+  }, [lead?.id, lead?.communications]);
 
   if (!lead) return null;
 
@@ -456,7 +465,7 @@ export function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
                   </label>
                   <select
                     value={noteAuthor}
-                    onChange={(e) => setNoteAuthor(e.target.value)}
+                    onChange={(e) => setNoteAuthor(e.target.value as TeamMember)}
                     className="w-full px-3 py-2 border border-[#E4DDD3] rounded text-sm focus:outline-none focus:border-[#625FFF] text-[#1C1B1A]"
                   >
                     {TEAM_MEMBERS.map((member) => (
@@ -629,7 +638,7 @@ export function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
                   <label className="block text-sm font-medium text-[#1C1B1A] mb-1">Your Name</label>
                   <select
                     value={noteAuthor}
-                    onChange={(e) => setNoteAuthor(e.target.value)}
+                    onChange={(e) => setNoteAuthor(e.target.value as TeamMember)}
                     className="w-full px-3 py-2 border border-[#E4DDD3] rounded focus:outline-none focus:ring-2 focus:ring-[#625FFF] focus:border-transparent"
                   >
                     {TEAM_MEMBERS.map((member) => (
@@ -711,7 +720,7 @@ export function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
                     <label className="block text-sm font-medium text-[#1C1B1A] mb-1">Assign To</label>
                     <select
                       value={taskAssignedTo}
-                      onChange={(e) => setTaskAssignedTo(e.target.value)}
+                      onChange={(e) => setTaskAssignedTo(e.target.value as TeamMember)}
                       className="w-full px-3 py-2 border border-[#E4DDD3] rounded focus:outline-none focus:ring-2 focus:ring-[#625FFF] focus:border-transparent"
                     >
                       {TEAM_MEMBERS.map((member) => (
@@ -807,14 +816,25 @@ export function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
                             <p className="text-sm text-[#55514D]">with {appt.advisorName}</p>
                           )}
                         </div>
-                        {showNoShowButton && (
+                        <div className="flex flex-col gap-2 items-end">
                           <button
-                            onClick={() => handleMarkNoShow(appt.id)}
-                            className="px-3 py-1 text-sm bg-red-50 text-red-700 border border-red-300 rounded hover:bg-red-100 transition-colors"
+                            onClick={() => {
+                              setSelectedAppointmentId(appt.id);
+                              setShowCallSummaryModal(true);
+                            }}
+                            className="px-3 py-1 text-sm bg-[#625FFF] text-white rounded hover:bg-[#4E4BCC] transition-colors"
                           >
-                            Mark as No-Show
+                            Log Call Outcome
                           </button>
-                        )}
+                          {showNoShowButton && (
+                            <button
+                              onClick={() => handleMarkNoShow(appt.id)}
+                              className="px-3 py-1 text-sm bg-red-50 text-red-700 border border-red-300 rounded hover:bg-red-100 transition-colors"
+                            >
+                              Mark as No-Show
+                            </button>
+                          )}
+                        </div>
                       </div>
                       {appt.meetingUrl && (
                         <a href={appt.meetingUrl} target="_blank" rel="noopener noreferrer" className="text-[#625FFF] hover:underline text-sm mt-2 block">
@@ -832,7 +852,7 @@ export function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
           {lead.communications && lead.communications.filter((c) => c.channel === "SMS").length > 0 && (
             <div className="mb-6">
               <h3 className="text-lg font-semibold mb-3 text-[#1C1B1A]">📱 SMS Conversation</h3>
-              <div className="bg-[#FBF3E7]/50 rounded-lg p-4 space-y-3 max-h-96 overflow-y-auto border border-[#E4DDD3]">
+              <div ref={smsConversationRef} className="bg-[#FBF3E7]/50 rounded-lg p-4 space-y-3 max-h-96 overflow-y-auto border border-[#E4DDD3]">
                 {lead.communications
                   .filter((comm) => comm.channel === "SMS")
                   .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
