@@ -7,7 +7,7 @@ import { executeDecision } from "@/lib/ai-conversation-enhanced";
 import { askHollyToDecide } from "@/lib/claude-decision";
 import { analyzeDealHealth } from "@/lib/deal-intelligence";
 import { validateDecision, HollyDecision } from "@/lib/safety-guardrails";
-import { sendSlackNotification, sendErrorAlert } from "@/lib/slack";
+import { sendSlackNotification, sendErrorAlert, sendSlackAlertWithDedup, hasUpcomingAppointment } from "@/lib/slack";
 
 /**
  * Automation rule trigger types
@@ -819,9 +819,10 @@ async function processSmartFollowUps() {
 
           // 🚨 HOT LEAD ALERT: Send Slack notification at 24h mark for manual outreach
           // This alert helps catch leads before they go completely cold
-          // Only send once by checking if we're within first 3 hours of day 1
-          const hoursIntoDayMilestone = hoursSinceContact - (daysSinceContact * 24);
-          if (hoursIntoDayMilestone < 3) {
+          // Uses deduplication to prevent spam (12h cooldown per lead)
+          // Skip if they already booked an appointment
+          const hasBookedCall = await hasUpcomingAppointment(lead.id);
+          if (!hasBookedCall) {
             const loanAmount = (lead.rawData as any)?.loanAmount || (lead.rawData as any)?.loan_amount;
             const loanType = (lead.rawData as any)?.loanType || (lead.rawData as any)?.loan_type;
             const creditScore = (lead.rawData as any)?.creditScore || (lead.rawData as any)?.credit_score;
@@ -833,14 +834,18 @@ async function processSmartFollowUps() {
               propertyType ? propertyType : null,
             ].filter(Boolean).join(', ');
 
-            await sendSlackNotification({
+            const sent = await sendSlackAlertWithDedup({
               type: "hot_lead_going_cold",
               leadName: `${lead.firstName} ${lead.lastName}`,
               leadId: lead.id,
               details: leadDetails || "New lead inquiry",
-            });
+            }, 12); // 12 hour cooldown
 
-            console.log(`[Automation] 🚨 Sent hot lead alert for ${lead.id} - 24h no response`);
+            if (sent) {
+              console.log(`[Automation] 🚨 Sent hot lead alert for ${lead.id} - 24h no response`);
+            }
+          } else {
+            console.log(`[Automation] Skipping hot lead alert for ${lead.id} - has booked appointment`);
           }
         }
       } else if (daysSinceContact === 2) {
@@ -909,20 +914,20 @@ async function processSmartFollowUps() {
       }
 
       // Send Slack alerts at key milestones
-      // Only send once per milestone day by checking if we're within the first few hours
+      // Uses deduplication to ensure only one alert per lead per 24h
       if ([3, 7, 10, 15, 21, 28, 35, 45, 55].includes(daysSinceContact)) {
-        const hoursIntoDayMilestone = hoursSinceContact - (daysSinceContact * 24);
-
-        // Only send alert if we're in the first 3 hours of the milestone day
-        // This prevents sending the same alert every 15 minutes all day long
-        if (hoursIntoDayMilestone < 3) {
+        // Skip if lead has a booked appointment (they're not really "going cold")
+        const hasBooking = await hasUpcomingAppointment(lead.id);
+        if (!hasBooking) {
           const phase = daysSinceContact <= 14 ? "Active Pursuit" : daysSinceContact <= 30 ? "Nurturing" : "Long-term";
-          await sendSlackNotification({
-            type: daysSinceContact >= 30 ? "lead_rotting" : "no_response",
+          const alertType = daysSinceContact >= 30 ? "lead_rotting" : "no_response";
+
+          await sendSlackAlertWithDedup({
+            type: alertType,
             leadName: `${lead.firstName} ${lead.lastName}`,
             leadId: lead.id,
             details: `Day ${daysSinceContact} | ${outboundCount} messages sent | ${phase} phase | ${hasReplied ? "Has replied before" : "Never replied"}`,
-          });
+          }, 24); // 24 hour cooldown for milestone alerts
         }
       }
 
@@ -1566,17 +1571,20 @@ async function processStaleLeadAlerts() {
   for (const lead of staleLeads) {
     const hoursIntoMilestone = (now.getTime() - lead.updatedAt.getTime()) / (1000 * 60 * 60);
     const daysSinceUpdate = Math.floor(hoursIntoMilestone / 24);
-    const hoursIntoDayMilestone = hoursIntoMilestone - (daysSinceUpdate * 24);
     const lastComm = lead.communications[0];
 
-    // Only alert on specific milestone days AND within first 3 hours to prevent duplicate notifications every 15 minutes
-    if ([5, 10, 15, 20, 25, 30].includes(daysSinceUpdate) && hoursIntoDayMilestone < 3) {
-      await sendSlackNotification({
-        type: "lead_rotting",
-        leadName: `${lead.firstName} ${lead.lastName}`,
-        leadId: lead.id,
-        details: `No activity in ${daysSinceUpdate} days. Last message: ${lastComm ? lastComm.content.substring(0, 50) + "..." : "None"}`,
-      });
+    // Alert on milestone days using deduplication to prevent spam
+    if ([5, 10, 15, 20, 25, 30].includes(daysSinceUpdate)) {
+      // Skip if lead has a booked appointment
+      const hasBooking = await hasUpcomingAppointment(lead.id);
+      if (!hasBooking) {
+        await sendSlackAlertWithDedup({
+          type: "lead_rotting",
+          leadName: `${lead.firstName} ${lead.lastName}`,
+          leadId: lead.id,
+          details: `No activity in ${daysSinceUpdate} days. Last message: ${lastComm ? lastComm.content.substring(0, 50) + "..." : "None"}`,
+        }, 24); // 24 hour cooldown
+      }
     }
   }
 }

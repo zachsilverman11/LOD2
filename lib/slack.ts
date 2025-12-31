@@ -387,3 +387,106 @@ async function logFailedSlackAlert(data: {
     console.error("Failed to log Slack alert failure to database:", dbError);
   }
 }
+
+/**
+ * Slack alert types that should be deduplicated per lead
+ */
+type DeduplicatedAlertType = "no_response" | "lead_rotting" | "hot_lead_going_cold";
+
+/**
+ * Send Slack notification with deduplication
+ *
+ * Prevents spam by checking if we've already sent this type of alert
+ * for this lead within the cooldown period.
+ *
+ * @param notification - The notification to send
+ * @param cooldownHours - Hours to wait before sending same alert type for same lead (default: 12)
+ * @returns true if sent, false if skipped due to cooldown
+ */
+export async function sendSlackAlertWithDedup(
+  notification: {
+    type: DeduplicatedAlertType;
+    leadName: string;
+    leadId: string;
+    details?: string;
+    metadata?: Record<string, any>;
+  },
+  cooldownHours: number = 12
+): Promise<boolean> {
+  const { type, leadId } = notification;
+
+  try {
+    // Check if we've already sent this type of alert recently
+    const lead = await prisma.lead.findUnique({
+      where: { id: leadId },
+      select: {
+        lastSlackAlertAt: true,
+        lastSlackAlertType: true,
+      },
+    });
+
+    if (!lead) {
+      console.log(`[Slack Dedup] Lead ${leadId} not found, skipping alert`);
+      return false;
+    }
+
+    const now = new Date();
+    const cooldownMs = cooldownHours * 60 * 60 * 1000;
+
+    // Check if same alert type was sent within cooldown period
+    if (
+      lead.lastSlackAlertAt &&
+      lead.lastSlackAlertType === type &&
+      now.getTime() - lead.lastSlackAlertAt.getTime() < cooldownMs
+    ) {
+      const hoursSinceLast = Math.floor(
+        (now.getTime() - lead.lastSlackAlertAt.getTime()) / (1000 * 60 * 60)
+      );
+      console.log(
+        `[Slack Dedup] Skipping ${type} alert for lead ${leadId} - already sent ${hoursSinceLast}h ago (cooldown: ${cooldownHours}h)`
+      );
+      return false;
+    }
+
+    // Send the notification
+    await sendSlackNotification(notification);
+
+    // Update the lead's alert tracking
+    await prisma.lead.update({
+      where: { id: leadId },
+      data: {
+        lastSlackAlertAt: now,
+        lastSlackAlertType: type,
+      },
+    });
+
+    console.log(`[Slack Dedup] Sent ${type} alert for lead ${leadId}`);
+    return true;
+  } catch (error) {
+    console.error(`[Slack Dedup] Error checking/sending alert for lead ${leadId}:`, error);
+    // Fall back to sending without dedup if there's an error
+    await sendSlackNotification(notification);
+    return true;
+  }
+}
+
+/**
+ * Check if a lead has an upcoming booked appointment
+ * Used to prevent "going cold" alerts for leads who have already booked
+ */
+export async function hasUpcomingAppointment(leadId: string): Promise<boolean> {
+  const now = new Date();
+
+  const upcomingAppointment = await prisma.appointment.findFirst({
+    where: {
+      leadId,
+      status: { in: ["SCHEDULED", "CONFIRMED", "scheduled", "confirmed"] },
+      OR: [
+        { scheduledFor: { gte: now } },
+        { scheduledAt: { gte: now } },
+      ],
+    },
+  });
+
+  return upcomingAppointment !== null;
+}
