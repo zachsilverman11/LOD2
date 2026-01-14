@@ -88,15 +88,19 @@ async function handleBookingCreated(payload: any) {
     : null;
 
   // If not found by email, try phone number (match last 10 digits)
+  // CRITICAL: Only match if we have a real phone number (at least 10 digits)
+  // This prevents false matches when Cal.com sends "integrations:daily" or similar non-phone values
   if (!lead && attendeePhone) {
     const phoneDigits = attendeePhone.replace(/\D/g, "").slice(-10);
-    lead = await prisma.lead.findFirst({
-      where: {
-        phone: {
-          contains: phoneDigits,
+    if (phoneDigits.length >= 10) {
+      lead = await prisma.lead.findFirst({
+        where: {
+          phone: {
+            contains: phoneDigits,
+          },
         },
-      },
-    });
+      });
+    }
   }
 
   if (!lead) {
@@ -131,9 +135,10 @@ async function handleBookingCreated(payload: any) {
     return;
   }
 
-  // CRITICAL: Check if lead is in a prohibited status (LOST, CONVERTED, DEALS_WON)
+  // CRITICAL: Check if lead is in a prohibited status (CONVERTED, DEALS_WON)
   // These leads should NOT be reactivated by bookings
-  const prohibitedStatuses = [LeadStatus.LOST, LeadStatus.CONVERTED, LeadStatus.DEALS_WON];
+  // NOTE: LOST leads ARE allowed to book - they may want to re-engage
+  const prohibitedStatuses = [LeadStatus.CONVERTED, LeadStatus.DEALS_WON];
 
   if (prohibitedStatuses.includes(lead.status)) {
     console.warn(`[Cal.com] BLOCKED booking for ${lead.status} lead:`, lead.id, lead.firstName, lead.lastName);
@@ -182,15 +187,17 @@ async function handleBookingCreated(payload: any) {
     },
   });
 
-  // Update lead status and disable Holly
-  // 🛑 CRITICAL: Disable Holly when appointment is booked
-  // Advisor now owns the relationship until the call happens
+  // Update lead status - Holly stays enabled with appointment context
+  // She knows about the scheduled appointment and won't try to book again
+  // Safety guardrails + POST-CALL CONTEXT keep her contextually aware
   await prisma.lead.update({
     where: { id: lead.id },
     data: {
       status: LeadStatus.CALL_SCHEDULED,
-      hollyDisabled: true, // Stop Holly from messaging - advisor owns this lead now
-      managedByAutonomous: false, // Turn off all automation
+      // Holly stays enabled - existing safeguards prevent booking hallucinations:
+      // 1. Safety guardrails pattern-match "did you book?" type messages
+      // 2. Appointment query only finds SCHEDULED/CONFIRMED appointments
+      // 3. POST-CALL CONTEXT provides call outcome details after call
     },
   });
 
@@ -235,29 +242,13 @@ async function handleBookingCreated(payload: any) {
 
   if (recentCommunications.length === 0) {
     try {
-      // 🛑 TEMPORARY: Re-enable Holly briefly to send booking confirmation
-      // Then disable again immediately after
-      await prisma.lead.update({
-        where: { id: lead.id },
-        data: { hollyDisabled: false },
-      });
-
+      // Holly is enabled and has context about the appointment
+      // Send booking confirmation message
       const decision = await handleConversation(lead.id);
       await executeDecision(lead.id, decision);
-
-      // 🛑 Disable Holly again - advisor owns the relationship from here
-      await prisma.lead.update({
-        where: { id: lead.id },
-        data: { hollyDisabled: true },
-      });
     } catch (error) {
       console.error("Failed to send appointment confirmation via Holly:", error);
       // Don't throw - appointment is already created, this is just a nice-to-have
-      // Make sure Holly is disabled even if confirmation fails
-      await prisma.lead.update({
-        where: { id: lead.id },
-        data: { hollyDisabled: true },
-      });
     }
   } else {
     console.log(`[Cal.com] Skipping booking confirmation - lead contacted within last hour`);

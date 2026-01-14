@@ -77,9 +77,10 @@ async function handleFunctionCall(payload: any) {
       return;
     }
 
-    // CRITICAL: Check if lead is in a prohibited status (LOST, CONVERTED, DEALS_WON)
+    // CRITICAL: Check if lead is in a prohibited status (CONVERTED, DEALS_WON)
     // These leads should NOT be reactivated by voice AI bookings
-    const prohibitedStatuses = [LeadStatus.LOST, LeadStatus.CONVERTED, LeadStatus.DEALS_WON];
+    // NOTE: LOST leads ARE allowed to book - they may want to re-engage
+    const prohibitedStatuses = [LeadStatus.CONVERTED, LeadStatus.DEALS_WON];
 
     if (prohibitedStatuses.includes(lead.status)) {
       console.warn(`[Vapi] BLOCKED booking for ${lead.status} lead:`, lead.id, lead.firstName, lead.lastName);
