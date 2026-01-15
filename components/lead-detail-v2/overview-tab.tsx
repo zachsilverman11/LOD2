@@ -1,0 +1,452 @@
+"use client";
+
+import { useState } from "react";
+import { LeadWithRelations } from "@/types/lead";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { SectionLabel } from "@/components/ui/section-label";
+import { format } from "date-fns";
+
+type OverviewTabProps = {
+  lead: LeadWithRelations;
+  onRefresh: () => void;
+  onLogCallOutcome?: (appointmentId?: string) => void;
+};
+
+// Format phone number for display
+function formatPhone(phone: string | null): string {
+  if (!phone) return "—";
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+  if (digits.length === 11 && digits[0] === "1") {
+    return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+  }
+  return phone;
+}
+
+// Format currency as Canadian dollars
+function formatCurrency(value: unknown): string {
+  if (value === null || value === undefined || value === "") return "—";
+  const num = parseFloat(String(value).replace(/[^0-9.-]/g, ""));
+  if (isNaN(num)) return String(value);
+  return new Intl.NumberFormat("en-CA", {
+    style: "currency",
+    currency: "CAD",
+    maximumFractionDigits: 0,
+  }).format(num);
+}
+
+// Format source names
+function formatSource(source: string | null): string {
+  if (!source) return "—";
+  const sourceMap: Record<string, string> = {
+    leads_on_demand: "Leads On Demand",
+    facebook: "Facebook",
+    google: "Google Ads",
+    referral: "Referral",
+    organic: "Organic Search",
+    direct: "Direct",
+  };
+  return (
+    sourceMap[source.toLowerCase()] ||
+    source
+      .split("_")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ")
+  );
+}
+
+// Parse date from rawData (handles DD/MM/YYYY format from Leads on Demand)
+function parseRawDate(value: unknown): Date | null {
+  if (!value) return null;
+  const str = String(value);
+  const ddmmyyyyPattern = /^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(.+)$/;
+  const match = str.match(ddmmyyyyPattern);
+  if (match) {
+    const [, day, month, year, time] = match;
+    const dateStr = `${month}/${day}/${year} ${time}`;
+    const date = new Date(dateStr);
+    if (!isNaN(date.getTime())) return date;
+  }
+  const date = new Date(str);
+  if (!isNaN(date.getTime())) return date;
+  return null;
+}
+
+// Copy to clipboard helper
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleCopy}
+      className="p-1.5 text-[#8E8983] hover:text-[#625FFF] hover:bg-[#625FFF]/5 rounded-md transition-all duration-150"
+      title="Copy to clipboard"
+    >
+      {copied ? (
+        <svg className="w-4 h-4 text-[#76C63E]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+        </svg>
+      ) : (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.5}
+            d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+          />
+        </svg>
+      )}
+    </button>
+  );
+}
+
+// Field row component for consistent styling
+function FieldRow({ label, value, copyable }: { label: string; value: string; copyable?: boolean }) {
+  return (
+    <div className="flex items-center justify-between py-2">
+      <span className="text-sm text-[#8E8983]">{label}</span>
+      <div className="flex items-center gap-1">
+        <span className="text-sm font-medium text-[#1C1B1A]">{value}</span>
+        {copyable && value !== "—" && <CopyButton text={value} />}
+      </div>
+    </div>
+  );
+}
+
+export function OverviewTab({ lead, onRefresh, onLogCallOutcome }: OverviewTabProps) {
+  const [isTogglingHolly, setIsTogglingHolly] = useState(false);
+
+  // Extract lead details from rawData
+  const rawData = (lead.rawData as Record<string, unknown>) || {};
+
+  // Get specific fields from rawData
+  const city = rawData.city || rawData.City || "—";
+  const province = rawData.province || rawData.Province || rawData.state || rawData.State || "—";
+  const lender = rawData.lender || rawData.Lender || rawData.current_lender || "—";
+  const loanType = rawData.lead_type || rawData.loan_type || rawData.loanType || rawData.LoanType || "—";
+  const propertyType = rawData.prop_type || rawData.property_type || rawData.propertyType || rawData.PropertyType || "—";
+  const balance = rawData.balance || rawData.Balance || rawData.mortgage_balance || rawData.loanAmount || null;
+  const homeValue = rawData.home_value || rawData.homeValue || rawData.HomeValue || rawData.propertyValue || null;
+  const hasRentIncome = rawData.rent_check || rawData.rentCheck || rawData.hasRentIncome || null;
+  const captureTime = rawData.capture_time || rawData.captureTime || rawData.submitted_at || lead.createdAt;
+
+  // Parse submitted date
+  const submittedDate = parseRawDate(captureTime) || new Date(lead.createdAt);
+
+  // Get upcoming appointment (first scheduled one)
+  const upcomingAppointment = lead.appointments?.find(
+    (appt) => appt.status === "scheduled" || appt.status === "completed"
+  );
+
+  // Toggle Holly status
+  const handleToggleHolly = async () => {
+    setIsTogglingHolly(true);
+    try {
+      const response = await fetch(`/api/leads/${lead.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hollyDisabled: !lead.hollyDisabled }),
+      });
+      if (response.ok) {
+        onRefresh();
+      }
+    } catch (error) {
+      console.error("Error toggling Holly:", error);
+    } finally {
+      setIsTogglingHolly(false);
+    }
+  };
+
+  // Check if appointment should show no-show button
+  const shouldShowNoShow = (appt: typeof upcomingAppointment) => {
+    if (!appt || appt.status !== "completed") return false;
+    const appointmentTime = new Date(appt.scheduledAt);
+    const now = new Date();
+    const hoursSince = (now.getTime() - appointmentTime.getTime()) / (1000 * 60 * 60);
+    return hoursSince >= 0 && hoursSince <= 24;
+  };
+
+  // Handle mark as no-show
+  const handleMarkNoShow = async (appointmentId: string) => {
+    if (!confirm("Mark this appointment as no-show? This will move the lead back to ENGAGED and trigger a recovery message.")) {
+      return;
+    }
+    try {
+      const response = await fetch(`/api/appointments/${appointmentId}/mark-no-show`, {
+        method: "POST",
+      });
+      if (response.ok) {
+        onRefresh();
+      } else {
+        alert("Failed to mark as no-show");
+      }
+    } catch (error) {
+      console.error("Error marking as no-show:", error);
+      alert("Error marking as no-show");
+    }
+  };
+
+  const isHollyActive = !lead.hollyDisabled;
+
+  return (
+    <div className="p-5 space-y-4">
+      {/* Contact Information */}
+      <section>
+        <SectionLabel>Contact Information</SectionLabel>
+        <Card>
+          <CardContent className="divide-y divide-[#E5E0D8]/50">
+            <FieldRow label="Email" value={lead.email || "—"} copyable />
+            <FieldRow label="Phone" value={formatPhone(lead.phone)} copyable />
+            <FieldRow label="Source" value={formatSource(lead.source)} />
+          </CardContent>
+        </Card>
+      </section>
+
+      {/* Lead Details */}
+      <section>
+        <SectionLabel>Lead Details</SectionLabel>
+        <Card>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-x-8 gap-y-3">
+              <div>
+                <p className="text-sm text-[#8E8983] mb-0.5">Location</p>
+                <p className="text-sm font-medium text-[#1C1B1A]">
+                  {city !== "—" || province !== "—" ? `${city}, ${province}` : "—"}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-[#8E8983] mb-0.5">Lender</p>
+                <p className="text-sm font-medium text-[#1C1B1A]">{String(lender)}</p>
+              </div>
+              <div>
+                <p className="text-sm text-[#8E8983] mb-0.5">Loan Type</p>
+                <p className="text-sm font-medium text-[#1C1B1A]">{String(loanType)}</p>
+              </div>
+              <div>
+                <p className="text-sm text-[#8E8983] mb-0.5">Property Type</p>
+                <p className="text-sm font-medium text-[#1C1B1A]">{String(propertyType)}</p>
+              </div>
+              <div>
+                <p className="text-sm text-[#8E8983] mb-0.5">Balance</p>
+                <p className="text-sm font-medium text-[#1C1B1A]">{formatCurrency(balance)}</p>
+              </div>
+              <div>
+                <p className="text-sm text-[#8E8983] mb-0.5">Home Value</p>
+                <p className="text-sm font-medium text-[#1C1B1A]">{formatCurrency(homeValue)}</p>
+              </div>
+              <div>
+                <p className="text-sm text-[#8E8983] mb-0.5">Has Rent Income</p>
+                <p className="text-sm font-medium text-[#1C1B1A]">
+                  {hasRentIncome === "Yes" || hasRentIncome === true
+                    ? "Yes"
+                    : hasRentIncome === "No" || hasRentIncome === false
+                    ? "No"
+                    : "—"}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-[#8E8983] mb-0.5">Submitted</p>
+                <p className="text-sm font-medium text-[#1C1B1A]">
+                  {format(submittedDate, "MMM d, yyyy")}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
+      {/* Consent Status */}
+      <section>
+        <SectionLabel>Consent Status</SectionLabel>
+        <Card>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              <Badge variant={lead.consentEmail ? "success" : "neutral"}>
+                {lead.consentEmail && (
+                  <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+                Email
+              </Badge>
+              <Badge variant={lead.consentSms ? "success" : "neutral"}>
+                {lead.consentSms && (
+                  <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+                SMS
+              </Badge>
+              <Badge variant={lead.consentCall ? "success" : "neutral"}>
+                {lead.consentCall && (
+                  <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+                Call
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
+      {/* Holly AI */}
+      <section>
+        <SectionLabel>Holly AI Assistant</SectionLabel>
+        <Card>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isHollyActive ? "bg-[#76C63E]/10" : "bg-[#FBF3E7]"}`}>
+                  <div className={`w-3 h-3 rounded-full ${isHollyActive ? "bg-[#76C63E]" : "bg-[#8E8983]"}`} />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-[#1C1B1A]">
+                    {isHollyActive ? "Active" : "Disabled"}
+                  </p>
+                  <p className="text-xs text-[#8E8983]">
+                    {isHollyActive
+                      ? "Automated follow-ups enabled"
+                      : "No automated messages"}
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant={isHollyActive ? "danger" : "primary"}
+                size="sm"
+                onClick={handleToggleHolly}
+                disabled={isTogglingHolly}
+              >
+                {isTogglingHolly ? "..." : isHollyActive ? "Disable" : "Enable"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
+      {/* Upcoming Appointment */}
+      {upcomingAppointment && (
+        <section>
+          <SectionLabel>Upcoming Appointment</SectionLabel>
+          <Card>
+            <CardContent>
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <p className="text-sm font-medium text-[#1C1B1A]">
+                    {format(new Date(upcomingAppointment.scheduledAt), "EEEE, MMMM d, yyyy")}
+                  </p>
+                  <p className="text-sm text-[#8E8983] mt-0.5">
+                    {format(new Date(upcomingAppointment.scheduledAt), "h:mm a")} · {upcomingAppointment.duration} min
+                  </p>
+                  {upcomingAppointment.advisorName && (
+                    <p className="text-xs text-[#8E8983] mt-1">
+                      with <span className="font-medium text-[#1C1B1A]">{upcomingAppointment.advisorName}</span>
+                    </p>
+                  )}
+                </div>
+                <Badge
+                  variant={
+                    upcomingAppointment.status === "scheduled"
+                      ? "warning"
+                      : upcomingAppointment.status === "completed"
+                      ? "info"
+                      : "neutral"
+                  }
+                >
+                  {upcomingAppointment.status === "no_show" ? "No Show" : upcomingAppointment.status}
+                </Badge>
+              </div>
+
+              <div className="flex flex-wrap gap-2 pt-3 border-t border-[#E5E0D8]/50">
+                <Button
+                  size="sm"
+                  variant="primary"
+                  onClick={() => onLogCallOutcome?.(upcomingAppointment.id)}
+                >
+                  Log Call Outcome
+                </Button>
+
+                {shouldShowNoShow(upcomingAppointment) && (
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    onClick={() => handleMarkNoShow(upcomingAppointment.id)}
+                  >
+                    Mark as No-Show
+                  </Button>
+                )}
+
+                {upcomingAppointment.meetingUrl && (
+                  <a
+                    href={upcomingAppointment.meetingUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#625FFF] hover:bg-[#625FFF]/5 rounded-lg transition-all duration-150"
+                  >
+                    Join Meeting
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </a>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+      )}
+
+      {/* All Appointments (if more than the upcoming one) */}
+      {lead.appointments && lead.appointments.length > 1 && (
+        <section>
+          <SectionLabel>All Appointments ({lead.appointments.length})</SectionLabel>
+          <Card>
+            <CardContent className="divide-y divide-[#E5E0D8]/50">
+              {lead.appointments
+                .sort((a, b) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime())
+                .map((appt) => (
+                  <div
+                    key={appt.id}
+                    className="flex items-center justify-between py-3 first:pt-0 last:pb-0"
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-[#1C1B1A]">
+                        {format(new Date(appt.scheduledAt), "MMM d, yyyy 'at' h:mm a")}
+                      </p>
+                      {appt.advisorName && (
+                        <p className="text-xs text-[#8E8983]">with {appt.advisorName}</p>
+                      )}
+                    </div>
+                    <Badge
+                      variant={
+                        appt.status === "scheduled"
+                          ? "warning"
+                          : appt.status === "completed"
+                          ? "success"
+                          : "neutral"
+                      }
+                    >
+                      {appt.status === "no_show" ? "No Show" : appt.status}
+                    </Badge>
+                  </div>
+                ))}
+            </CardContent>
+          </Card>
+        </section>
+      )}
+    </div>
+  );
+}
