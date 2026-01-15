@@ -122,7 +122,12 @@ export function LeadSearchBar({ onLeadSelect }: LeadSearchBarProps) {
 
   const getStatusColor = (status: LeadStatus) => {
     const stage = PIPELINE_STAGES.find((s) => s.id === status);
-    return stage?.color || "bg-gray-400";
+    return stage?.headerBg || "bg-gray-100";
+  };
+
+  const getStatusTextColor = (status: LeadStatus) => {
+    const stage = PIPELINE_STAGES.find((s) => s.id === status);
+    return stage?.textColor || "text-gray-600";
   };
 
   const formatTimeAgo = (dateString: string) => {
@@ -150,7 +155,7 @@ export function LeadSearchBar({ onLeadSelect }: LeadSearchBarProps) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search leads... (⌘K)"
-          className="w-full px-4 py-2 pl-10 pr-10 text-sm border border-[#E4DDD3] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#625FFF] focus:border-transparent bg-white/90 backdrop-blur-sm"
+          className="w-full px-4 py-2.5 pl-10 pr-10 text-sm border border-[#E5E0D8] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#625FFF] focus:border-transparent bg-[#FAFAF9] shadow-sm hover:bg-white transition-colors"
         />
 
         {/* Search Icon */}
@@ -257,7 +262,7 @@ export function LeadSearchBar({ onLeadSelect }: LeadSearchBarProps) {
                 {/* Status Badge */}
                 <div>
                   <span
-                    className={`${getStatusColor(result.status)} text-white text-xs px-2 py-1 rounded-full whitespace-nowrap`}
+                    className={`${getStatusColor(result.status)} ${getStatusTextColor(result.status)} text-xs px-2.5 py-1 rounded-lg whitespace-nowrap font-medium`}
                   >
                     {PIPELINE_STAGES.find((s) => s.id === result.status)?.label ||
                       result.status}

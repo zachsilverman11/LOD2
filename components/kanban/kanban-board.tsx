@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   DndContext,
   DragEndEvent,
@@ -17,13 +17,17 @@ import { LeadCard } from "./lead-card";
 
 interface KanbanBoardProps {
   onLeadClick: (lead: LeadWithRelations) => void;
+  selectedLeadId?: string | null;
 }
 
-export function KanbanBoard({ onLeadClick }: KanbanBoardProps) {
+export function KanbanBoard({ onLeadClick, selectedLeadId }: KanbanBoardProps) {
   const [leads, setLeads] = useState<LeadWithRelations[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -36,6 +40,28 @@ export function KanbanBoard({ onLeadClick }: KanbanBoardProps) {
   useEffect(() => {
     fetchLeads();
   }, []);
+
+  // Check scroll position for shadow indicators
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const checkScroll = () => {
+      setCanScrollLeft(container.scrollLeft > 0);
+      setCanScrollRight(
+        container.scrollLeft < container.scrollWidth - container.clientWidth - 10
+      );
+    };
+
+    checkScroll();
+    container.addEventListener("scroll", checkScroll);
+    window.addEventListener("resize", checkScroll);
+
+    return () => {
+      container.removeEventListener("scroll", checkScroll);
+      window.removeEventListener("resize", checkScroll);
+    };
+  }, [leads]);
 
   const fetchLeads = async () => {
     try {
@@ -163,7 +189,10 @@ export function KanbanBoard({ onLeadClick }: KanbanBoardProps) {
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-96">
-        <div className="text-gray-500">Loading leads...</div>
+        <div className="flex flex-col items-center gap-3">
+          <div className="animate-spin w-8 h-8 border-2 border-[#625FFF] border-t-transparent rounded-full"></div>
+          <p className="text-sm text-[#8E8983]">Loading pipeline...</p>
+        </div>
       </div>
     );
   }
@@ -177,40 +206,58 @@ export function KanbanBoard({ onLeadClick }: KanbanBoardProps) {
       <div className="relative">
         {/* Notification Toast */}
         {notification && (
-          <div className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg border-2 transition-all ${
+          <div className={`fixed top-20 right-6 z-50 px-5 py-3 rounded-xl shadow-lg border transition-all ${
             notification.type === 'success'
-              ? 'bg-green-50 border-green-500 text-green-800'
-              : 'bg-red-50 border-red-500 text-red-800'
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+              : 'bg-red-50 border-red-200 text-red-800'
           }`}>
             <div className="flex items-center gap-2">
               {notification.type === 'success' ? (
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                 </svg>
               ) : (
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                 </svg>
               )}
-              <span className="font-medium">{notification.message}</span>
+              <span className="text-sm font-medium">{notification.message}</span>
             </div>
           </div>
         )}
 
-        <div className="flex gap-4 overflow-x-auto pb-4 scroll-smooth">
+        {/* Left scroll shadow */}
+        <div
+          className={`absolute left-0 top-0 bottom-4 w-12 bg-gradient-to-r from-[#FAFAF9] to-transparent pointer-events-none z-10 transition-opacity duration-200 ${
+            canScrollLeft ? "opacity-100" : "opacity-0"
+          }`}
+        />
+
+        {/* Right scroll shadow */}
+        <div
+          className={`absolute right-0 top-0 bottom-4 w-12 bg-gradient-to-l from-[#FAFAF9] to-transparent pointer-events-none z-10 transition-opacity duration-200 ${
+            canScrollRight ? "opacity-100" : "opacity-0"
+          }`}
+        />
+
+        <div
+          ref={scrollContainerRef}
+          className="flex gap-4 overflow-x-auto pb-4 scroll-smooth scrollbar-thin scrollbar-thumb-[#E5E0D8] scrollbar-track-transparent"
+        >
           {PIPELINE_STAGES.map((stage) => (
             <KanbanColumn
               key={stage.id}
               status={stage.id}
               label={stage.label}
-              color={stage.color}
+              headerBg={stage.headerBg}
+              textColor={stage.textColor}
+              borderColor={stage.borderColor}
               leads={getLeadsByStatus(stage.id)}
               onLeadClick={onLeadClick}
+              selectedLeadId={selectedLeadId}
             />
           ))}
         </div>
-        {/* Scroll indicator shadow on right edge */}
-        <div className="absolute right-0 top-0 bottom-4 w-20 bg-gradient-to-l from-[#FBF3E7] via-[#FBF3E7]/60 to-transparent pointer-events-none" />
       </div>
       <DragOverlay>
         {activeLead ? <LeadCard lead={activeLead} onClick={() => {}} /> : null}

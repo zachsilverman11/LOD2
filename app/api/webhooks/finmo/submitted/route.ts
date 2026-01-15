@@ -5,6 +5,44 @@ import { sendSlackNotification } from "@/lib/slack";
 import { handleConversation, executeDecision } from "@/lib/ai-conversation-enhanced";
 
 /**
+ * Extract ALL borrower emails from Finmo payload
+ * Handles multiple payload structures and returns all unique emails
+ */
+function extractAllBorrowerEmails(payload: any): string[] {
+  const emails: string[] = [];
+
+  // Main borrower
+  if (payload.mainBorrower?.email) {
+    emails.push(payload.mainBorrower.email.toLowerCase());
+  }
+
+  // borrowersArray (array format)
+  if (Array.isArray(payload.borrowersArray)) {
+    payload.borrowersArray.forEach((b: any) => {
+      if (b?.email) emails.push(b.email.toLowerCase());
+    });
+  }
+
+  // borrowers object (keyed by "1", "2", etc.)
+  if (payload.borrowers && typeof payload.borrowers === 'object') {
+    Object.values(payload.borrowers).forEach((b: any) => {
+      if (b?.email) emails.push(b.email.toLowerCase());
+    });
+  }
+
+  // Legacy/fallback fields
+  if (payload.application?.email) {
+    emails.push(payload.application.email.toLowerCase());
+  }
+  if (payload.email) {
+    emails.push(payload.email.toLowerCase());
+  }
+
+  // Deduplicate
+  return [...new Set(emails)];
+}
+
+/**
  * Finmo Webhook: Application Submitted
  *
  * Triggered when a borrower completes and submits the mortgage application
@@ -20,12 +58,11 @@ export async function POST(request: NextRequest) {
     const payload: any = JSON.parse(rawBody);
     console.log("[Finmo - Submitted] Parsed Payload:", JSON.stringify(payload, null, 2));
 
-    // Extract email from Finmo payload structure
-    const email = payload.mainBorrower?.email ||
-                  payload.borrowersArray?.[0]?.email ||
-                  payload.borrowers?.["1"]?.email;
+    // Extract ALL borrower emails from payload (main + co-borrowers)
+    const allEmails = extractAllBorrowerEmails(payload);
+    const primaryEmail = payload.mainBorrower?.email?.toLowerCase();
 
-    if (!email) {
+    if (allEmails.length === 0) {
       console.error("[Finmo - Submitted] No email found in payload");
       await sendSlackNotification({
         type: "error",
@@ -38,13 +75,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`[Finmo - Submitted] Email: ${email}`);
+    console.log(`[Finmo - Submitted] All borrower emails: ${allEmails.join(', ')}`);
+    console.log(`[Finmo - Submitted] Primary email: ${primaryEmail || 'N/A'}`);
 
-    // Find lead by email (case-insensitive to handle R277ben vs r277ben)
+    // Find lead by ANY borrower email (case-insensitive)
+    // This handles cases where the lead is a co-borrower, not the main applicant
     const lead = await prisma.lead.findFirst({
       where: {
         email: {
-          equals: email,
+          in: allEmails,
           mode: 'insensitive'
         }
       },
@@ -62,7 +101,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!lead) {
-      console.error(`[Finmo - Submitted] Lead not found for email: ${email}`);
+      console.error(`[Finmo - Submitted] Lead not found for any email: ${allEmails.join(', ')}`);
 
       // Get all emails in database for debugging
       const allLeads = await prisma.lead.findMany({
@@ -75,12 +114,30 @@ export async function POST(request: NextRequest) {
       await sendSlackNotification({
         type: "error",
         message: "Finmo Webhook (Submitted): Lead Not Found",
-        details: `Email from Finmo: ${email}\n\nRecent leads in database:\n${recentEmails}`,
+        details: `Emails from Finmo: ${allEmails.join(', ')}\n\nRecent leads in database:\n${recentEmails}`,
       });
       return NextResponse.json(
         { error: "Lead not found" },
         { status: 404 }
       );
+    }
+
+    // Check if lead was matched via co-borrower email (not primary applicant)
+    const matchedViaCoBorrower = primaryEmail && lead.email?.toLowerCase() !== primaryEmail;
+    if (matchedViaCoBorrower) {
+      console.log(`[Finmo - Submitted] ℹ️  Lead matched via CO-BORROWER email`);
+      console.log(`[Finmo - Submitted]    Main applicant: ${primaryEmail}`);
+      console.log(`[Finmo - Submitted]    Matched lead: ${lead.firstName} ${lead.lastName} (${lead.email})`);
+
+      await sendSlackNotification({
+        type: "lead_updated",
+        leadName: `${lead.firstName} ${lead.lastName}`,
+        leadId: lead.id,
+        details: `ℹ️  **Co-Borrower Match**: Lead found via co-borrower email.\n\n` +
+                 `Main applicant email: ${primaryEmail}\n` +
+                 `Matched lead email: ${lead.email}\n\n` +
+                 `The lead in our system is a co-borrower on this Finmo application.`,
+      });
     }
 
     console.log(`[Finmo - Submitted] Found lead: ${lead.firstName} ${lead.lastName} (ID: ${lead.id})`);

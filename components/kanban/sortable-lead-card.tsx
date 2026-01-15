@@ -9,9 +9,10 @@ import { useRef } from "react";
 interface SortableLeadCardProps {
   lead: LeadWithRelations;
   onClick: () => void;
+  isSelected?: boolean;
 }
 
-export function SortableLeadCard({ lead, onClick }: SortableLeadCardProps) {
+export function SortableLeadCard({ lead, onClick, isSelected }: SortableLeadCardProps) {
   const {
     attributes,
     listeners,
@@ -36,8 +37,8 @@ export function SortableLeadCard({ lead, onClick }: SortableLeadCardProps) {
   };
 
   // Only trigger click if mouse hasn't moved much (not a drag)
-  const handleClick = (e: React.MouseEvent) => {
-    if (dragStartPos.current) {
+  const handleClick = (e?: React.MouseEvent) => {
+    if (dragStartPos.current && e) {
       const dx = Math.abs(e.clientX - dragStartPos.current.x);
       const dy = Math.abs(e.clientY - dragStartPos.current.y);
 
@@ -58,7 +59,7 @@ export function SortableLeadCard({ lead, onClick }: SortableLeadCardProps) {
       {...attributes}
       {...listeners}
     >
-      <LeadCard lead={lead} onClick={handleClick} />
+      <LeadCard lead={lead} onClick={handleClick} isSelected={isSelected} />
     </div>
   );
 }

@@ -18,12 +18,12 @@ export type LeadWithRelations = Lead & {
 
 /**
  * CONVERSION TRACKING
- * A lead is converted if BOTH conditions are met:
- * 1. status === "CONVERTED"
- * 2. convertedAt timestamp is set
+ * A lead is converted if convertedAt timestamp is set.
+ * This tracks HISTORICAL conversion - once converted, always counted as converted
+ * even if the lead is later moved back to nurture or another status.
  */
 export function isLeadConverted(lead: Lead): boolean {
-  return lead.status === 'CONVERTED' && lead.convertedAt !== null;
+  return lead.convertedAt !== null;
 }
 
 /**
@@ -208,7 +208,7 @@ export interface KeyMetrics {
   // Rates
   leadToCallBookedRate: number;
   callBookedToAppRate: number;
-  leadToAppRate: number;
+  appToDealsWonRate: number;
   leadToDealsWonRate: number;
 }
 
@@ -233,8 +233,8 @@ export function calculateKeyMetrics(leads: LeadWithRelations[]): KeyMetrics {
     leadToCallBookedRate: calculateRate(leadsBooked, totalLeads),
     // Call Booked → Application: apps submitted / leads with appointments
     callBookedToAppRate: calculateRate(appsSubmitted, leadsBooked),
-    // Lead → Application: apps submitted / total
-    leadToAppRate: calculateRate(appsSubmitted, totalLeads),
+    // Application → Deals Won: deals won / apps submitted
+    appToDealsWonRate: calculateRate(dealsWon, appsSubmitted),
     // Lead → Deals Won: deals won / total (TRUE conversion)
     leadToDealsWonRate: calculateRate(dealsWon, totalLeads),
   };
@@ -425,7 +425,7 @@ export interface SimplifiedCohortMetrics {
   appsSubmitted: number;
   dealsWon: number;
   leadToCallRate: number;
-  leadToAppRate: number;
+  appToDealsWonRate: number;
   leadToDealsWonRate: number;
   startDate: Date | null;
 }
@@ -460,7 +460,7 @@ export function calculateAllCohortMetrics(leads: LeadWithRelations[]): Simplifie
       appsSubmitted,
       dealsWon,
       leadToCallRate: calculateRate(booked, totalLeads),
-      leadToAppRate: calculateRate(appsSubmitted, totalLeads),
+      appToDealsWonRate: calculateRate(dealsWon, appsSubmitted),
       leadToDealsWonRate: calculateRate(dealsWon, totalLeads),
       startDate: cohortLeads[0]?.cohortStartDate || null,
     };
@@ -483,7 +483,7 @@ export function calculateCohortTotals(cohortMetrics: SimplifiedCohortMetrics[]):
     appsSubmitted,
     dealsWon,
     leadToCallRate: calculateRate(booked, totalLeads),
-    leadToAppRate: calculateRate(appsSubmitted, totalLeads),
+    appToDealsWonRate: calculateRate(dealsWon, appsSubmitted),
     leadToDealsWonRate: calculateRate(dealsWon, totalLeads),
     startDate: null,
   };
@@ -506,4 +506,113 @@ export function groupByMonth(leads: Lead[]): Record<string, Lead[]> {
     },
     {} as Record<string, Lead[]>
   );
+}
+
+/**
+ * LOAN TYPE ANALYTICS
+ * Extract and normalize loan type from lead rawData
+ */
+
+export type LoanType = 'refinance' | 'purchase' | 'heloc' | 'renewal' | 'reverse_mortgage' | 'unknown';
+
+export function extractLoanType(lead: Lead): LoanType {
+  const raw = lead.rawData as Record<string, unknown> | null;
+  if (!raw) return 'unknown';
+
+  // Try multiple field names - prioritize lead_type which has better data
+  const loanTypeRaw = (raw.lead_type as string) || (raw.loanType as string) || (raw.loan_type as string) || '';
+  const loanType = loanTypeRaw.toLowerCase();
+
+  // Normalize to standard categories
+  if (loanType.includes('refinance')) return 'refinance';
+  if (loanType.includes('purchase') || loanType.includes('buying') || loanType.includes('first time')) return 'purchase';
+  if (loanType.includes('heloc') || loanType.includes('equity')) return 'heloc';
+  if (loanType.includes('renew') || loanType.includes('switch')) return 'renewal';
+  if (loanType.includes('reverse')) return 'reverse_mortgage';
+
+  return 'unknown';
+}
+
+export interface LoanTypeMetrics {
+  loanType: LoanType;
+  displayName: string;
+  totalLeads: number;
+  booked: number;
+  appsSubmitted: number;
+  dealsWon: number;
+  leadToCallRate: number;
+  appToDealsWonRate: number;
+  leadToDealsWonRate: number;
+}
+
+const LOAN_TYPE_DISPLAY_NAMES: Record<LoanType, string> = {
+  refinance: 'Refinance',
+  purchase: 'Purchase',
+  heloc: 'HELOC',
+  renewal: 'Renewal/Switch',
+  reverse_mortgage: 'Reverse Mortgage',
+  unknown: 'Unknown',
+};
+
+export function calculateLoanTypeMetrics(leads: LeadWithRelations[]): LoanTypeMetrics[] {
+  // Group leads by loan type
+  const byLoanType: Record<LoanType, LeadWithRelations[]> = {
+    refinance: [],
+    purchase: [],
+    heloc: [],
+    renewal: [],
+    reverse_mortgage: [],
+    unknown: [],
+  };
+
+  for (const lead of leads) {
+    const loanType = extractLoanType(lead);
+    byLoanType[loanType].push(lead);
+  }
+
+  // Calculate metrics for each loan type
+  const results: LoanTypeMetrics[] = [];
+
+  for (const [loanType, typeLeads] of Object.entries(byLoanType)) {
+    if (typeLeads.length === 0) continue; // Skip empty categories
+
+    const totalLeads = typeLeads.length;
+    const booked = typeLeads.filter(hasEverBooked).length;
+    const appsSubmitted = typeLeads.filter(hasAppSubmitted).length;
+    const dealsWon = typeLeads.filter(isLeadDealsWon).length;
+
+    results.push({
+      loanType: loanType as LoanType,
+      displayName: LOAN_TYPE_DISPLAY_NAMES[loanType as LoanType],
+      totalLeads,
+      booked,
+      appsSubmitted,
+      dealsWon,
+      leadToCallRate: calculateRate(booked, totalLeads),
+      appToDealsWonRate: calculateRate(dealsWon, appsSubmitted),
+      leadToDealsWonRate: calculateRate(dealsWon, totalLeads),
+    });
+  }
+
+  // Sort by total leads descending
+  return results.sort((a, b) => b.totalLeads - a.totalLeads);
+}
+
+export function calculateLoanTypeTotals(metrics: LoanTypeMetrics[]): LoanTypeMetrics {
+  const totalLeads = metrics.reduce((sum, m) => sum + m.totalLeads, 0);
+  const booked = metrics.reduce((sum, m) => sum + m.booked, 0);
+  const appsSubmitted = metrics.reduce((sum, m) => sum + m.appsSubmitted, 0);
+  const dealsWon = metrics.reduce((sum, m) => sum + m.dealsWon, 0);
+
+  return {
+    loanType: 'unknown', // placeholder
+    displayName: 'All Types',
+    totalLeads,
+    booked,
+    appsSubmitted,
+    dealsWon,
+    leadToCallRate: calculateRate(booked, totalLeads),
+    appToDealsWonRate: calculateRate(dealsWon, appsSubmitted),
+    leadToDealsWonRate: calculateRate(dealsWon, totalLeads),
+  };
 }

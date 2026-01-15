@@ -87,8 +87,8 @@ async function testFinmoApplicationCompleted() {
       console.log(`   Response:`, data);
       console.log('\n📝 Expected outcomes:');
       console.log('   1. Lead status → CONVERTED');
-      console.log('   2. Pipedrive deal created in "Active Mortgage Pipeline"');
-      console.log('   3. Deal placed in "Doc Collection" stage');
+      console.log('   2. Pipedrive deal created in "Leads on Demand (Engaged)" pipeline');
+      console.log('   3. Deal placed in "App Started" stage');
       console.log('   4. Slack notification sent');
     } else {
       console.log('\n⚠️  Webhook response:');
@@ -159,17 +159,17 @@ async function testPipedriveDirect() {
 
     // Test 2: Verify pipeline and stage
     const stagesResponse = await fetch(
-      `https://${PIPEDRIVE_COMPANY}.pipedrive.com/v1/stages?pipeline_id=22&api_token=${PIPEDRIVE_API_TOKEN}`
+      `https://${PIPEDRIVE_COMPANY}.pipedrive.com/v1/stages?pipeline_id=33&api_token=${PIPEDRIVE_API_TOKEN}`
     );
 
     if (stagesResponse.ok) {
       const stagesData = await stagesResponse.json();
-      const docStage = stagesData.data.find((s: any) => s.id === 152);
+      const appStartedStage = stagesData.data.find((s: any) => s.id === 239);
 
       console.log('\n✅ Pipeline configuration verified');
-      console.log(`   Pipeline: Active Mortgage Pipeline (ID: 22)`);
-      console.log(`   Stage: ${docStage.name} (ID: 152)`);
-      console.log(`   Order: ${docStage.order_nr} of ${stagesData.data.length}`);
+      console.log(`   Pipeline: Leads on Demand (Engaged) (ID: 33)`);
+      console.log(`   Stage: ${appStartedStage.name} (ID: 239)`);
+      console.log(`   Order: ${appStartedStage.order_nr} of ${stagesData.data.length}`);
     }
 
     // Test 3: Check recent deals

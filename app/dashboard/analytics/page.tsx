@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
-import { LogoutButton } from "../logout-button";
+import { DashboardHeader } from "@/components/layout/dashboard-header";
 
 interface KeyMetrics {
   totalLeads: number;
@@ -11,7 +10,7 @@ interface KeyMetrics {
   dealsWon: number;
   leadToCallBookedRate: number;
   callBookedToAppRate: number;
-  leadToAppRate: number;
+  appToDealsWonRate: number;
   leadToDealsWonRate: number;
 }
 
@@ -29,7 +28,7 @@ interface CohortData {
   appsSubmitted: number;
   dealsWon: number;
   leadToCallRate: number;
-  leadToAppRate: number;
+  appToDealsWonRate: number;
   leadToDealsWonRate: number;
   startDate: string | null;
 }
@@ -40,9 +39,27 @@ interface CohortComparisonData {
   totalCohorts: number;
 }
 
+interface LoanTypeData {
+  loanType: string;
+  displayName: string;
+  totalLeads: number;
+  booked: number;
+  appsSubmitted: number;
+  dealsWon: number;
+  leadToCallRate: number;
+  appToDealsWonRate: number;
+  leadToDealsWonRate: number;
+}
+
+interface LoanTypeAnalytics {
+  loanTypes: LoanTypeData[];
+  totals: LoanTypeData;
+}
+
 export default function AnalyticsPage() {
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [cohortData, setCohortData] = useState<CohortComparisonData | null>(null);
+  const [loanTypeData, setLoanTypeData] = useState<LoanTypeAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Cohort filtering
@@ -57,13 +74,15 @@ export default function AnalyticsPage() {
     setLoading(true);
     try {
       const cohortParam = selectedCohort !== "all" ? `?cohort=${selectedCohort}` : "";
-      const [overviewRes, cohortRes] = await Promise.all([
+      const [overviewRes, cohortRes, loanTypeRes] = await Promise.all([
         fetch(`/api/analytics/overview${cohortParam}`),
         fetch("/api/analytics/cohort-comparison"),
+        fetch(`/api/analytics/loan-types${cohortParam}`),
       ]);
 
       const overviewData = await overviewRes.json();
       const cohortComparisonData = await cohortRes.json();
+      const loanTypeAnalytics = await loanTypeRes.json();
 
       if (overviewData.success) {
         setOverview(overviewData.data);
@@ -73,6 +92,9 @@ export default function AnalyticsPage() {
         // Extract cohort names for filter dropdown
         const cohortNames = cohortComparisonData.data.cohorts.map((c: CohortData) => c.cohort);
         setAvailableCohorts(cohortNames);
+      }
+      if (loanTypeAnalytics.success) {
+        setLoanTypeData(loanTypeAnalytics.data);
       }
     } catch (error) {
       console.error("Failed to fetch analytics:", error);
@@ -94,14 +116,6 @@ export default function AnalyticsPage() {
     return `${value.toFixed(1)}%`;
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-[#FBF3E7] via-[#B1AFFF]/20 to-[#F6D7FF]/30 flex items-center justify-center">
-        <div className="text-2xl text-[#1C1B1A]">Loading analytics...</div>
-      </div>
-    );
-  }
-
   // Get key metrics from overview or calculate from cohort data
   const keyMetrics = overview?.keyMetrics || {
     totalLeads: 0,
@@ -110,58 +124,47 @@ export default function AnalyticsPage() {
     dealsWon: 0,
     leadToCallBookedRate: 0,
     callBookedToAppRate: 0,
-    leadToAppRate: 0,
+    appToDealsWonRate: 0,
     leadToDealsWonRate: 0,
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#FAFAF9]">
+        <DashboardHeader subtitle="Analytics" />
+        <div className="flex items-center justify-center h-[calc(100vh-64px)]">
+          <div className="animate-pulse text-[#55514D]">Loading analytics...</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#FBF3E7] via-[#B1AFFF]/20 to-[#F6D7FF]/30">
-      <header className="bg-white/80 backdrop-blur-sm shadow-sm border-b border-[#E4DDD3]">
-        <div className="max-w-full mx-auto px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-4xl font-extrabold text-[#1C1B1A]">
-                <span className="italic text-[#625FFF]">inspired</span>{" "}
-                <span className="font-bold">mortgage.</span>
-              </h1>
-              <p className="text-[#55514D] mt-2 text-lg">Analytics Dashboard</p>
-            </div>
-            <div className="flex items-center gap-3">
-              {/* Cohort Filter */}
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-[#55514D]">Cohort:</label>
-                <select
-                  value={selectedCohort}
-                  onChange={(e) => setSelectedCohort(e.target.value)}
-                  className="px-3 py-2 text-sm border border-[#E4DDD3] rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-[#625FFF]"
-                >
-                  <option value="all">All Cohorts</option>
-                  {availableCohorts.map((cohort) => (
-                    <option key={cohort} value={cohort}>
-                      {cohort}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <Link
-                href="/dashboard/admin"
-                className="px-4 py-2 text-sm text-[#625FFF] border border-[#625FFF] rounded-md hover:bg-[#625FFF] hover:text-white transition-colors"
-              >
-                Admin
-              </Link>
-              <Link
-                href="/dashboard"
-                className="px-4 py-2 text-sm text-[#625FFF] border border-[#625FFF] rounded-md hover:bg-[#625FFF] hover:text-white transition-colors"
-              >
-                ← Pipeline
-              </Link>
-              <LogoutButton />
-            </div>
+    <div className="min-h-screen bg-[#FAFAF9]">
+      <DashboardHeader subtitle="Analytics" />
+
+      {/* Secondary Toolbar - Cohort Filter */}
+      <div className="bg-white border-b border-[#E5E0D8]">
+        <div className="max-w-full mx-auto px-6 lg:px-8 py-3">
+          <div className="flex items-center gap-3">
+            <label className="text-sm font-medium text-[#55514D]">Filter by Cohort:</label>
+            <select
+              value={selectedCohort}
+              onChange={(e) => setSelectedCohort(e.target.value)}
+              className="px-3 py-1.5 text-sm border border-[#E5E0D8] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#625FFF]/20 focus:border-[#625FFF]"
+            >
+              <option value="all">All Cohorts</option>
+              {availableCohorts.map((cohort) => (
+                <option key={cohort} value={cohort}>
+                  {cohort}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
-      </header>
+      </div>
 
-      <main className="max-w-full mx-auto px-8 py-8">
+      <main className="max-w-full mx-auto px-6 lg:px-8 py-6">
         {/* Cohort Filter Indicator */}
         {selectedCohort !== "all" && (
           <div className="mb-6 bg-[#625FFF]/10 border border-[#625FFF] rounded-lg p-4">
@@ -259,14 +262,14 @@ export default function AnalyticsPage() {
                 </div>
               </div>
 
-              {/* Lead → Application */}
+              {/* App → Deals Won */}
               <div className="text-center p-4 bg-[#625FFF]/5 rounded-lg">
-                <div className="text-sm text-[#55514D] mb-2">Lead → Application</div>
+                <div className="text-sm text-[#55514D] mb-2">App → Won</div>
                 <div className="text-3xl font-bold text-[#625FFF]">
-                  {formatPercent(keyMetrics.leadToAppRate)}
+                  {formatPercent(keyMetrics.appToDealsWonRate)}
                 </div>
                 <div className="text-xs text-[#55514D] mt-1">
-                  {keyMetrics.appsSubmitted} / {keyMetrics.totalLeads}
+                  {keyMetrics.dealsWon} / {keyMetrics.appsSubmitted}
                 </div>
               </div>
 
@@ -335,7 +338,7 @@ export default function AnalyticsPage() {
                     <th className="text-right py-4 px-4 text-sm font-semibold text-[#55514D]">Booked</th>
                     <th className="text-right py-4 px-4 text-sm font-semibold text-[#55514D]">Lead→Call %</th>
                     <th className="text-right py-4 px-4 text-sm font-semibold text-[#55514D]">Apps</th>
-                    <th className="text-right py-4 px-4 text-sm font-semibold text-[#55514D]">Lead→App %</th>
+                    <th className="text-right py-4 px-4 text-sm font-semibold text-[#55514D]">App→Won %</th>
                     <th className="text-right py-4 px-4 text-sm font-semibold text-green-700">Deals Won</th>
                     <th className="text-right py-4 px-4 text-sm font-semibold text-green-700">Lead→Deal %</th>
                   </tr>
@@ -367,7 +370,7 @@ export default function AnalyticsPage() {
                       </td>
                       <td className="py-3 px-4 text-sm text-right text-[#55514D]">{cohort.appsSubmitted}</td>
                       <td className="py-3 px-4 text-sm text-right font-semibold text-[#625FFF]">
-                        {formatPercent(cohort.leadToAppRate)}
+                        {formatPercent(cohort.appToDealsWonRate)}
                       </td>
                       <td className="py-3 px-4 text-sm text-right font-semibold text-green-600">
                         {cohort.dealsWon}
@@ -389,7 +392,7 @@ export default function AnalyticsPage() {
                       </td>
                       <td className="py-3 px-4 text-sm text-right">{cohortData.totals.appsSubmitted}</td>
                       <td className="py-3 px-4 text-sm text-right">
-                        {formatPercent(cohortData.totals.leadToAppRate)}
+                        {formatPercent(cohortData.totals.appToDealsWonRate)}
                       </td>
                       <td className="py-3 px-4 text-sm text-right text-green-400">
                         {cohortData.totals.dealsWon}
@@ -405,7 +408,80 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
-        {/* Section 4: Status Breakdown (simplified) */}
+        {/* Section 4: Loan Type Performance */}
+        {loanTypeData && loanTypeData.loanTypes.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-[#1C1B1A] mb-4">Performance by Loan Type</h2>
+            <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-[#FBF3E7]">
+                    <tr>
+                      <th className="text-left py-4 px-4 text-sm font-bold text-[#1C1B1A]">Loan Type</th>
+                      <th className="text-right py-4 px-4 text-sm font-semibold text-[#55514D]">Total</th>
+                      <th className="text-right py-4 px-4 text-sm font-semibold text-[#55514D]">Booked</th>
+                      <th className="text-right py-4 px-4 text-sm font-semibold text-[#55514D]">Lead→Call %</th>
+                      <th className="text-right py-4 px-4 text-sm font-semibold text-[#55514D]">Apps</th>
+                      <th className="text-right py-4 px-4 text-sm font-semibold text-[#55514D]">App→Won %</th>
+                      <th className="text-right py-4 px-4 text-sm font-semibold text-green-700">Deals Won</th>
+                      <th className="text-right py-4 px-4 text-sm font-semibold text-green-700">Lead→Deal %</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loanTypeData.loanTypes.map((lt, index) => (
+                      <tr
+                        key={lt.loanType}
+                        className={`border-b border-[#E4DDD3]/50 hover:bg-[#FBF3E7]/30 ${
+                          index % 2 === 0 ? "bg-white" : "bg-[#FBF3E7]/10"
+                        }`}
+                      >
+                        <td className="py-3 px-4 text-sm font-bold text-[#625FFF]">{lt.displayName}</td>
+                        <td className="py-3 px-4 text-sm text-right font-semibold text-[#1C1B1A]">
+                          {lt.totalLeads}
+                        </td>
+                        <td className="py-3 px-4 text-sm text-right text-[#55514D]">{lt.booked}</td>
+                        <td className="py-3 px-4 text-sm text-right font-semibold text-[#625FFF]">
+                          {formatPercent(lt.leadToCallRate)}
+                        </td>
+                        <td className="py-3 px-4 text-sm text-right text-[#55514D]">{lt.appsSubmitted}</td>
+                        <td className="py-3 px-4 text-sm text-right font-semibold text-[#625FFF]">
+                          {formatPercent(lt.appToDealsWonRate)}
+                        </td>
+                        <td className="py-3 px-4 text-sm text-right font-semibold text-green-600">
+                          {lt.dealsWon}
+                        </td>
+                        <td className="py-3 px-4 text-sm text-right font-bold text-green-700">
+                          {formatPercent(lt.leadToDealsWonRate)}
+                        </td>
+                      </tr>
+                    ))}
+                    {/* Totals Row */}
+                    <tr className="bg-[#1C1B1A] text-white font-bold">
+                      <td className="py-3 px-4 text-sm">ALL TYPES</td>
+                      <td className="py-3 px-4 text-sm text-right">{loanTypeData.totals.totalLeads}</td>
+                      <td className="py-3 px-4 text-sm text-right">{loanTypeData.totals.booked}</td>
+                      <td className="py-3 px-4 text-sm text-right">
+                        {formatPercent(loanTypeData.totals.leadToCallRate)}
+                      </td>
+                      <td className="py-3 px-4 text-sm text-right">{loanTypeData.totals.appsSubmitted}</td>
+                      <td className="py-3 px-4 text-sm text-right">
+                        {formatPercent(loanTypeData.totals.appToDealsWonRate)}
+                      </td>
+                      <td className="py-3 px-4 text-sm text-right text-green-400">
+                        {loanTypeData.totals.dealsWon}
+                      </td>
+                      <td className="py-3 px-4 text-sm text-right text-green-400">
+                        {formatPercent(loanTypeData.totals.leadToDealsWonRate)}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Section 5: Status Breakdown (simplified) */}
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-[#1C1B1A] mb-4">Lead Status Breakdown</h2>
           <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-6">

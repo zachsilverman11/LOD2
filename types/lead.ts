@@ -12,15 +12,92 @@ export type LeadWithRelations = Lead & {
 export const TEAM_MEMBERS = ["Greg", "Jakub", "Admin Team"] as const;
 export type TeamMember = typeof TEAM_MEMBERS[number];
 
-export const PIPELINE_STAGES: { id: LeadStatus; label: string; color: string }[] = [
-  { id: "NEW", label: "New Lead", color: "bg-[#625FFF]" }, // Bold purple - new opportunities
-  { id: "CONTACTED", label: "Contacted", color: "bg-[#8B88FF]" }, // Lighter purple - initial engagement
-  { id: "ENGAGED", label: "Engaged", color: "bg-[#FFB6E1]" }, // Bright pink - active conversation
-  { id: "CALL_SCHEDULED", label: "Call Scheduled", color: "bg-[#D9F36E]" }, // Lime - action pending
-  { id: "WAITING_FOR_APPLICATION", label: "Waiting for Application", color: "bg-[#B8E986]" }, // Olive green - waiting for app submission
-  { id: "APPLICATION_STARTED", label: "Application Started", color: "bg-[#A8E86E]" }, // Bright green - in progress
-  { id: "CONVERTED", label: "Converted", color: "bg-[#76C63E]" }, // Success green - application completed
-  { id: "DEALS_WON", label: "Deals Won", color: "bg-[#2E7D32]" }, // Dark green - funded & commissioned
-  { id: "NURTURING", label: "Nurturing", color: "bg-[#E0BBE4]" }, // Soft lavender - long-term nurture (parallel track)
-  { id: "LOST", label: "Lost", color: "bg-[#55514D]" }, // Gray - closed lost
+export const PIPELINE_STAGES: {
+  id: LeadStatus;
+  label: string;
+  bgColor: string;
+  textColor: string;
+  headerBg: string;
+  borderColor: string;
+}[] = [
+  {
+    id: "NEW",
+    label: "New Lead",
+    bgColor: "bg-slate-50",
+    textColor: "text-slate-700",
+    headerBg: "bg-slate-100",
+    borderColor: "border-slate-200"
+  },
+  {
+    id: "CONTACTED",
+    label: "Contacted",
+    bgColor: "bg-[#625FFF]/5",
+    textColor: "text-[#625FFF]",
+    headerBg: "bg-[#625FFF]/10",
+    borderColor: "border-[#625FFF]/20"
+  },
+  {
+    id: "ENGAGED",
+    label: "Engaged",
+    bgColor: "bg-pink-50/50",
+    textColor: "text-pink-700",
+    headerBg: "bg-pink-50",
+    borderColor: "border-pink-200"
+  },
+  {
+    id: "CALL_SCHEDULED",
+    label: "Call Booked",
+    bgColor: "bg-amber-50/50",
+    textColor: "text-amber-700",
+    headerBg: "bg-amber-50",
+    borderColor: "border-amber-200"
+  },
+  {
+    id: "WAITING_FOR_APPLICATION",
+    label: "Awaiting App",
+    bgColor: "bg-lime-50/50",
+    textColor: "text-lime-700",
+    headerBg: "bg-lime-50",
+    borderColor: "border-lime-200"
+  },
+  {
+    id: "APPLICATION_STARTED",
+    label: "App Started",
+    bgColor: "bg-emerald-50/50",
+    textColor: "text-emerald-700",
+    headerBg: "bg-emerald-50",
+    borderColor: "border-emerald-200"
+  },
+  {
+    id: "CONVERTED",
+    label: "Converted",
+    bgColor: "bg-green-50/50",
+    textColor: "text-green-700",
+    headerBg: "bg-green-100",
+    borderColor: "border-green-200"
+  },
+  {
+    id: "DEALS_WON",
+    label: "Deals Won",
+    bgColor: "bg-green-100/50",
+    textColor: "text-green-800",
+    headerBg: "bg-green-100",
+    borderColor: "border-green-300"
+  },
+  {
+    id: "NURTURING",
+    label: "Nurturing",
+    bgColor: "bg-violet-50/50",
+    textColor: "text-violet-700",
+    headerBg: "bg-violet-50",
+    borderColor: "border-violet-200"
+  },
+  {
+    id: "LOST",
+    label: "Lost",
+    bgColor: "bg-gray-50/50",
+    textColor: "text-gray-500",
+    headerBg: "bg-gray-100",
+    borderColor: "border-gray-200"
+  },
 ];

@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { DevBoard } from "@/components/dev-board/dev-board";
 import { DevCardModal } from "@/components/dev-board/dev-card-modal";
 import { DevCardWithComments, DevCardType, DevCardPriority } from "@/types/dev-card";
+import { DashboardHeader } from "@/components/layout/dashboard-header";
 
 export default function DevBoardPage() {
   const [selectedCard, setSelectedCard] = useState<DevCardWithComments | null>(null);
@@ -32,7 +32,6 @@ export default function DevBoardPage() {
       });
 
       if (response.ok) {
-        // Reset form and refresh page
         setFormData({
           title: "",
           description: "",
@@ -52,226 +51,216 @@ export default function DevBoardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#FBF3E7] via-[#B1AFFF]/20 to-[#F6D7FF]/30">
-      <header className="bg-white/80 backdrop-blur-sm shadow-sm border-b border-[#E4DDD3]">
-        <div className="max-w-full mx-auto px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-4xl font-extrabold text-[#1C1B1A]">
-                <span className="italic text-[#625FFF]">development</span> <span className="font-bold">board.</span>
-              </h1>
-              <p className="text-[#55514D] mt-2 text-lg">Track features, bugs, and improvements with screenshots</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setShowNewCardForm(!showNewCardForm)}
-                className="px-4 py-2 text-sm bg-[#625FFF] text-white rounded-md hover:bg-[#4E4BCC] transition-colors"
-              >
-                + New Card
-              </button>
-              <Link
-                href="/dashboard"
-                className="px-4 py-2 text-sm text-[#625FFF] border border-[#625FFF] rounded-md hover:bg-[#625FFF] hover:text-white transition-colors"
-              >
-                Lead Dashboard
-              </Link>
-            </div>
-          </div>
+    <div className="min-h-screen bg-[#FAFAF9]">
+      <DashboardHeader subtitle="Dev Board" />
 
-          {/* New Card Form */}
-          {showNewCardForm && (
-            <div className="mt-6 bg-white p-6 rounded-lg border border-[#E4DDD3]">
-              <h2 className="text-xl font-bold text-[#1C1B1A] mb-4">Create New Card</h2>
-              <form onSubmit={handleCreateCard} className="space-y-4">
+      {/* Secondary Toolbar */}
+      <div className="bg-white border-b border-[#E5E0D8]">
+        <div className="max-w-full mx-auto px-6 lg:px-8 py-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-[#55514D]">
+              Track features, bugs, and improvements
+            </p>
+            <button
+              onClick={() => setShowNewCardForm(!showNewCardForm)}
+              className="px-4 py-2 text-sm font-medium bg-[#625FFF] text-white rounded-lg hover:bg-[#524DD9] transition-colors shadow-sm"
+            >
+              + New Card
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Collapsible New Card Form */}
+      {showNewCardForm && (
+        <div className="bg-white border-b border-[#E5E0D8]">
+          <div className="max-w-3xl mx-auto px-6 lg:px-8 py-6">
+            <h2 className="text-lg font-semibold text-[#1C1B1A] mb-4">Create New Card</h2>
+            <form onSubmit={handleCreateCard} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-[#55514D] mb-1">
+                  Title *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  className="w-full px-3 py-2 border border-[#E5E0D8] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#625FFF]/20 focus:border-[#625FFF] text-[#1C1B1A]"
+                  placeholder="Brief title for the card"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[#55514D] mb-1">
+                  Description
+                </label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-[#E5E0D8] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#625FFF]/20 focus:border-[#625FFF] text-[#1C1B1A]"
+                  placeholder="Detailed description..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[#55514D] mb-1">
+                  Screenshot (optional)
+                </label>
+                <div
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const file = e.dataTransfer.files[0];
+                    if (file && file.type.startsWith('image/')) {
+                      if (file.size > 5 * 1024 * 1024) {
+                        alert('File too large. Max size is 5MB.');
+                        return;
+                      }
+                      const reader = new FileReader();
+                      reader.onloadend = () => {
+                        setFormData({ ...formData, screenshotUrl: reader.result as string });
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }}
+                  onDragOver={(e) => e.preventDefault()}
+                  onPaste={(e) => {
+                    const items = e.clipboardData.items;
+                    for (let i = 0; i < items.length; i++) {
+                      if (items[i].type.startsWith('image/')) {
+                        const file = items[i].getAsFile();
+                        if (file) {
+                          if (file.size > 5 * 1024 * 1024) {
+                            alert('File too large. Max size is 5MB.');
+                            return;
+                          }
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            setFormData({ ...formData, screenshotUrl: reader.result as string });
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                        e.preventDefault();
+                        break;
+                      }
+                    }
+                  }}
+                  className="border-2 border-dashed border-[#E5E0D8] rounded-lg p-4 text-center bg-[#FAFAF9] hover:border-[#625FFF] transition-colors cursor-pointer"
+                  onClick={() => document.getElementById('screenshot-input')?.click()}
+                  tabIndex={0}
+                >
+                  {formData.screenshotUrl ? (
+                    <div className="space-y-2">
+                      <img
+                        src={formData.screenshotUrl}
+                        alt="Screenshot preview"
+                        className="max-h-32 mx-auto rounded"
+                      />
+                      <p className="text-xs text-[#55514D]">Screenshot attached (click to change)</p>
+                    </div>
+                  ) : (
+                    <div className="py-4">
+                      <p className="text-sm text-[#55514D]">
+                        Drag & drop screenshot here, paste (Cmd+V), or click to upload
+                      </p>
+                      <p className="text-xs text-[#8E8983] mt-1">Max 5MB</p>
+                    </div>
+                  )}
+                </div>
+                <input
+                  id="screenshot-input"
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      if (file.size > 5 * 1024 * 1024) {
+                        alert('File too large. Max size is 5MB.');
+                        e.target.value = '';
+                        return;
+                      }
+                      const reader = new FileReader();
+                      reader.onloadend = () => {
+                        setFormData({ ...formData, screenshotUrl: reader.result as string });
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }}
+                  className="hidden"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-[#55514D] mb-1">
-                    Title *
+                    Type *
+                  </label>
+                  <select
+                    value={formData.type}
+                    onChange={(e) => setFormData({ ...formData, type: e.target.value as DevCardType })}
+                    className="w-full px-3 py-2 border border-[#E5E0D8] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#625FFF]/20 focus:border-[#625FFF] text-[#1C1B1A]"
+                  >
+                    <option value="FEATURE_REQUEST">Feature Request</option>
+                    <option value="BUG_FIX">Bug Fix</option>
+                    <option value="IMPROVEMENT">Improvement</option>
+                    <option value="OPTIMIZATION">Optimization</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[#55514D] mb-1">
+                    Priority *
+                  </label>
+                  <select
+                    value={formData.priority}
+                    onChange={(e) => setFormData({ ...formData, priority: e.target.value as DevCardPriority })}
+                    className="w-full px-3 py-2 border border-[#E5E0D8] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#625FFF]/20 focus:border-[#625FFF] text-[#1C1B1A]"
+                  >
+                    <option value="LOW">Low</option>
+                    <option value="MEDIUM">Medium</option>
+                    <option value="HIGH">High</option>
+                    <option value="CRITICAL">Critical</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[#55514D] mb-1">
+                    Your Name *
                   </label>
                   <input
                     type="text"
                     required
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    className="w-full px-3 py-2 border border-[#E4DDD3] rounded-md focus:outline-none focus:border-[#625FFF] text-[#1C1B1A]"
-                    placeholder="Brief title for the card"
+                    value={formData.createdBy}
+                    onChange={(e) => setFormData({ ...formData, createdBy: e.target.value })}
+                    className="w-full px-3 py-2 border border-[#E5E0D8] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#625FFF]/20 focus:border-[#625FFF] text-[#1C1B1A]"
+                    placeholder="Your name"
                   />
                 </div>
+              </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-[#55514D] mb-1">
-                    Description
-                  </label>
-                  <textarea
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    rows={3}
-                    className="w-full px-3 py-2 border border-[#E4DDD3] rounded-md focus:outline-none focus:border-[#625FFF] text-[#1C1B1A]"
-                    placeholder="Detailed description..."
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-[#55514D] mb-1">
-                    Screenshot (optional)
-                  </label>
-
-                  {/* Drag & Drop Zone */}
-                  <div
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      const file = e.dataTransfer.files[0];
-                      if (file && file.type.startsWith('image/')) {
-                        if (file.size > 5 * 1024 * 1024) {
-                          alert('File too large. Max size is 5MB.');
-                          return;
-                        }
-                        const reader = new FileReader();
-                        reader.onloadend = () => {
-                          setFormData({ ...formData, screenshotUrl: reader.result as string });
-                        };
-                        reader.readAsDataURL(file);
-                      }
-                    }}
-                    onDragOver={(e) => e.preventDefault()}
-                    onPaste={(e) => {
-                      const items = e.clipboardData.items;
-                      for (let i = 0; i < items.length; i++) {
-                        if (items[i].type.startsWith('image/')) {
-                          const file = items[i].getAsFile();
-                          if (file) {
-                            if (file.size > 5 * 1024 * 1024) {
-                              alert('File too large. Max size is 5MB.');
-                              return;
-                            }
-                            const reader = new FileReader();
-                            reader.onloadend = () => {
-                              setFormData({ ...formData, screenshotUrl: reader.result as string });
-                            };
-                            reader.readAsDataURL(file);
-                          }
-                          e.preventDefault();
-                          break;
-                        }
-                      }
-                    }}
-                    className="border-2 border-dashed border-[#E4DDD3] rounded-md p-4 text-center bg-[#FBF3E7]/50 hover:border-[#625FFF] transition-colors cursor-pointer"
-                    onClick={() => document.getElementById('screenshot-input')?.click()}
-                    tabIndex={0}
-                  >
-                    {formData.screenshotUrl ? (
-                      <div className="space-y-2">
-                        <img
-                          src={formData.screenshotUrl}
-                          alt="Screenshot preview"
-                          className="max-h-32 mx-auto rounded"
-                        />
-                        <p className="text-xs text-[#55514D]">✓ Screenshot attached (click to change)</p>
-                      </div>
-                    ) : (
-                      <div className="py-4">
-                        <p className="text-sm text-[#55514D]">
-                          📸 Drag & drop screenshot here, paste (Cmd+V), or click to upload
-                        </p>
-                        <p className="text-xs text-[#999] mt-1">Max 5MB</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Hidden file input */}
-                  <input
-                    id="screenshot-input"
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        if (file.size > 5 * 1024 * 1024) {
-                          alert('File too large. Max size is 5MB.');
-                          e.target.value = '';
-                          return;
-                        }
-                        const reader = new FileReader();
-                        reader.onloadend = () => {
-                          setFormData({ ...formData, screenshotUrl: reader.result as string });
-                        };
-                        reader.readAsDataURL(file);
-                      }
-                    }}
-                    className="hidden"
-                  />
-                </div>
-
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-[#55514D] mb-1">
-                      Type *
-                    </label>
-                    <select
-                      value={formData.type}
-                      onChange={(e) => setFormData({ ...formData, type: e.target.value as DevCardType })}
-                      className="w-full px-3 py-2 border border-[#E4DDD3] rounded-md focus:outline-none focus:border-[#625FFF] text-[#1C1B1A]"
-                    >
-                      <option value="FEATURE_REQUEST">Feature Request</option>
-                      <option value="BUG_FIX">Bug Fix</option>
-                      <option value="IMPROVEMENT">Improvement</option>
-                      <option value="OPTIMIZATION">Optimization</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-[#55514D] mb-1">
-                      Priority *
-                    </label>
-                    <select
-                      value={formData.priority}
-                      onChange={(e) => setFormData({ ...formData, priority: e.target.value as DevCardPriority })}
-                      className="w-full px-3 py-2 border border-[#E4DDD3] rounded-md focus:outline-none focus:border-[#625FFF] text-[#1C1B1A]"
-                    >
-                      <option value="LOW">Low</option>
-                      <option value="MEDIUM">Medium</option>
-                      <option value="HIGH">High</option>
-                      <option value="CRITICAL">Critical</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-[#55514D] mb-1">
-                      Your Name *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.createdBy}
-                      onChange={(e) => setFormData({ ...formData, createdBy: e.target.value })}
-                      className="w-full px-3 py-2 border border-[#E4DDD3] rounded-md focus:outline-none focus:border-[#625FFF] text-[#1C1B1A]"
-                      placeholder="Your name"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="px-4 py-2 bg-[#625FFF] text-white rounded-md hover:bg-[#4E4BCC] disabled:opacity-50"
-                  >
-                    {isSubmitting ? "Creating..." : "Create Card"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowNewCardForm(false)}
-                    className="px-4 py-2 border border-[#E4DDD3] text-[#55514D] rounded-md hover:bg-[#E4DDD3]"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="px-4 py-2 bg-[#625FFF] text-white text-sm font-medium rounded-lg hover:bg-[#524DD9] disabled:opacity-50 transition-colors"
+                >
+                  {isSubmitting ? "Creating..." : "Create Card"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowNewCardForm(false)}
+                  className="px-4 py-2 border border-[#E5E0D8] text-[#55514D] text-sm font-medium rounded-lg hover:bg-[#F5F3F0] transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
-      </header>
+      )}
 
-      <main className="max-w-full mx-auto px-8 py-8">
+      <main className="max-w-full mx-auto px-6 lg:px-8 py-6">
         <DevBoard onCardClick={setSelectedCard} />
       </main>
 

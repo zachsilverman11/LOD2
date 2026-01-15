@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 export type UIPreference = "classic" | "new";
 
 const STORAGE_KEY = "lead-detail-ui-preference";
-const DEFAULT_PREFERENCE: UIPreference = "classic";
+const DEFAULT_PREFERENCE: UIPreference = "new";
 
 export function useUIPreference() {
   const searchParams = useSearchParams();

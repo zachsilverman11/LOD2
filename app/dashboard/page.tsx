@@ -4,7 +4,6 @@ import { useState, Suspense } from "react";
 import { KanbanBoard } from "@/components/kanban/kanban-board";
 import { LeadDetailModal } from "@/components/lead-detail/lead-detail-modal";
 import { LeadDetailPanel } from "@/components/lead-detail-v2/lead-detail-panel";
-import { ActivityFeed } from "@/components/activity-feed";
 import { LeadSearchBar } from "@/components/lead-search-bar";
 import { LeadWithRelations } from "@/types/lead";
 import { DashboardHeader } from "@/components/layout/dashboard-header";
@@ -33,7 +32,7 @@ function DashboardContent() {
   const [selectedLead, setSelectedLead] = useState<LeadWithRelations | null>(null);
   const { preference, setPreference, isLoaded, isOverriddenByUrl } = useUIPreference();
 
-  const handleActivityLeadClick = async (leadId: string) => {
+  const handleLeadSelect = async (leadId: string) => {
     const res = await fetch(`/api/leads/${leadId}`);
     if (res.ok) {
       const data = await res.json();
@@ -63,7 +62,7 @@ function DashboardContent() {
           <div className="flex items-center justify-between gap-6">
             {/* Search Bar */}
             <div className="flex-1 max-w-md">
-              <LeadSearchBar onLeadSelect={handleActivityLeadClick} />
+              <LeadSearchBar onLeadSelect={handleLeadSelect} />
             </div>
 
             {/* UI Toggle */}
@@ -105,25 +104,12 @@ function DashboardContent() {
         </div>
       </div>
 
-      <main className="max-w-full mx-auto px-6 lg:px-8 py-6">
-        <div className="flex gap-6">
-          {/* Main Kanban Board */}
-          <div className="flex-1 min-w-0">
-            <KanbanBoard onLeadClick={handleLeadCardClick} />
-          </div>
-
-          {/* Activity Feed Sidebar */}
-          <div className="w-80 flex-shrink-0 hidden xl:block">
-            <div className="sticky top-24">
-              <ActivityFeed
-                onLeadClick={handleActivityLeadClick}
-                limit={15}
-                autoRefresh={true}
-                refreshInterval={30}
-              />
-            </div>
-          </div>
-        </div>
+      {/* Full-width Kanban Board */}
+      <main className="px-6 py-6">
+        <KanbanBoard
+          onLeadClick={handleLeadCardClick}
+          selectedLeadId={selectedLead?.id}
+        />
       </main>
 
       {/* Lead Detail Panel/Modal */}

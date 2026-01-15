@@ -4,6 +4,7 @@
  */
 
 import { prisma } from './db';
+import { LeadStatus } from '@/app/generated/prisma';
 import { analyzeDealHealth } from './deal-intelligence';
 import { askHollyToDecide } from './claude-decision';
 import { validateDecision, detectMessageRepetition } from './safety-guardrails';
@@ -350,6 +351,17 @@ export async function processLeadWithAutonomousAgent(
           return { success: false, action: 'move_stage', error: 'Invalid transition' };
         }
 
+        // Send farewell/pause message BEFORE changing stage (if provided)
+        if (decision.message && lead.consentSms && lead.phone) {
+          console.log(`[Holly Agent] 💬 Sending farewell message to ${lead.firstName} before moving to ${decision.newStage}`);
+
+          await executeDecision(lead.id, {
+            action: 'send_sms',
+            message: decision.message,
+            reasoning: `Stage transition message: ${lead.status} → ${decision.newStage}`,
+          });
+        }
+
         // Update lead status
         await prisma.lead.update({
           where: { id: lead.id },
@@ -363,13 +375,14 @@ export async function processLeadWithAutonomousAgent(
             type: 'NOTE_ADDED',
             channel: 'SYSTEM',
             subject: `🚦 Stage Changed: ${lead.status} → ${decision.newStage}`,
-            content: `Holly moved this lead from ${lead.status} to ${decision.newStage}.\n\nReasoning: ${decision.thinking}\n\nCustomer mindset: ${decision.customerMindset || 'N/A'}`,
+            content: `Holly moved this lead from ${lead.status} to ${decision.newStage}.\n\nReasoning: ${decision.thinking}\n\nCustomer mindset: ${decision.customerMindset || 'N/A'}${decision.message ? `\n\nFarewell message sent: "${decision.message}"` : ''}`,
             metadata: {
               automated: true,
               autonomous: true,
               previousStatus: lead.status,
               newStatus: decision.newStage,
               hollyReasoning: decision.thinking,
+              farewellMessage: decision.message || null,
             },
           },
         });
@@ -387,7 +400,10 @@ export async function processLeadWithAutonomousAgent(
         const nextReview = new Date(now.getTime() + nextReviewHours * 60 * 60 * 1000);
         await prisma.lead.update({
           where: { id: lead.id },
-          data: { nextReviewAt: nextReview },
+          data: {
+            nextReviewAt: nextReview,
+            lastContactedAt: decision.message ? now : lead.lastContactedAt, // Update if we sent a message
+          },
         });
 
         // Send Slack notification for LOST transitions
@@ -396,12 +412,22 @@ export async function processLeadWithAutonomousAgent(
             type: 'lead_rotting',
             leadName: `${lead.firstName} ${lead.lastName}`,
             leadId: lead.id,
-            details: `Holly marked this lead as LOST.\n\nReason: ${decision.thinking}`,
+            details: `Holly marked this lead as LOST.\n\nReason: ${decision.thinking}${decision.message ? `\n\nFarewell sent: "${decision.message}"` : ''}`,
+          });
+        }
+
+        // Send Slack notification for NURTURING transitions (helpful for team visibility)
+        if (decision.newStage === 'NURTURING') {
+          await sendSlackNotification({
+            type: 'lead_escalated',
+            leadName: `${lead.firstName} ${lead.lastName}`,
+            leadId: lead.id,
+            details: `📦 Holly moved this lead to NURTURING (long-term follow-up).\n\nReason: ${decision.thinking}\n\nNext check-in: 14 days`,
           });
         }
       }
 
-      return { success: true, action: 'move_stage', newStage: decision.newStage };
+      return { success: true, action: 'move_stage', newStage: decision.newStage, messageSent: !!decision.message };
     } else {
       // Send message
       console.log(

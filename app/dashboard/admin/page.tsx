@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
-import { LogoutButton } from "../logout-button";
+import { DashboardHeader } from "@/components/layout/dashboard-header";
 
 interface CohortInfo {
   currentCohort: string;
@@ -62,44 +61,20 @@ export default function AdminPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#FBF3E7] via-[#B1AFFF]/20 to-[#F6D7FF]/30 flex items-center justify-center">
-        <div className="text-2xl text-[#1C1B1A]">Loading...</div>
+      <div className="min-h-screen bg-[#FAFAF9]">
+        <DashboardHeader subtitle="Cohort Management" />
+        <div className="flex items-center justify-center h-[calc(100vh-64px)]">
+          <div className="animate-pulse text-[#55514D]">Loading...</div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#FBF3E7] via-[#B1AFFF]/20 to-[#F6D7FF]/30">
-      <header className="bg-white/80 backdrop-blur-sm shadow-sm border-b border-[#E4DDD3]">
-        <div className="max-w-7xl mx-auto px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-4xl font-extrabold text-[#1C1B1A]">
-                <span className="italic text-[#625FFF]">inspired</span>{" "}
-                <span className="font-bold">mortgage.</span>
-              </h1>
-              <p className="text-[#55514D] mt-2 text-lg">Cohort Management</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <Link
-                href="/dashboard/analytics"
-                className="px-4 py-2 text-sm text-[#625FFF] border border-[#625FFF] rounded-md hover:bg-[#625FFF] hover:text-white transition-colors"
-              >
-                Analytics
-              </Link>
-              <Link
-                href="/dashboard"
-                className="px-4 py-2 text-sm text-[#625FFF] border border-[#625FFF] rounded-md hover:bg-[#625FFF] hover:text-white transition-colors"
-              >
-                Pipeline
-              </Link>
-              <LogoutButton />
-            </div>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-[#FAFAF9]">
+      <DashboardHeader subtitle="Cohort Management" />
 
-      <main className="max-w-7xl mx-auto px-8 py-8">
+      <main className="max-w-7xl mx-auto px-6 lg:px-8 py-6">
         {/* Current Cohort Display */}
         <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-8 mb-8">
           <div className="flex items-start justify-between">

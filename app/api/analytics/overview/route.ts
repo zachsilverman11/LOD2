@@ -167,7 +167,7 @@ export async function GET(request: NextRequest) {
           dealsWon: keyMetrics.dealsWon,
           leadToCallBookedRate: keyMetrics.leadToCallBookedRate,
           callBookedToAppRate: keyMetrics.callBookedToAppRate,
-          leadToAppRate: keyMetrics.leadToAppRate,
+          appToDealsWonRate: keyMetrics.appToDealsWonRate,
           leadToDealsWonRate: keyMetrics.leadToDealsWonRate,
         },
 

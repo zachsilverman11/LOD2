@@ -98,20 +98,20 @@ async function testPipelinePipeline() {
   try {
     // Get pipeline stages
     const response = await fetch(
-      `https://${pipedriveCompany}.pipedrive.com/v1/stages?pipeline_id=22&api_token=${pipedriveToken}`
+      `https://${pipedriveCompany}.pipedrive.com/v1/stages?pipeline_id=33&api_token=${pipedriveToken}`
     );
 
     if (response.ok) {
       const data = await response.json();
-      const docCollectionStage = data.data.find((s: any) => s.id === 152);
+      const appStartedStage = data.data.find((s: any) => s.id === 239);
 
-      if (docCollectionStage) {
+      if (appStartedStage) {
         console.log('✅ Pipeline configured correctly');
-        console.log(`   Pipeline: ${docCollectionStage.pipeline_name} (ID: 22)`);
-        console.log(`   Stage: ${docCollectionStage.name} (ID: 152)`);
-        console.log(`   Deal Probability: ${docCollectionStage.deal_probability}%`);
+        console.log(`   Pipeline: ${appStartedStage.pipeline_name} (ID: 33)`);
+        console.log(`   Stage: ${appStartedStage.name} (ID: 239)`);
+        console.log(`   Deal Probability: ${appStartedStage.deal_probability}%`);
       } else {
-        console.log('❌ Doc Collection stage not found');
+        console.log('❌ App Started stage not found');
         console.log(`   Available stages: ${data.data.map((s: any) => `${s.name} (${s.id})`).join(', ')}`);
       }
     } else {
