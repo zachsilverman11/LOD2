@@ -109,7 +109,7 @@ export default function LoginPage() {
         </form>
 
         <p className="text-center text-xs text-[#8E8983] mt-6">
-          Only authorized team members can sign in.
+          Only authorized team members can sign in. v2
         </p>
       </div>
     </div>
