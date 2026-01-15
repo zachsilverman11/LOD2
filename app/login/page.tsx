@@ -23,7 +23,13 @@ export default function LoginPage() {
       });
 
       if (result?.error) {
-        setError("This email is not authorized. Contact your administrator.");
+        // Show actual error for debugging
+        console.error("Sign in error:", result.error);
+        if (result.error === "AccessDenied") {
+          setError("This email is not authorized. Contact your administrator.");
+        } else {
+          setError(`Sign in failed: ${result.error}`);
+        }
       } else {
         setSubmitted(true);
       }
