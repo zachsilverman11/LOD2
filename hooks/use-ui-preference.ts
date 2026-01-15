@@ -22,8 +22,8 @@ export function useUIPreference() {
     setIsLoaded(true);
   }, []);
 
-  // Check URL param override
-  const urlOverride = searchParams.get("ui");
+  // Check URL param override (safely handle null searchParams during SSR/build)
+  const urlOverride = searchParams?.get("ui") ?? null;
   const effectivePreference: UIPreference =
     urlOverride === "v2" || urlOverride === "new"
       ? "new"
