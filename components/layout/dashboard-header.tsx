@@ -27,29 +27,12 @@ export function DashboardHeader({ subtitle }: DashboardHeaderProps) {
   const [activityOpen, setActivityOpen] = useState(false);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [activityLoading, setActivityLoading] = useState(false);
+  const [activityCount, setActivityCount] = useState(0);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const activityRef = useRef<HTMLDivElement>(null);
 
-  const fetchActivities = useCallback(async () => {
-    setActivityLoading(true);
-    try {
-      const res = await fetch("/api/activity/recent?limit=10");
-      if (res.ok) {
-        const json = await res.json();
-        // Handle wrapped response format { success, data }
-        const data = json.data || json;
-        setActivities(Array.isArray(data) ? data : []);
-      }
-    } catch (error) {
-      console.error("Failed to fetch activities:", error);
-    } finally {
-      setActivityLoading(false);
-    }
-  }, []);
-
-  // Filter out system/error messages
-  const isUserRelevantActivity = (activity: Activity): boolean => {
-    // Only show these activity types
+  // Filter function for user-relevant activities
+  const isUserRelevantActivity = useCallback((activity: Activity): boolean => {
     const allowedTypes = [
       "SMS_SENT",
       "SMS_RECEIVED",
@@ -66,11 +49,9 @@ export function DashboardHeader({ subtitle }: DashboardHeaderProps) {
       return false;
     }
 
-    // Filter out error/system content
     const content = (activity.content || "");
     const contentLower = content.toLowerCase();
 
-    // Filter out raw JSON messages
     if (content.trim().startsWith("{") || content.includes("**Type:**")) {
       return false;
     }
@@ -92,9 +73,41 @@ export function DashboardHeader({ subtitle }: DashboardHeaderProps) {
     }
 
     return true;
-  };
+  }, []);
 
-  // Get filtered activities
+  const fetchActivities = useCallback(async () => {
+    setActivityLoading(true);
+    try {
+      const res = await fetch("/api/activity/recent?limit=20");
+      if (res.ok) {
+        const json = await res.json();
+        const data = json.data || json;
+        const activityList = Array.isArray(data) ? data : [];
+        setActivities(activityList);
+        // Update count based on filtered activities
+        const filtered = activityList.filter(isUserRelevantActivity);
+        setActivityCount(filtered.length);
+      }
+    } catch (error) {
+      console.error("Failed to fetch activities:", error);
+    } finally {
+      setActivityLoading(false);
+    }
+  }, [isUserRelevantActivity]);
+
+  // Fetch activities on mount for badge count
+  useEffect(() => {
+    fetchActivities();
+  }, [fetchActivities]);
+
+  // Refetch when dropdown opens
+  useEffect(() => {
+    if (activityOpen) {
+      fetchActivities();
+    }
+  }, [activityOpen, fetchActivities]);
+
+  // Get filtered activities for display
   const filteredActivities = activities.filter(isUserRelevantActivity);
 
   // Generate description from activity data
@@ -122,13 +135,6 @@ export function DashboardHeader({ subtitle }: DashboardHeaderProps) {
         return activity.content || activity.type.replace(/_/g, " ").toLowerCase();
     }
   };
-
-  // Fetch activities when dropdown opens
-  useEffect(() => {
-    if (activityOpen) {
-      fetchActivities();
-    }
-  }, [activityOpen, fetchActivities]);
 
   // Close menus when clicking outside
   useEffect(() => {
@@ -301,9 +307,11 @@ export function DashboardHeader({ subtitle }: DashboardHeaderProps) {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                 </svg>
                 {/* Badge */}
-                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-[#625FFF] text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                  {filteredActivities.length > 0 ? (filteredActivities.length > 9 ? "9+" : filteredActivities.length) : "0"}
-                </span>
+                {activityCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-[#625FFF] text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                    {activityCount > 9 ? "9+" : activityCount}
+                  </span>
+                )}
               </button>
 
               {/* Activity Dropdown */}
@@ -338,7 +346,7 @@ export function DashboardHeader({ subtitle }: DashboardHeaderProps) {
                       </div>
                     ) : (
                       <div className="divide-y divide-[#E5E0D8]">
-                        {filteredActivities.map((activity) => (
+                        {filteredActivities.slice(0, 10).map((activity) => (
                           <Link
                             key={activity.id}
                             href={`/dashboard?lead=${activity.leadId}`}
@@ -369,11 +377,11 @@ export function DashboardHeader({ subtitle }: DashboardHeaderProps) {
                   {filteredActivities.length > 0 && (
                     <div className="px-4 py-3 border-t border-[#E5E0D8] bg-[#FAFAF9]">
                       <Link
-                        href="/dashboard"
+                        href="/dashboard/activity"
                         onClick={() => setActivityOpen(false)}
                         className="text-xs text-[#625FFF] hover:text-[#524DD9] font-medium"
                       >
-                        View all activity
+                        View all activity →
                       </Link>
                     </div>
                   )}
@@ -396,7 +404,7 @@ export function DashboardHeader({ subtitle }: DashboardHeaderProps) {
                   </span>
                 </div>
                 <span className="hidden lg:block text-sm font-medium text-[#1C1B1A] max-w-[120px] truncate">
-                  {session?.user?.name || session?.user?.email?.split("@")[0]}
+                  {session?.user?.name || session?.user?.email?.split("@")[0] || "User"}
                 </span>
                 <svg
                   className={`w-4 h-4 text-[#55514D] transition-transform duration-200 ${
@@ -425,7 +433,7 @@ export function DashboardHeader({ subtitle }: DashboardHeaderProps) {
                           {session?.user?.name || "User"}
                         </p>
                         <p className="text-xs text-[#55514D] truncate">
-                          {session?.user?.email}
+                          {session?.user?.email || ""}
                         </p>
                       </div>
                     </div>
@@ -468,6 +476,16 @@ export function DashboardHeader({ subtitle }: DashboardHeaderProps) {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                       </svg>
                       Home
+                    </Link>
+                    <Link
+                      href="/dashboard/activity"
+                      onClick={() => setUserMenuOpen(false)}
+                      className="flex items-center gap-3 px-4 py-2 text-sm text-[#55514D] hover:text-[#1C1B1A] hover:bg-[#F5F3F0] transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Activity Feed
                     </Link>
                   </div>
 
