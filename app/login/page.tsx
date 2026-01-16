@@ -16,7 +16,7 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const result = await signIn("email", {
+      const result = await signIn("sendgrid", {
         email,
         redirect: false,
         callbackUrl: "/dashboard",
