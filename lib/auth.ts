@@ -18,17 +18,14 @@ declare module "next-auth" {
   }
 }
 
-// Custom email sending using SendGrid HTTP API (Edge-compatible)
-async function sendVerificationEmail(params: {
+// Custom email sending using SendGrid HTTP API
+async function sendVerificationRequest(params: {
   identifier: string;
   url: string;
   provider: { from?: string };
-  token: string;
-  theme: { colorScheme?: "auto" | "dark" | "light"; brandColor?: string; logo?: string };
-  request: Request;
 }) {
-  const { identifier: email, url } = params;
-  const fromEmail = process.env.FROM_EMAIL || "noreply@inspired.mortgage";
+  const { identifier: email, url, provider } = params;
+  const fromEmail = provider.from || process.env.FROM_EMAIL || "noreply@inspired.mortgage";
   const sendgridApiKey = process.env.SENDGRID_API_KEY;
 
   if (!sendgridApiKey) {
@@ -97,8 +94,9 @@ const config: NextAuthConfig = {
       id: "sendgrid",
       name: "Email",
       type: "email",
+      from: process.env.FROM_EMAIL || "noreply@inspired.mortgage",
       maxAge: 24 * 60 * 60, // 24 hours
-      sendVerificationRequest: sendVerificationEmail,
+      sendVerificationRequest,
     },
   ],
   callbacks: {
@@ -156,8 +154,9 @@ const config: NextAuthConfig = {
     verifyRequest: "/login/verify",
   },
   session: {
-    strategy: "jwt", // Use JWT instead of database sessions (Edge runtime compatible)
+    strategy: "jwt",
   },
+  trustHost: true,
 };
 
 export const { handlers, signIn, signOut, auth } = NextAuth(config);
