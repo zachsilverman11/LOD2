@@ -21,7 +21,8 @@ interface Activity {
 }
 
 export function DashboardHeader({ subtitle }: DashboardHeaderProps) {
-  const { data: session } = useSession();
+  const sessionResult = useSession();
+  const session = sessionResult?.data;
   const pathname = usePathname();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
