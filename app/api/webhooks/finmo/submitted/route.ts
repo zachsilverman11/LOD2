@@ -43,6 +43,45 @@ function extractAllBorrowerEmails(payload: any): string[] {
 }
 
 /**
+ * Normalize phone number to E.164 format for comparison
+ */
+function normalizePhone(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
+  return digits.startsWith('+') ? phone : `+${digits}`;
+}
+
+/**
+ * Extract ALL borrower phone numbers from Finmo payload
+ */
+function extractAllBorrowerPhones(payload: any): string[] {
+  const phones: string[] = [];
+
+  if (payload.mainBorrower?.phone) phones.push(normalizePhone(payload.mainBorrower.phone));
+  if (payload.mainBorrower?.cellPhone) phones.push(normalizePhone(payload.mainBorrower.cellPhone));
+
+  if (Array.isArray(payload.borrowersArray)) {
+    payload.borrowersArray.forEach((b: any) => {
+      if (b?.phone) phones.push(normalizePhone(b.phone));
+      if (b?.cellPhone) phones.push(normalizePhone(b.cellPhone));
+    });
+  }
+
+  if (payload.borrowers && typeof payload.borrowers === 'object') {
+    Object.values(payload.borrowers).forEach((b: any) => {
+      if (b?.phone) phones.push(normalizePhone(b.phone));
+      if (b?.cellPhone) phones.push(normalizePhone(b.cellPhone));
+    });
+  }
+
+  if (payload.application?.phone) phones.push(normalizePhone(payload.application.phone));
+  if (payload.phone) phones.push(normalizePhone(payload.phone));
+
+  return [...new Set(phones)];
+}
+
+/**
  * Finmo Webhook: Application Submitted
  *
  * Triggered when a borrower completes and submits the mortgage application
@@ -75,46 +114,79 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Extract phone numbers for fallback lookup
+    const allPhones = extractAllBorrowerPhones(payload);
+
     console.log(`[Finmo - Submitted] All borrower emails: ${allEmails.join(', ')}`);
+    console.log(`[Finmo - Submitted] All borrower phones: ${allPhones.join(', ')}`);
     console.log(`[Finmo - Submitted] Primary email: ${primaryEmail || 'N/A'}`);
 
+    // Lead lookup includes
+    const leadInclude = {
+      communications: {
+        where: { channel: "SMS" as const },
+        orderBy: { createdAt: "asc" as const },
+      },
+      appointments: {
+        where: { advisorEmail: { not: null } },
+        orderBy: { createdAt: "desc" as const },
+        take: 1,
+      },
+    };
+
     // Find lead by ANY borrower email (case-insensitive)
-    // This handles cases where the lead is a co-borrower, not the main applicant
-    const lead = await prisma.lead.findFirst({
+    let lead = await prisma.lead.findFirst({
       where: {
         email: {
           in: allEmails,
           mode: 'insensitive'
         }
       },
-      include: {
-        communications: {
-          where: { channel: "SMS" },
-          orderBy: { createdAt: "asc" },
-        },
-        appointments: {
-          where: { advisorEmail: { not: null } },
-          orderBy: { createdAt: "desc" },
-          take: 1,
-        },
-      },
+      include: leadInclude,
     });
 
-    if (!lead) {
-      console.error(`[Finmo - Submitted] Lead not found for any email: ${allEmails.join(', ')}`);
+    // FALLBACK: If no email match, try phone number
+    if (!lead && allPhones.length > 0) {
+      console.log(`[Finmo - Submitted] No email match, trying phone fallback...`);
 
-      // Get all emails in database for debugging
+      lead = await prisma.lead.findFirst({
+        where: { phone: { in: allPhones } },
+        include: leadInclude,
+      });
+
+      if (!lead) {
+        const phoneDigits = allPhones.map(p => p.replace(/\D/g, '').slice(-10));
+        const potentialLeads = await prisma.lead.findMany({
+          where: { phone: { not: null } },
+          include: leadInclude,
+        });
+
+        lead = potentialLeads.find(l => {
+          if (!l.phone) return false;
+          const leadDigits = l.phone.replace(/\D/g, '').slice(-10);
+          return phoneDigits.includes(leadDigits);
+        }) || null;
+      }
+
+      if (lead) {
+        console.log(`[Finmo - Submitted] ✅ Found lead via PHONE FALLBACK: ${lead.firstName} ${lead.lastName}`);
+      }
+    }
+
+    if (!lead) {
+      console.error(`[Finmo - Submitted] Lead not found for any email or phone`);
+
       const allLeads = await prisma.lead.findMany({
-        select: { email: true, firstName: true, lastName: true },
+        select: { email: true, firstName: true, lastName: true, phone: true },
         take: 20,
         orderBy: { createdAt: 'desc' }
       });
-      const recentEmails = allLeads.map(l => `${l.firstName} ${l.lastName}: ${l.email}`).join('\n');
+      const recentLeads = allLeads.map(l => `${l.firstName} ${l.lastName}: ${l.email} | ${l.phone}`).join('\n');
 
       await sendSlackNotification({
         type: "error",
         message: "Finmo Webhook (Submitted): Lead Not Found",
-        details: `Emails from Finmo: ${allEmails.join(', ')}\n\nRecent leads in database:\n${recentEmails}`,
+        details: `**Emails from Finmo:** ${allEmails.join(', ')}\n**Phones from Finmo:** ${allPhones.join(', ')}\n\n**Recent leads:**\n${recentLeads}`,
       });
       return NextResponse.json(
         { error: "Lead not found" },

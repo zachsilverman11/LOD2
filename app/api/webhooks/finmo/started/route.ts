@@ -43,6 +43,69 @@ function extractAllBorrowerEmails(payload: any): string[] {
 }
 
 /**
+ * Normalize phone number to E.164 format for comparison
+ * Strips all non-digit characters and ensures +1 prefix for North American numbers
+ */
+function normalizePhone(phone: string): string {
+  // Remove all non-digit characters
+  const digits = phone.replace(/\D/g, '');
+
+  // Handle North American numbers
+  if (digits.length === 10) {
+    return `+1${digits}`;
+  }
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return `+${digits}`;
+  }
+
+  // Return with + prefix if not already
+  return digits.startsWith('+') ? phone : `+${digits}`;
+}
+
+/**
+ * Extract ALL borrower phone numbers from Finmo payload
+ * Handles multiple payload structures and returns all unique normalized phones
+ */
+function extractAllBorrowerPhones(payload: any): string[] {
+  const phones: string[] = [];
+
+  // Main borrower
+  if (payload.mainBorrower?.phone) {
+    phones.push(normalizePhone(payload.mainBorrower.phone));
+  }
+  if (payload.mainBorrower?.cellPhone) {
+    phones.push(normalizePhone(payload.mainBorrower.cellPhone));
+  }
+
+  // borrowersArray (array format)
+  if (Array.isArray(payload.borrowersArray)) {
+    payload.borrowersArray.forEach((b: any) => {
+      if (b?.phone) phones.push(normalizePhone(b.phone));
+      if (b?.cellPhone) phones.push(normalizePhone(b.cellPhone));
+    });
+  }
+
+  // borrowers object (keyed by "1", "2", etc.)
+  if (payload.borrowers && typeof payload.borrowers === 'object') {
+    Object.values(payload.borrowers).forEach((b: any) => {
+      if (b?.phone) phones.push(normalizePhone(b.phone));
+      if (b?.cellPhone) phones.push(normalizePhone(b.cellPhone));
+    });
+  }
+
+  // Legacy/fallback fields
+  if (payload.application?.phone) {
+    phones.push(normalizePhone(payload.application.phone));
+  }
+  if (payload.phone) {
+    phones.push(normalizePhone(payload.phone));
+  }
+
+  // Deduplicate
+  return [...new Set(phones)];
+}
+
+/**
  * Finmo Webhook: Application Started
  *
  * Triggered when a borrower starts filling out the mortgage application
@@ -75,46 +138,103 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Extract phone numbers for fallback lookup
+    const allPhones = extractAllBorrowerPhones(payload);
+
     console.log(`[Finmo - Started] All borrower emails: ${allEmails.join(', ')}`);
+    console.log(`[Finmo - Started] All borrower phones: ${allPhones.join(', ')}`);
     console.log(`[Finmo - Started] Primary email: ${primaryEmail || 'N/A'}`);
+
+    // Lead lookup includes for all queries
+    const leadInclude = {
+      communications: {
+        where: { channel: "SMS" as const },
+        orderBy: { createdAt: "asc" as const },
+      },
+      appointments: {
+        where: { advisorEmail: { not: null } },
+        orderBy: { createdAt: "desc" as const },
+        take: 1,
+      },
+    };
 
     // Find lead by ANY borrower email (case-insensitive)
     // This handles cases where the lead is a co-borrower, not the main applicant
-    const lead = await prisma.lead.findFirst({
+    let lead = await prisma.lead.findFirst({
       where: {
         email: {
           in: allEmails,
           mode: 'insensitive'
         }
       },
-      include: {
-        communications: {
-          where: { channel: "SMS" },
-          orderBy: { createdAt: "asc" },
-        },
-        appointments: {
-          where: { advisorEmail: { not: null } },
-          orderBy: { createdAt: "desc" },
-          take: 1,
-        },
-      },
+      include: leadInclude,
     });
 
+    // Track how we matched the lead
+    let matchedViaPhone = false;
+
+    // FALLBACK: If no email match, try phone number
+    if (!lead && allPhones.length > 0) {
+      console.log(`[Finmo - Started] No email match, trying phone fallback...`);
+
+      // Try exact match first
+      lead = await prisma.lead.findFirst({
+        where: {
+          phone: { in: allPhones }
+        },
+        include: leadInclude,
+      });
+
+      // If still no match, try normalized comparison (handles format differences)
+      if (!lead) {
+        // Get leads with similar phone patterns
+        const phoneDigits = allPhones.map(p => p.replace(/\D/g, '').slice(-10));
+        const potentialLeads = await prisma.lead.findMany({
+          where: {
+            phone: { not: null }
+          },
+          include: leadInclude,
+        });
+
+        // Find a lead whose normalized phone matches any of our phones
+        lead = potentialLeads.find(l => {
+          if (!l.phone) return false;
+          const leadDigits = l.phone.replace(/\D/g, '').slice(-10);
+          return phoneDigits.includes(leadDigits);
+        }) || null;
+      }
+
+      if (lead) {
+        matchedViaPhone = true;
+        console.log(`[Finmo - Started] ✅ Found lead via PHONE FALLBACK: ${lead.firstName} ${lead.lastName}`);
+
+        // Send Slack notification about phone match
+        await sendSlackNotification({
+          type: "lead_updated",
+          leadName: `${lead.firstName} ${lead.lastName}`,
+          leadId: lead.id,
+          details: `📱 **PHONE FALLBACK MATCH**\n\nFinmo used different email(s): ${allEmails.join(', ')}\nMatched via phone: ${lead.phone}\nLOD email: ${lead.email}\n\nProceeding with application started flow.`,
+        });
+      }
+    }
+
     if (!lead) {
-      console.error(`[Finmo - Started] Lead not found for any email: ${allEmails.join(', ')}`);
+      console.error(`[Finmo - Started] Lead not found for any email or phone`);
+      console.error(`[Finmo - Started]   Emails tried: ${allEmails.join(', ')}`);
+      console.error(`[Finmo - Started]   Phones tried: ${allPhones.join(', ')}`);
 
       // Get all emails in database for debugging
       const allLeads = await prisma.lead.findMany({
-        select: { email: true, firstName: true, lastName: true },
+        select: { email: true, firstName: true, lastName: true, phone: true },
         take: 20,
         orderBy: { createdAt: 'desc' }
       });
-      const recentEmails = allLeads.map(l => `${l.firstName} ${l.lastName}: ${l.email}`).join('\n');
+      const recentLeads = allLeads.map(l => `${l.firstName} ${l.lastName}: ${l.email} | ${l.phone}`).join('\n');
 
       await sendSlackNotification({
         type: "error",
         message: "Finmo Webhook (Started): Lead Not Found",
-        details: `Emails from Finmo: ${allEmails.join(', ')}\n\nRecent leads in database:\n${recentEmails}`,
+        details: `**Emails from Finmo:** ${allEmails.join(', ')}\n**Phones from Finmo:** ${allPhones.join(', ')}\n\n**Recent leads in database:**\n${recentLeads}`,
       });
       return NextResponse.json(
         { error: "Lead not found" },
@@ -141,6 +261,26 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`[Finmo - Started] Found lead: ${lead.firstName} ${lead.lastName} (ID: ${lead.id})`);
+    console.log(`[Finmo - Started] Current lead status: ${lead.status}`);
+
+    // IMPORTANT: We process ALL leads regardless of their current status.
+    // Even leads in NURTURING or LOST stages should be moved to APPLICATION_STARTED
+    // and get a Pipedrive deal created when they start an application via Finmo.
+    // This is intentional - a lead re-engaging with the application process is a
+    // significant event that overrides their previous "cold" status.
+    const isReEngagement = lead.status === LeadStatus.NURTURING || lead.status === LeadStatus.LOST;
+
+    if (isReEngagement) {
+      console.log(`[Finmo - Started] 🔥 RE-ENGAGEMENT: Lead was in ${lead.status} status and is now starting an application!`);
+
+      // Send special Slack notification for re-engaged leads
+      await sendSlackNotification({
+        type: "lead_updated",
+        leadName: `${lead.firstName} ${lead.lastName}`,
+        leadId: lead.id,
+        details: `🔥 **RE-ENGAGEMENT ALERT** 🔥\n\nLead was previously in **${lead.status}** status but just started a Finmo application!\n\nThis is a "cold" lead coming back to life. Moving to APPLICATION_STARTED and creating Pipedrive deal.`,
+      });
+    }
 
     // Create Pipedrive deal first to get the deal ID
     let pipedriveDealId = null;
@@ -193,38 +333,57 @@ export async function POST(request: NextRequest) {
     });
 
     // Log activity
+    const reEngagementNote = isReEngagement
+      ? `\n\n🔥 RE-ENGAGEMENT: This lead was previously in ${lead.status} status and has come back to start an application!`
+      : "";
+    const phoneMatchNote = matchedViaPhone
+      ? `\n\n📱 PHONE FALLBACK: Lead was matched via phone number because Finmo used a different email (${allEmails.join(', ')}).`
+      : "";
+
     await prisma.leadActivity.create({
       data: {
         leadId: lead.id,
         type: ActivityType.NOTE_ADDED,
         channel: CommunicationChannel.SYSTEM,
-        subject: "🚦 APPLICATION STARTED - Finmo Handoff Complete",
-        content: "Lead started mortgage application via Finmo.\n\n🛑 HOLLY PERMANENTLY DISABLED 🛑\n\nAll communication from this point forward is handled by the Finmo automated system.\n\nHolly will NOT:\n- Send any messages\n- Follow up or nurture\n- Move stages\n- Take any automated actions\n\nFinmo owns this relationship until application is completed or abandoned.",
+        subject: isReEngagement
+          ? `🔥 RE-ENGAGEMENT: APPLICATION STARTED (was ${lead.status})`
+          : matchedViaPhone
+            ? "📱 APPLICATION STARTED (Phone Match)"
+            : "🚦 APPLICATION STARTED - Finmo Handoff Complete",
+        content: `Lead started mortgage application via Finmo.${reEngagementNote}${phoneMatchNote}\n\n🛑 HOLLY PERMANENTLY DISABLED 🛑\n\nAll communication from this point forward is handled by the Finmo automated system.\n\nHolly will NOT:\n- Send any messages\n- Follow up or nurture\n- Move stages\n- Take any automated actions\n\nFinmo owns this relationship until application is completed or abandoned.`,
         metadata: {
           finmoDealId: payload.finmoDealId || payload.dealId,
           finmoId: payload.id,
           event: "application.started",
           hollyDisabled: true,
           hollyNextReviewAt: oneYearFromNow.toISOString(),
+          matchedViaPhone: matchedViaPhone,
+          finmoEmails: allEmails,
+          finmoPhones: allPhones,
           pipedriveDealId: pipedriveDealId,
+          previousStatus: lead.status,
+          isReEngagement: isReEngagement,
         },
       },
     });
 
-    // Send Slack notification
-    await sendSlackNotification({
-      type: "lead_updated",
-      leadName: `${lead.firstName} ${lead.lastName}`,
-      leadId: lead.id,
-      details: `🎉 Started mortgage application via Finmo!${pipedriveDealId ? ` | Pipedrive deal: ${pipedriveDealId}` : ''}\n\n🛑 Holly's messaging is now PERMANENTLY DISABLED. Finmo system has taken over all communication.`,
-    });
+    // Send Slack notification (only if not already sent for re-engagement or phone match)
+    if (!isReEngagement && !matchedViaPhone) {
+      await sendSlackNotification({
+        type: "lead_updated",
+        leadName: `${lead.firstName} ${lead.lastName}`,
+        leadId: lead.id,
+        details: `🎉 Started mortgage application via Finmo!${pipedriveDealId ? ` | Pipedrive deal: ${pipedriveDealId}` : ''}\n\n🛑 Holly's messaging is now PERMANENTLY DISABLED. Finmo system has taken over all communication.`,
+      });
+    }
 
     // 🚫 DO NOT send Holly message - Finmo handles all communication from this point
     // Previous behavior: Holly would send encouragement message
     // NEW behavior: Complete handoff - Holly stops all contact
     console.log(`[Finmo - Started] 🚫 Holly messaging disabled - Finmo has taken over communication`);
 
-    console.log(`[Finmo - Started] ✅ Lead ${lead.id} moved to APPLICATION_STARTED`);
+    const matchInfo = matchedViaPhone ? ' - PHONE MATCH' : '';
+    console.log(`[Finmo - Started] ✅ Lead ${lead.id} moved to APPLICATION_STARTED (was: ${lead.status}${isReEngagement ? ' - RE-ENGAGEMENT!' : ''}${matchInfo})`);
     console.log("[Finmo - Started] ========== WEBHOOK PROCESSED SUCCESSFULLY ==========");
 
     return NextResponse.json({ success: true });
