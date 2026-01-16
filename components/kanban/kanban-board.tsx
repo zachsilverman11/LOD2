@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   DndContext,
   DragEndEvent,
@@ -41,6 +41,15 @@ export function KanbanBoard({ onLeadClick, selectedLeadId }: KanbanBoardProps) {
     fetchLeads();
   }, []);
 
+  // Scroll left/right by one column width
+  const scrollByColumn = useCallback((direction: 'left' | 'right') => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const columnWidth = 320; // matches min-w-[300px] + gap
+    const scrollAmount = direction === 'left' ? -columnWidth : columnWidth;
+    container.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+  }, []);
+
   // Check scroll position for shadow indicators
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -53,12 +62,23 @@ export function KanbanBoard({ onLeadClick, selectedLeadId }: KanbanBoardProps) {
       );
     };
 
+    // Enable horizontal scroll with Shift + mouse wheel (for non-Magic Mouse users)
+    const handleWheel = (e: WheelEvent) => {
+      // If shift is held or it's a horizontal scroll, scroll horizontally
+      if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        e.preventDefault();
+        container.scrollLeft += e.shiftKey ? e.deltaY : e.deltaX;
+      }
+    };
+
     checkScroll();
     container.addEventListener("scroll", checkScroll);
+    container.addEventListener("wheel", handleWheel, { passive: false });
     window.addEventListener("resize", checkScroll);
 
     return () => {
       container.removeEventListener("scroll", checkScroll);
+      container.removeEventListener("wheel", handleWheel);
       window.removeEventListener("resize", checkScroll);
     };
   }, [leads]);
@@ -225,6 +245,32 @@ export function KanbanBoard({ onLeadClick, selectedLeadId }: KanbanBoardProps) {
             </div>
           </div>
         )}
+
+        {/* Left scroll button - always visible when scrollable */}
+        <button
+          onClick={() => scrollByColumn('left')}
+          className={`absolute left-0 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white border border-[#E5E0D8] shadow-lg flex items-center justify-center hover:bg-[#FAFAF9] hover:border-[#625FFF] transition-all ${
+            canScrollLeft ? "opacity-100" : "opacity-0 pointer-events-none"
+          }`}
+          aria-label="Scroll left"
+        >
+          <svg className="w-5 h-5 text-[#55514D]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+
+        {/* Right scroll button - always visible when scrollable */}
+        <button
+          onClick={() => scrollByColumn('right')}
+          className={`absolute right-0 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white border border-[#E5E0D8] shadow-lg flex items-center justify-center hover:bg-[#FAFAF9] hover:border-[#625FFF] transition-all ${
+            canScrollRight ? "opacity-100" : "opacity-0 pointer-events-none"
+          }`}
+          aria-label="Scroll right"
+        >
+          <svg className="w-5 h-5 text-[#55514D]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
 
         {/* Left scroll shadow */}
         <div

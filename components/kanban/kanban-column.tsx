@@ -45,10 +45,10 @@ export function KanbanColumn({
         </span>
       </div>
 
-      {/* Column Body */}
+      {/* Column Body - fixed height with internal scrolling */}
       <div
         ref={setNodeRef}
-        className={`bg-white rounded-b-xl min-h-[500px] p-3 space-y-3 border border-t-0 transition-all ${
+        className={`bg-white rounded-b-xl min-h-[200px] max-h-[calc(100vh-220px)] overflow-y-auto p-3 space-y-3 border border-t-0 transition-all scrollbar-thin scrollbar-thumb-[#E5E0D8] scrollbar-track-transparent ${
           isOver
             ? "border-[#625FFF] bg-[#625FFF]/5 shadow-md"
             : "border-[#E5E0D8] shadow-sm"
