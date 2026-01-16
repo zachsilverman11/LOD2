@@ -93,7 +93,8 @@ const config: NextAuthConfig = {
   providers: [
     Sendgrid({
       from: process.env.FROM_EMAIL || "noreply@inspired.mortgage",
-      apiKey: process.env.SENDGRID_API_KEY,
+      // Check both possible env var names
+      apiKey: process.env.AUTH_SENDGRID_KEY || process.env.SENDGRID_API_KEY,
     }),
   ],
   callbacks: {
