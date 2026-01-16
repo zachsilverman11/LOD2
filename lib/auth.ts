@@ -94,7 +94,6 @@ const config: NextAuthConfig = {
     Sendgrid({
       from: process.env.FROM_EMAIL || "noreply@inspired.mortgage",
       apiKey: process.env.SENDGRID_API_KEY,
-      sendVerificationRequest,
     }),
   ],
   callbacks: {
