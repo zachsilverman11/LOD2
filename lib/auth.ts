@@ -2,7 +2,6 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { PrismaClient } from "@/app/generated/prisma";
 import NextAuth from "next-auth";
 import type { NextAuthConfig } from "next-auth";
-import Email from "next-auth/providers/email";
 
 // Create a dedicated prisma client for auth to avoid import issues
 const prisma = new PrismaClient();
@@ -91,11 +90,16 @@ async function sendVerificationRequest(params: {
 const config: NextAuthConfig = {
   adapter: PrismaAdapter(prisma),
   providers: [
-    Email({
+    {
+      id: "email",
+      type: "email",
+      name: "Email",
       from: process.env.FROM_EMAIL || "noreply@inspired.mortgage",
       maxAge: 24 * 60 * 60, // 24 hours
+      // Dummy server config - we use custom sendVerificationRequest with SendGrid HTTP API
+      server: {},
       sendVerificationRequest,
-    }),
+    } as any,
   ],
   callbacks: {
     async signIn({ user }) {
