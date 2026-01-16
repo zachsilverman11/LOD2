@@ -10,9 +10,10 @@ export default auth((req) => {
   const isWebhook = pathname.startsWith("/api/webhook");
   const isPublicApi = pathname.startsWith("/api/cron"); // Cron jobs
   const isAdminSeed = pathname === "/api/admin/seed-users"; // Temporary: seed users
+  const isDebug = pathname.startsWith("/api/debug"); // Temporary: debug endpoints
 
   // Allow public routes
-  if (isAuthRoute || isWebhook || isPublicApi || isAdminSeed) {
+  if (isAuthRoute || isWebhook || isPublicApi || isAdminSeed || isDebug) {
     return;
   }
 
