@@ -25,11 +25,13 @@ export function LeadDetailPanel({ leadId, onClose }: LeadDetailPanelProps) {
   const [callSummaryOpen, setCallSummaryOpen] = useState(false);
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
 
-  // Edit name state
-  const [isEditingName, setIsEditingName] = useState(false);
+  // Edit lead state
+  const [isEditing, setIsEditing] = useState(false);
   const [editedFirstName, setEditedFirstName] = useState("");
   const [editedLastName, setEditedLastName] = useState("");
-  const [isSavingName, setIsSavingName] = useState(false);
+  const [editedEmail, setEditedEmail] = useState("");
+  const [editedPhone, setEditedPhone] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   const fetchLead = useCallback(async () => {
     try {
@@ -69,22 +71,24 @@ export function LeadDetailPanel({ leadId, onClose }: LeadDetailPanelProps) {
     setSelectedAppointmentId(null);
   };
 
-  // Handler to start editing name
-  const handleStartEditName = () => {
+  // Handler to start editing
+  const handleStartEdit = () => {
     if (lead) {
       setEditedFirstName(lead.firstName || "");
       setEditedLastName(lead.lastName || "");
-      setIsEditingName(true);
+      setEditedEmail(lead.email || "");
+      setEditedPhone(lead.phone || "");
+      setIsEditing(true);
     }
   };
 
-  // Handler to save name
-  const handleSaveName = async () => {
-    if (!editedFirstName.trim() || !editedLastName.trim()) {
+  // Handler to save edits
+  const handleSaveEdit = async () => {
+    if (!editedFirstName.trim() || !editedLastName.trim() || !editedEmail.trim()) {
       return;
     }
 
-    setIsSavingName(true);
+    setIsSaving(true);
     try {
       const response = await fetch(`/api/leads/${leadId}`, {
         method: "PATCH",
@@ -92,25 +96,29 @@ export function LeadDetailPanel({ leadId, onClose }: LeadDetailPanelProps) {
         body: JSON.stringify({
           firstName: editedFirstName.trim(),
           lastName: editedLastName.trim(),
+          email: editedEmail.trim(),
+          phone: editedPhone.trim() || null,
         }),
       });
 
       if (response.ok) {
-        setIsEditingName(false);
+        setIsEditing(false);
         fetchLead(); // Refresh lead data
       }
     } catch (error) {
-      console.error("Error updating name:", error);
+      console.error("Error updating lead:", error);
     } finally {
-      setIsSavingName(false);
+      setIsSaving(false);
     }
   };
 
-  // Handler to cancel name edit
-  const handleCancelNameEdit = () => {
-    setIsEditingName(false);
+  // Handler to cancel edit
+  const handleCancelEdit = () => {
+    setIsEditing(false);
     setEditedFirstName("");
     setEditedLastName("");
+    setEditedEmail("");
+    setEditedPhone("");
   };
 
   if (loading) {
@@ -170,15 +178,16 @@ export function LeadDetailPanel({ leadId, onClose }: LeadDetailPanelProps) {
         {/* Lead name and status */}
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
-            {isEditingName ? (
-              <div className="mb-2">
-                <div className="flex items-center gap-2 mb-2">
+            {isEditing ? (
+              <div className="space-y-3">
+                {/* Name fields */}
+                <div className="flex items-center gap-2">
                   <input
                     type="text"
                     value={editedFirstName}
                     onChange={(e) => setEditedFirstName(e.target.value)}
                     placeholder="First Name"
-                    className="text-lg font-semibold text-[#1C1B1A] border border-[#E5E0D8] rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#625FFF] focus:ring-1 focus:ring-[#625FFF] w-32"
+                    className="text-lg font-semibold text-[#1C1B1A] border border-[#E5E0D8] rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#625FFF] focus:ring-1 focus:ring-[#625FFF] flex-1"
                     autoFocus
                   />
                   <input
@@ -186,23 +195,46 @@ export function LeadDetailPanel({ leadId, onClose }: LeadDetailPanelProps) {
                     value={editedLastName}
                     onChange={(e) => setEditedLastName(e.target.value)}
                     placeholder="Last Name"
-                    className="text-lg font-semibold text-[#1C1B1A] border border-[#E5E0D8] rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#625FFF] focus:ring-1 focus:ring-[#625FFF] w-32"
+                    className="text-lg font-semibold text-[#1C1B1A] border border-[#E5E0D8] rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#625FFF] focus:ring-1 focus:ring-[#625FFF] flex-1"
                   />
                 </div>
-                <div className="flex items-center gap-2">
+                {/* Email field */}
+                <div>
+                  <label className="block text-xs text-[#8E8983] mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={editedEmail}
+                    onChange={(e) => setEditedEmail(e.target.value)}
+                    placeholder="Email"
+                    className="w-full text-sm text-[#1C1B1A] border border-[#E5E0D8] rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#625FFF] focus:ring-1 focus:ring-[#625FFF]"
+                  />
+                </div>
+                {/* Phone field */}
+                <div>
+                  <label className="block text-xs text-[#8E8983] mb-1">Phone</label>
+                  <input
+                    type="tel"
+                    value={editedPhone}
+                    onChange={(e) => setEditedPhone(e.target.value)}
+                    placeholder="Phone"
+                    className="w-full text-sm text-[#1C1B1A] border border-[#E5E0D8] rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#625FFF] focus:ring-1 focus:ring-[#625FFF]"
+                  />
+                </div>
+                {/* Action buttons */}
+                <div className="flex items-center gap-2 pt-1">
                   <Button
                     size="sm"
                     variant="primary"
-                    onClick={handleSaveName}
-                    disabled={isSavingName || !editedFirstName.trim() || !editedLastName.trim()}
+                    onClick={handleSaveEdit}
+                    disabled={isSaving || !editedFirstName.trim() || !editedLastName.trim() || !editedEmail.trim()}
                   >
-                    {isSavingName ? "Saving..." : "Save"}
+                    {isSaving ? "Saving..." : "Save"}
                   </Button>
                   <Button
                     size="sm"
                     variant="secondary"
-                    onClick={handleCancelNameEdit}
-                    disabled={isSavingName}
+                    onClick={handleCancelEdit}
+                    disabled={isSaving}
                   >
                     Cancel
                   </Button>
@@ -213,7 +245,7 @@ export function LeadDetailPanel({ leadId, onClose }: LeadDetailPanelProps) {
                 {leadName}
               </h1>
             )}
-            <StatusBadge status={lead.status} />
+            {!isEditing && <StatusBadge status={lead.status} />}
           </div>
         </div>
 
@@ -231,7 +263,13 @@ export function LeadDetailPanel({ leadId, onClose }: LeadDetailPanelProps) {
             </svg>
             Send SMS
           </Button>
-          <Button size="sm" variant="ghost" onClick={handleStartEditName} disabled={isEditingName}>
+          <Button
+            size="sm"
+            variant="ghost"
+            type="button"
+            onClick={handleStartEdit}
+            disabled={isEditing}
+          >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
             </svg>
