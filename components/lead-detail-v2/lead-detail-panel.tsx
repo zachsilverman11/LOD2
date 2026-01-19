@@ -25,6 +25,12 @@ export function LeadDetailPanel({ leadId, onClose }: LeadDetailPanelProps) {
   const [callSummaryOpen, setCallSummaryOpen] = useState(false);
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
 
+  // Edit name state
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editedFirstName, setEditedFirstName] = useState("");
+  const [editedLastName, setEditedLastName] = useState("");
+  const [isSavingName, setIsSavingName] = useState(false);
+
   const fetchLead = useCallback(async () => {
     try {
       setLoading(true);
@@ -61,6 +67,50 @@ export function LeadDetailPanel({ leadId, onClose }: LeadDetailPanelProps) {
   const handleCloseCallSummary = () => {
     setCallSummaryOpen(false);
     setSelectedAppointmentId(null);
+  };
+
+  // Handler to start editing name
+  const handleStartEditName = () => {
+    if (lead) {
+      setEditedFirstName(lead.firstName || "");
+      setEditedLastName(lead.lastName || "");
+      setIsEditingName(true);
+    }
+  };
+
+  // Handler to save name
+  const handleSaveName = async () => {
+    if (!editedFirstName.trim() || !editedLastName.trim()) {
+      return;
+    }
+
+    setIsSavingName(true);
+    try {
+      const response = await fetch(`/api/leads/${leadId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          firstName: editedFirstName.trim(),
+          lastName: editedLastName.trim(),
+        }),
+      });
+
+      if (response.ok) {
+        setIsEditingName(false);
+        fetchLead(); // Refresh lead data
+      }
+    } catch (error) {
+      console.error("Error updating name:", error);
+    } finally {
+      setIsSavingName(false);
+    }
+  };
+
+  // Handler to cancel name edit
+  const handleCancelNameEdit = () => {
+    setIsEditingName(false);
+    setEditedFirstName("");
+    setEditedLastName("");
   };
 
   if (loading) {
@@ -120,9 +170,49 @@ export function LeadDetailPanel({ leadId, onClose }: LeadDetailPanelProps) {
         {/* Lead name and status */}
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
-            <h1 className="text-xl font-semibold text-[#1C1B1A] truncate mb-2">
-              {leadName}
-            </h1>
+            {isEditingName ? (
+              <div className="mb-2">
+                <div className="flex items-center gap-2 mb-2">
+                  <input
+                    type="text"
+                    value={editedFirstName}
+                    onChange={(e) => setEditedFirstName(e.target.value)}
+                    placeholder="First Name"
+                    className="text-lg font-semibold text-[#1C1B1A] border border-[#E5E0D8] rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#625FFF] focus:ring-1 focus:ring-[#625FFF] w-32"
+                    autoFocus
+                  />
+                  <input
+                    type="text"
+                    value={editedLastName}
+                    onChange={(e) => setEditedLastName(e.target.value)}
+                    placeholder="Last Name"
+                    className="text-lg font-semibold text-[#1C1B1A] border border-[#E5E0D8] rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#625FFF] focus:ring-1 focus:ring-[#625FFF] w-32"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    onClick={handleSaveName}
+                    disabled={isSavingName || !editedFirstName.trim() || !editedLastName.trim()}
+                  >
+                    {isSavingName ? "Saving..." : "Save"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={handleCancelNameEdit}
+                    disabled={isSavingName}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <h1 className="text-xl font-semibold text-[#1C1B1A] truncate mb-2">
+                {leadName}
+              </h1>
+            )}
             <StatusBadge status={lead.status} />
           </div>
         </div>
@@ -141,7 +231,7 @@ export function LeadDetailPanel({ leadId, onClose }: LeadDetailPanelProps) {
             </svg>
             Send SMS
           </Button>
-          <Button size="sm" variant="ghost">
+          <Button size="sm" variant="ghost" onClick={handleStartEditName} disabled={isEditingName}>
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
             </svg>
