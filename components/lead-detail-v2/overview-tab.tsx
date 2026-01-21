@@ -76,6 +76,70 @@ function parseRawDate(value: unknown): Date | null {
   return null;
 }
 
+// Format field name from camelCase/snake_case to readable label
+function formatFieldName(key: string): string {
+  return key
+    .replace(/_/g, " ")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
+// Check if a value looks like a currency amount
+function isCurrencyField(key: string): boolean {
+  const currencyKeywords = [
+    "value", "amount", "price", "balance", "payment", "income", "salary",
+    "equity", "down", "cost", "fee", "rate", "mortgage", "loan"
+  ];
+  const lowerKey = key.toLowerCase();
+  return currencyKeywords.some((kw) => lowerKey.includes(kw));
+}
+
+// Check if a value looks like a date/time field
+function isDateField(key: string): boolean {
+  const dateKeywords = ["date", "time", "at", "created", "updated", "submitted"];
+  const lowerKey = key.toLowerCase();
+  return dateKeywords.some((kw) => lowerKey.includes(kw));
+}
+
+// Format field value based on field name and value type
+function formatFieldValue(key: string, value: unknown): string {
+  if (value === null || value === undefined || value === "") return "—";
+
+  const strValue = String(value);
+
+  // Try to format as currency if key suggests it's a money field
+  if (isCurrencyField(key)) {
+    const num = parseFloat(strValue.replace(/[^0-9.-]/g, ""));
+    if (!isNaN(num) && num > 100) {
+      return new Intl.NumberFormat("en-CA", {
+        style: "currency",
+        currency: "CAD",
+        maximumFractionDigits: 0,
+      }).format(num);
+    }
+  }
+
+  // Try to format as date if key suggests it's a date field
+  if (isDateField(key)) {
+    const date = parseRawDate(value);
+    if (date) {
+      return format(date, "MMM d, yyyy");
+    }
+  }
+
+  // Handle boolean values
+  if (value === true || strValue.toLowerCase() === "true" || strValue.toLowerCase() === "yes") {
+    return "Yes";
+  }
+  if (value === false || strValue.toLowerCase() === "false" || strValue.toLowerCase() === "no") {
+    return "No";
+  }
+
+  return strValue;
+}
+
 // Copy to clipboard helper
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -268,6 +332,109 @@ export function OverviewTab({ lead, onRefresh, onLogCallOutcome }: OverviewTabPr
           </CardContent>
         </Card>
       </section>
+
+      {/* Application Status - show if lead has application tracking data */}
+      {(lead.applicationStartedAt || lead.applicationCompletedAt) && (
+        <section>
+          <SectionLabel>Application Status</SectionLabel>
+          <Card>
+            <CardContent>
+              <div className="space-y-3">
+                {lead.applicationStartedAt && (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-[#F59E0B]" />
+                      <span className="text-sm text-[#8E8983]">Application Started</span>
+                    </div>
+                    <span className="text-sm font-medium text-[#1C1B1A]">
+                      {format(new Date(lead.applicationStartedAt), "MMM d, yyyy 'at' h:mm a")}
+                    </span>
+                  </div>
+                )}
+                {lead.applicationCompletedAt ? (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-[#76C63E]" />
+                      <span className="text-sm text-[#8E8983]">Application Completed</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-[#1C1B1A]">
+                        {format(new Date(lead.applicationCompletedAt), "MMM d, yyyy 'at' h:mm a")}
+                      </span>
+                      <Badge variant="success">CONVERTED</Badge>
+                    </div>
+                  </div>
+                ) : lead.applicationStartedAt ? (
+                  <div className="flex items-center gap-2 text-sm text-[#8E8983]">
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    <span>Application in progress</span>
+                  </div>
+                ) : null}
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+      )}
+
+      {/* Additional Details - dynamically display all other rawData fields */}
+      {(() => {
+        // Fields already displayed elsewhere or should be hidden
+        const excludedFields = new Set([
+          // Already displayed in Lead Details
+          "city", "City", "province", "Province", "state", "State",
+          "lender", "Lender", "current_lender",
+          "lead_type", "loan_type", "loanType", "LoanType",
+          "prop_type", "property_type", "propertyType", "PropertyType",
+          "balance", "Balance", "mortgage_balance",
+          "home_value", "homeValue", "HomeValue", "propertyValue",
+          "rent_check", "rentCheck", "hasRentIncome",
+          "capture_time", "captureTime", "submitted_at",
+          // Contact info displayed elsewhere
+          "name", "Name", "first_name", "last_name", "firstName", "lastName",
+          "email", "Email", "phone", "Phone", "mobile", "Mobile",
+          // Consent fields
+          "consent", "consent_email", "consent_sms", "consent_call",
+          "consentEmail", "consentSms", "consentCall",
+          // Internal/tracking fields
+          "id", "leadId", "lead_id", "webhook_id", "webhookId",
+          "source", "Source", "utm_source", "utm_medium", "utm_campaign",
+        ]);
+
+        const additionalFields = Object.entries(rawData)
+          .filter(([key, value]) => {
+            // Exclude known fields
+            if (excludedFields.has(key)) return false;
+            // Exclude empty values
+            if (value === null || value === undefined || value === "") return false;
+            // Exclude objects and arrays
+            if (typeof value === "object") return false;
+            return true;
+          })
+          .sort(([a], [b]) => a.localeCompare(b));
+
+        if (additionalFields.length === 0) return null;
+
+        return (
+          <section>
+            <SectionLabel>Additional Details</SectionLabel>
+            <Card>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-x-8 gap-y-3">
+                  {additionalFields.map(([key, value]) => (
+                    <div key={key}>
+                      <p className="text-sm text-[#8E8983] mb-0.5">{formatFieldName(key)}</p>
+                      <p className="text-sm font-medium text-[#1C1B1A]">{formatFieldValue(key, value)}</p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </section>
+        );
+      })()}
 
       {/* Consent Status */}
       <section>
