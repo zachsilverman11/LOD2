@@ -28,6 +28,7 @@ interface CohortData {
   appsSubmitted: number;
   dealsWon: number;
   leadToCallRate: number;
+  callToAppRate: number;
   appToDealsWonRate: number;
   leadToDealsWonRate: number;
   startDate: string | null;
@@ -338,6 +339,7 @@ export default function AnalyticsPage() {
                     <th className="text-right py-4 px-4 text-sm font-semibold text-[#55514D]">Booked</th>
                     <th className="text-right py-4 px-4 text-sm font-semibold text-[#55514D]">Lead→Call %</th>
                     <th className="text-right py-4 px-4 text-sm font-semibold text-[#55514D]">Apps</th>
+                    <th className="text-right py-4 px-4 text-sm font-semibold text-[#55514D]">Call→App %</th>
                     <th className="text-right py-4 px-4 text-sm font-semibold text-[#55514D]">App→Won %</th>
                     <th className="text-right py-4 px-4 text-sm font-semibold text-green-700">Deals Won</th>
                     <th className="text-right py-4 px-4 text-sm font-semibold text-green-700">Lead→Deal %</th>
@@ -370,6 +372,9 @@ export default function AnalyticsPage() {
                       </td>
                       <td className="py-3 px-4 text-sm text-right text-[#55514D]">{cohort.appsSubmitted}</td>
                       <td className="py-3 px-4 text-sm text-right font-semibold text-[#625FFF]">
+                        {formatPercent(cohort.callToAppRate)}
+                      </td>
+                      <td className="py-3 px-4 text-sm text-right font-semibold text-[#625FFF]">
                         {formatPercent(cohort.appToDealsWonRate)}
                       </td>
                       <td className="py-3 px-4 text-sm text-right font-semibold text-green-600">
@@ -391,6 +396,9 @@ export default function AnalyticsPage() {
                         {formatPercent(cohortData.totals.leadToCallRate)}
                       </td>
                       <td className="py-3 px-4 text-sm text-right">{cohortData.totals.appsSubmitted}</td>
+                      <td className="py-3 px-4 text-sm text-right">
+                        {formatPercent(cohortData.totals.callToAppRate)}
+                      </td>
                       <td className="py-3 px-4 text-sm text-right">
                         {formatPercent(cohortData.totals.appToDealsWonRate)}
                       </td>

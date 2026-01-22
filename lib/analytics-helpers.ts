@@ -425,6 +425,7 @@ export interface SimplifiedCohortMetrics {
   appsSubmitted: number;
   dealsWon: number;
   leadToCallRate: number;
+  callToAppRate: number;
   appToDealsWonRate: number;
   leadToDealsWonRate: number;
   startDate: Date | null;
@@ -460,6 +461,7 @@ export function calculateAllCohortMetrics(leads: LeadWithRelations[]): Simplifie
       appsSubmitted,
       dealsWon,
       leadToCallRate: calculateRate(booked, totalLeads),
+      callToAppRate: calculateRate(appsSubmitted, booked),
       appToDealsWonRate: calculateRate(dealsWon, appsSubmitted),
       leadToDealsWonRate: calculateRate(dealsWon, totalLeads),
       startDate: cohortLeads[0]?.cohortStartDate || null,
@@ -483,6 +485,7 @@ export function calculateCohortTotals(cohortMetrics: SimplifiedCohortMetrics[]):
     appsSubmitted,
     dealsWon,
     leadToCallRate: calculateRate(booked, totalLeads),
+    callToAppRate: calculateRate(appsSubmitted, booked),
     appToDealsWonRate: calculateRate(dealsWon, appsSubmitted),
     leadToDealsWonRate: calculateRate(dealsWon, totalLeads),
     startDate: null,
