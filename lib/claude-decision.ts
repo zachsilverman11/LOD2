@@ -23,6 +23,11 @@ import { getConversationGuidance, SALES_PSYCHOLOGY } from './sales-psychology';
 import { getRelevantExamples } from './holly-training-examples';
 import { LEARNED_EXAMPLES } from './holly-learned-examples';
 import { getLocalTime, getLocalTimeString } from './timezone-utils';
+import {
+  detectConversationStage,
+  buildStageEnforcementPrompt,
+  ConversationStage,
+} from './conversation-stage';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -143,6 +148,48 @@ export async function askHollyToDecide(
       completed: lead.applicationCompletedAt || undefined,
     },
   });
+
+  // === CONVERSATION STAGE DETECTION ===
+  const conversationStage = detectConversationStage({
+    lead: {
+      status: lead.status,
+      applicationStartedAt: lead.applicationStartedAt || null,
+      applicationCompletedAt: lead.applicationCompletedAt || null,
+    },
+    appointments: lead.appointments || [],
+    callOutcomes: lead.callOutcomes || [],
+    communications: lead.communications || [],
+  });
+
+  // Get appointment details for the prompt if there's an upcoming appointment
+  const upcomingAppointment = lead.appointments?.find((apt: any) => {
+    const scheduledTime = apt.scheduledFor || apt.scheduledAt;
+    return scheduledTime && scheduledTime > now;
+  });
+
+  const appointmentDetails = upcomingAppointment
+    ? {
+        date: (upcomingAppointment.scheduledFor || upcomingAppointment.scheduledAt).toLocaleDateString('en-US', {
+          weekday: 'long',
+          month: 'long',
+          day: 'numeric',
+        }),
+        time: (upcomingAppointment.scheduledFor || upcomingAppointment.scheduledAt).toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+          timeZone: 'America/Vancouver',
+        }),
+      }
+    : undefined;
+
+  const stageEnforcementBlock = buildStageEnforcementPrompt(
+    conversationStage,
+    firstName,
+    appointmentDetails
+  );
+
+  console.log(`[Holly Decision] 🎭 ${firstName}: Stage = ${conversationStage}`);
 
   // === LAYER 1: LEAD JOURNEY CONTEXT ===
   const journeyContext = getLeadJourneyIntro(leadType, rawData?.motivation_level);
@@ -337,7 +384,7 @@ Supportive, helpful, customer-service oriented. NOT sales-y.
 `
       : '';
 
-  const prompt = `${convertedLeadInstructions}# ⏰ CURRENT DATE & TIME (CRITICAL CONTEXT)
+  const prompt = `${stageEnforcementBlock}${convertedLeadInstructions}# ⏰ CURRENT DATE & TIME (CRITICAL CONTEXT)
 
 **System Time:** ${currentDateFormatted} at ${currentTimeFormatted}
 **Lead's Local Time (${province}):** ${leadLocalTimeFormatted}

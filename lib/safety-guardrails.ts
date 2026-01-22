@@ -6,6 +6,7 @@
 import { Lead } from '@prisma/client';
 import { DealSignals } from './deal-intelligence';
 import { getLocalTime } from './timezone-utils';
+import { ConversationStage, getDiscoveryQuestionPatterns } from './conversation-stage';
 
 export interface ValidationResult {
   isValid: boolean;
@@ -31,6 +32,7 @@ interface DecisionContext {
     hollyDisabled?: boolean;
   };
   signals: DealSignals;
+  conversationStage?: ConversationStage;
 }
 
 export function validateDecision(
@@ -166,6 +168,45 @@ export function validateDecision(
     if (asksAboutBooking) {
       errors.push(
         'CRITICAL: Message asks if lead booked, but they already have an appointment! This makes Holly look disorganized. Instead, acknowledge their existing appointment or offer to reschedule if they no-showed.'
+      );
+    }
+  }
+
+  // === STAGE-SPECIFIC MESSAGE VALIDATION ===
+  if (decision.message && context.conversationStage === 'POST_BOOKING_PRE_CALL') {
+    const discoveryPatterns = getDiscoveryQuestionPatterns();
+
+    if (discoveryPatterns.some(p => p.test(decision.message!))) {
+      errors.push(
+        'POST_BOOKING violation: Cannot ask discovery questions to a lead who already booked. ' +
+        'They answered these during the form/conversation. Focus on preparing them for their call.'
+      );
+    }
+
+    // Also check for cold outreach language in post-booking context
+    const coldOutreachPatterns = [
+      /saw you filled out/i,
+      /noticed you (submitted|filled|completed)/i,
+      /thanks for (your interest|reaching out|the inquiry)/i,
+      /wanted to (introduce myself|reach out|follow up on your inquiry)/i,
+    ];
+
+    if (coldOutreachPatterns.some(p => p.test(decision.message!))) {
+      errors.push(
+        'POST_BOOKING violation: Cannot use cold outreach language to a lead who already booked. ' +
+        'They\'re past the inquiry stage - acknowledge their appointment instead.'
+      );
+    }
+  }
+
+  // === STAGE-SPECIFIC: POST_CALL_PENDING_APP ===
+  if (decision.message && context.conversationStage === 'POST_CALL_PENDING_APP') {
+    const discoveryPatterns = getDiscoveryQuestionPatterns();
+
+    if (discoveryPatterns.some(p => p.test(decision.message!))) {
+      errors.push(
+        'POST_CALL violation: Cannot ask discovery questions to a lead who already had their call. ' +
+        'Focus on next steps like sending the application link or following up on action items.'
       );
     }
   }

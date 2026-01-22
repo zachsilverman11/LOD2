@@ -8,6 +8,7 @@ import { LeadStatus } from '@/app/generated/prisma';
 import { analyzeDealHealth } from './deal-intelligence';
 import { askHollyToDecide } from './claude-decision';
 import { validateDecision, detectMessageRepetition } from './safety-guardrails';
+import { detectConversationStage } from './conversation-stage';
 import { executeDecision } from './ai-conversation-enhanced';
 import { sendSlackNotification } from './slack';
 import { trackConversationOutcome } from './conversation-outcome-tracker';
@@ -147,11 +148,25 @@ export async function processLeadWithAutonomousAgent(
     // === ANALYZE DEAL HEALTH ===
     const signals = analyzeDealHealth(lead);
 
+    // === DETECT CONVERSATION STAGE ===
+    const conversationStage = detectConversationStage({
+      lead: {
+        status: lead.status,
+        applicationStartedAt: lead.applicationStartedAt || null,
+        applicationCompletedAt: lead.applicationCompletedAt || null,
+      },
+      appointments: lead.appointments || [],
+      callOutcomes: lead.callOutcomes || [],
+      communications: lead.communications || [],
+    });
+
+    console.log(`[Holly Agent] 🎭 ${lead.firstName}: Stage = ${conversationStage}`);
+
     // === ASK HOLLY TO DECIDE ===
     const decision = await askHollyToDecide(lead, signals);
 
     // === VALIDATE DECISION ===
-    const validation = validateDecision(decision, { lead, signals });
+    const validation = validateDecision(decision, { lead, signals, conversationStage });
 
     // Log warnings
     if (validation.warnings.length > 0) {
@@ -593,15 +608,27 @@ export async function runHollyAgentLoop() {
         // === ANALYZE DEAL HEALTH ===
         const signals = analyzeDealHealth(lead);
 
+        // === DETECT CONVERSATION STAGE ===
+        const conversationStage = detectConversationStage({
+          lead: {
+            status: lead.status,
+            applicationStartedAt: lead.applicationStartedAt || null,
+            applicationCompletedAt: lead.applicationCompletedAt || null,
+          },
+          appointments: lead.appointments || [],
+          callOutcomes: lead.callOutcomes || [],
+          communications: lead.communications || [],
+        });
+
         console.log(
-          `[Holly Agent] 🔍 ${lead.firstName} ${lead.lastName}: ${signals.temperature} (${signals.engagementTrend})`
+          `[Holly Agent] 🔍 ${lead.firstName} ${lead.lastName}: ${signals.temperature} (${signals.engagementTrend}) | Stage: ${conversationStage}`
         );
 
         // === ASK HOLLY TO DECIDE ===
         const decision = await askHollyToDecide(lead, signals);
 
         // === VALIDATE DECISION ===
-        const validation = validateDecision(decision, { lead, signals });
+        const validation = validateDecision(decision, { lead, signals, conversationStage });
 
         // Log warnings
         if (validation.warnings.length > 0) {
