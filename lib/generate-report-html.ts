@@ -1118,7 +1118,8 @@ function generateScenario1Pages(
   const paymentDiff = formatCurrency(data.paymentDifference || 644);
   const fiveYearTotal = formatCurrency(data.fiveYearsOfPayments || 161340);
   const previousRate = formatPercent(data.previousRate || 0.0189);
-  const currentRate = formatPercent(data.currentMarketRate || 0.0449);
+  // Use the actual currentMarketRate if provided, otherwise check for null/undefined explicitly
+  const currentRate = data.currentMarketRate != null ? formatPercent(data.currentMarketRate) : formatPercent(0.045);
   const mortgageAmount = formatCurrency(data.mortgageAmount || 485000);
   const originalAm = data.originalAmortization || 25;
   const currentAm = data.currentAmortization || 20;
