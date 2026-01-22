@@ -57,10 +57,36 @@ interface LoanTypeAnalytics {
   totals: LoanTypeData;
 }
 
+interface BookingSourceStats {
+  source: string;
+  displayName: string;
+  total: number;
+  scheduled: number;
+  completed: number;
+  noShow: number;
+  cancelled: number;
+  showUpRate: number;
+  conversionRate: number;
+}
+
+interface BookingSourceData {
+  sources: BookingSourceStats[];
+  totals: {
+    total: number;
+    scheduled: number;
+    completed: number;
+    noShow: number;
+    cancelled: number;
+    showUpRate: number;
+    conversionRate: number;
+  };
+}
+
 export default function AnalyticsPage() {
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [cohortData, setCohortData] = useState<CohortComparisonData | null>(null);
   const [loanTypeData, setLoanTypeData] = useState<LoanTypeAnalytics | null>(null);
+  const [bookingSourceData, setBookingSourceData] = useState<BookingSourceData | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Cohort filtering
@@ -75,15 +101,17 @@ export default function AnalyticsPage() {
     setLoading(true);
     try {
       const cohortParam = selectedCohort !== "all" ? `?cohort=${selectedCohort}` : "";
-      const [overviewRes, cohortRes, loanTypeRes] = await Promise.all([
+      const [overviewRes, cohortRes, loanTypeRes, bookingSourceRes] = await Promise.all([
         fetch(`/api/analytics/overview${cohortParam}`),
         fetch("/api/analytics/cohort-comparison"),
         fetch(`/api/analytics/loan-types${cohortParam}`),
+        fetch(`/api/analytics/booking-sources${cohortParam}`),
       ]);
 
       const overviewData = await overviewRes.json();
       const cohortComparisonData = await cohortRes.json();
       const loanTypeAnalytics = await loanTypeRes.json();
+      const bookingSourceAnalytics = await bookingSourceRes.json();
 
       if (overviewData.success) {
         setOverview(overviewData.data);
@@ -96,6 +124,9 @@ export default function AnalyticsPage() {
       }
       if (loanTypeAnalytics.success) {
         setLoanTypeData(loanTypeAnalytics.data);
+      }
+      if (bookingSourceAnalytics.success) {
+        setBookingSourceData(bookingSourceAnalytics.data);
       }
     } catch (error) {
       console.error("Failed to fetch analytics:", error);
@@ -489,7 +520,124 @@ export default function AnalyticsPage() {
           </div>
         )}
 
-        {/* Section 5: Status Breakdown (simplified) */}
+        {/* Section 5: Appointments by Booking Source */}
+        {bookingSourceData && bookingSourceData.sources.some(s => s.total > 0) && (
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-[#1C1B1A] mb-4">Appointments by Booking Source</h2>
+
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              {bookingSourceData.sources.map((source) => (
+                <div
+                  key={source.source}
+                  className={`bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border p-5 ${
+                    source.source === "MANUAL"
+                      ? "border-[#8B88FF]/30 bg-[#8B88FF]/5"
+                      : source.source === "LOD"
+                      ? "border-[#625FFF]/30 bg-[#625FFF]/5"
+                      : "border-[#E4DDD3]"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <span className={`text-sm font-semibold ${
+                      source.source === "MANUAL"
+                        ? "text-[#625FFF]"
+                        : source.source === "LOD"
+                        ? "text-[#625FFF]"
+                        : "text-[#55514D]"
+                    }`}>
+                      {source.displayName}
+                    </span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                      source.source === "MANUAL"
+                        ? "bg-[#8B88FF]/20 text-[#625FFF]"
+                        : source.source === "LOD"
+                        ? "bg-[#625FFF]/20 text-[#625FFF]"
+                        : "bg-[#FBF3E7] text-[#55514D]"
+                    }`}>
+                      {source.total} total
+                    </span>
+                  </div>
+                  <div className="text-3xl font-bold text-[#1C1B1A] mb-2">
+                    {formatPercent(source.showUpRate)}
+                  </div>
+                  <div className="text-xs text-[#55514D]">
+                    Show-up rate ({source.completed} of {source.completed + source.noShow})
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Detailed Table */}
+            <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-[#FBF3E7]">
+                    <tr>
+                      <th className="text-left py-4 px-4 text-sm font-bold text-[#1C1B1A]">Source</th>
+                      <th className="text-right py-4 px-4 text-sm font-semibold text-[#55514D]">Total</th>
+                      <th className="text-right py-4 px-4 text-sm font-semibold text-[#55514D]">Scheduled</th>
+                      <th className="text-right py-4 px-4 text-sm font-semibold text-[#55514D]">Completed</th>
+                      <th className="text-right py-4 px-4 text-sm font-semibold text-[#55514D]">No Show</th>
+                      <th className="text-right py-4 px-4 text-sm font-semibold text-[#625FFF]">Show-up %</th>
+                      <th className="text-right py-4 px-4 text-sm font-semibold text-green-700">Conv. %</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bookingSourceData.sources.map((source, index) => (
+                      <tr
+                        key={source.source}
+                        className={`border-b border-[#E4DDD3]/50 hover:bg-[#FBF3E7]/30 ${
+                          index % 2 === 0 ? "bg-white" : "bg-[#FBF3E7]/10"
+                        }`}
+                      >
+                        <td className={`py-3 px-4 text-sm font-bold ${
+                          source.source === "MANUAL" ? "text-[#625FFF]" : "text-[#1C1B1A]"
+                        }`}>
+                          {source.displayName}
+                        </td>
+                        <td className="py-3 px-4 text-sm text-right font-semibold text-[#1C1B1A]">
+                          {source.total}
+                        </td>
+                        <td className="py-3 px-4 text-sm text-right text-[#55514D]">
+                          {source.scheduled}
+                        </td>
+                        <td className="py-3 px-4 text-sm text-right text-[#55514D]">
+                          {source.completed}
+                        </td>
+                        <td className="py-3 px-4 text-sm text-right text-[#55514D]">
+                          {source.noShow}
+                        </td>
+                        <td className="py-3 px-4 text-sm text-right font-semibold text-[#625FFF]">
+                          {formatPercent(source.showUpRate)}
+                        </td>
+                        <td className="py-3 px-4 text-sm text-right font-bold text-green-700">
+                          {formatPercent(source.conversionRate)}
+                        </td>
+                      </tr>
+                    ))}
+                    {/* Totals Row */}
+                    <tr className="bg-[#1C1B1A] text-white font-bold">
+                      <td className="py-3 px-4 text-sm">TOTALS</td>
+                      <td className="py-3 px-4 text-sm text-right">{bookingSourceData.totals.total}</td>
+                      <td className="py-3 px-4 text-sm text-right">{bookingSourceData.totals.scheduled}</td>
+                      <td className="py-3 px-4 text-sm text-right">{bookingSourceData.totals.completed}</td>
+                      <td className="py-3 px-4 text-sm text-right">{bookingSourceData.totals.noShow}</td>
+                      <td className="py-3 px-4 text-sm text-right">
+                        {formatPercent(bookingSourceData.totals.showUpRate)}
+                      </td>
+                      <td className="py-3 px-4 text-sm text-right text-green-400">
+                        {formatPercent(bookingSourceData.totals.conversionRate)}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Section 6: Status Breakdown (simplified) */}
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-[#1C1B1A] mb-4">Lead Status Breakdown</h2>
           <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-6">

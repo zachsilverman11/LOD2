@@ -96,6 +96,9 @@ model Appointment {
   scheduledFor     DateTime?
   advisorEmail     String?
   advisorName      String?
+  bookingSource    BookingSource @default(HOLLY)
+  markedManualAt   DateTime?     // Audit: when marked manual
+  markedManualBy   String?       // Audit: who marked it
   lead             Lead          @relation(fields: [leadId], references: [id], onDelete: Cascade)
   callOutcomes     CallOutcome[]
 
@@ -104,6 +107,7 @@ model Appointment {
   @@index([scheduledFor])
   @@index([advisorEmail])
   @@index([status])
+  @@index([bookingSource])
   @@index([status, scheduledFor, reminder24hSent, reminder1hSent], map: "idx_appointment_reminders")
 }
 
@@ -400,6 +404,12 @@ enum DevCardPriority {
   MEDIUM
   HIGH
   CRITICAL
+}
+
+enum BookingSource {
+  HOLLY   // Cal.com webhooks (Holly AI automated)
+  LOD     // System-booked (VAPI voice AI)
+  MANUAL  // Manually marked by adviser
 }
 
 // User Management

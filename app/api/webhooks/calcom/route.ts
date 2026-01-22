@@ -183,6 +183,7 @@ async function handleBookingCreated(payload: any) {
       meetingUrl: meetingUrl,
       advisorName: organizer?.name || null,
       advisorEmail: organizer?.email || null,
+      bookingSource: "HOLLY",
       notes: payload.location ? `Meeting location: ${typeof payload.location === 'string' ? payload.location : JSON.stringify(payload.location)}` : undefined,
     },
   });

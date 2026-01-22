@@ -193,6 +193,7 @@ function FieldRow({ label, value, copyable }: { label: string; value: string; co
 
 export function OverviewTab({ lead, onRefresh, onLogCallOutcome }: OverviewTabProps) {
   const [isTogglingHolly, setIsTogglingHolly] = useState(false);
+  const [isTogglingBookingSource, setIsTogglingBookingSource] = useState(false);
 
   // Extract lead details from rawData
   const rawData = (lead.rawData as Record<string, unknown>) || {};
@@ -261,6 +262,42 @@ export function OverviewTab({ lead, onRefresh, onLogCallOutcome }: OverviewTabPr
     } catch (error) {
       console.error("Error marking as no-show:", error);
       alert("Error marking as no-show");
+    }
+  };
+
+  // Handle toggle booking source
+  const handleToggleBookingSource = async (appointmentId: string, currentSource: string | null) => {
+    setIsTogglingBookingSource(true);
+    const newSource = currentSource === "MANUAL" ? "HOLLY" : "MANUAL";
+    try {
+      const response = await fetch(`/api/appointments/${appointmentId}/booking-source`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingSource: newSource, markedBy: "Adviser" }),
+      });
+      if (response.ok) {
+        onRefresh();
+      } else {
+        alert("Failed to update booking source");
+      }
+    } catch (error) {
+      console.error("Error updating booking source:", error);
+      alert("Error updating booking source");
+    } finally {
+      setIsTogglingBookingSource(false);
+    }
+  };
+
+  // Get booking source label and styling
+  const getBookingSourceDisplay = (source: string | null) => {
+    switch (source) {
+      case "MANUAL":
+        return { label: "Manual", variant: "purple" as const };
+      case "LOD":
+        return { label: "System", variant: "info" as const };
+      case "HOLLY":
+      default:
+        return { label: "Holly", variant: "neutral" as const };
     }
   };
 
@@ -525,17 +562,22 @@ export function OverviewTab({ lead, onRefresh, onLogCallOutcome }: OverviewTabPr
                     </p>
                   )}
                 </div>
-                <Badge
-                  variant={
-                    upcomingAppointment.status === "scheduled"
-                      ? "warning"
-                      : upcomingAppointment.status === "completed"
-                      ? "info"
-                      : "neutral"
-                  }
-                >
-                  {upcomingAppointment.status === "no_show" ? "No Show" : upcomingAppointment.status}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Badge variant={getBookingSourceDisplay(upcomingAppointment.bookingSource).variant}>
+                    {getBookingSourceDisplay(upcomingAppointment.bookingSource).label}
+                  </Badge>
+                  <Badge
+                    variant={
+                      upcomingAppointment.status === "scheduled"
+                        ? "warning"
+                        : upcomingAppointment.status === "completed"
+                        ? "info"
+                        : "neutral"
+                    }
+                  >
+                    {upcomingAppointment.status === "no_show" ? "No Show" : upcomingAppointment.status}
+                  </Badge>
+                </div>
               </div>
 
               <div className="flex flex-wrap gap-2 pt-3 border-t border-[#E5E0D8]/50">
@@ -545,6 +587,16 @@ export function OverviewTab({ lead, onRefresh, onLogCallOutcome }: OverviewTabPr
                   onClick={() => onLogCallOutcome?.(upcomingAppointment.id)}
                 >
                   Log Call Outcome
+                </Button>
+
+                <Button
+                  size="sm"
+                  variant={upcomingAppointment.bookingSource === "MANUAL" ? "secondary" : "secondary"}
+                  onClick={() => handleToggleBookingSource(upcomingAppointment.id, upcomingAppointment.bookingSource)}
+                  disabled={isTogglingBookingSource}
+                  className={upcomingAppointment.bookingSource === "MANUAL" ? "border-[#625FFF] text-[#625FFF]" : ""}
+                >
+                  {isTogglingBookingSource ? "..." : upcomingAppointment.bookingSource === "MANUAL" ? "Unmark Manual" : "Mark as Manual"}
                 </Button>
 
                 {shouldShowNoShow(upcomingAppointment) && (
