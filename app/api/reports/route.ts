@@ -12,12 +12,29 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { leadId, advisorId, consultantName, bullets, mortgageAmount } = body;
+    const {
+      leadId,
+      advisorId,
+      consultantName,
+      bullets,
+      mortgageAmount,
+      scenario,
+      includeDebtConsolidation,
+      extractedData,
+    } = body;
 
     // Validate required fields
     if (!leadId || !advisorId || !consultantName || !bullets || mortgageAmount === undefined) {
       return NextResponse.json(
         { error: "Missing required fields" },
+        { status: 400 }
+      );
+    }
+
+    // Validate scenario is exactly 1, 2, or 3
+    if (scenario !== undefined && ![1, 2, 3].includes(scenario)) {
+      return NextResponse.json(
+        { error: "Scenario must be 1, 2, or 3" },
         { status: 400 }
       );
     }
@@ -39,6 +56,9 @@ export async function POST(request: NextRequest) {
         consultantName,
         bullets: bullets as string[],
         mortgageAmount: parseFloat(String(mortgageAmount)),
+        scenario: scenario || 1,
+        includeDebtConsolidation: includeDebtConsolidation || false,
+        extractedData: extractedData || null,
       },
       include: {
         generatedBy: {
@@ -46,6 +66,8 @@ export async function POST(request: NextRequest) {
             id: true,
             name: true,
             email: true,
+            phone: true,
+            calLink: true,
           },
         },
       },

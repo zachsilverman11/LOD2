@@ -6,6 +6,25 @@ import { LeadWithRelations } from "@/types/lead";
 import { Card, CardContent } from "@/components/ui/card";
 import { SectionLabel } from "@/components/ui/section-label";
 import { Button } from "@/components/ui/button";
+import { formatCurrency, calculateScenario1Data, calculateScenario2Data } from "@/lib/mortgage-calculations";
+
+// ExtractedData type for mortgage calculations
+type ExtractedData = {
+  mortgageAmount?: number;
+  originalAmortization?: number;
+  currentAmortization?: number;
+  previousRate?: number;
+  currentMarketRate?: number;
+  oldPayment?: number;
+  newPayment?: number;
+  paymentDifference?: number;
+  fiveYearsOfPayments?: number;
+  originalRate?: number;
+  lockInRate?: number;
+  estimatedExtraInterest?: number;
+  fixedPayment?: number;
+  otherDebts?: Array<{ type: string; balance: number; payment: number }>;
+};
 
 type Advisor = {
   id: string;
@@ -20,6 +39,9 @@ type SavedReport = {
   consultantName: string;
   bullets: string[];
   mortgageAmount: number;
+  scenario: number;
+  includeDebtConsolidation: boolean;
+  extractedData: ExtractedData | null;
   sentToEmail: string | null;
   sentAt: string | null;
   createdAt: string;
@@ -29,6 +51,12 @@ type SavedReport = {
 type ReportsTabProps = {
   lead: LeadWithRelations;
 };
+
+const SCENARIO_OPTIONS = [
+  { value: 1, label: "Scenario 1: Sub-2% Fixed → Renewal Trap", description: "Client locked in at sub-2% in 2020-2021, now facing payment shock" },
+  { value: 2, label: "Scenario 2: Variable → Panic Lock", description: "Client was in variable, rode rates up, then panic-locked at peak" },
+  { value: 3, label: "Scenario 3: Fixed Payment Variable → Negative Am", description: "Client had variable with fixed payments, didn't realize balance was growing" },
+];
 
 export function ReportsTab({ lead }: ReportsTabProps) {
   const { data: session, status } = useSession();
@@ -41,6 +69,12 @@ export function ReportsTab({ lead }: ReportsTabProps) {
   const [error, setError] = useState<string | null>(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [isLoadingAdvisors, setIsLoadingAdvisors] = useState(false);
+
+  // New state for scenario and debt consolidation
+  const [scenario, setScenario] = useState<1 | 2 | 3 | null>(null);
+  const [includeDebtConsolidation, setIncludeDebtConsolidation] = useState(false);
+  const [extractedData, setExtractedData] = useState<ExtractedData | null>(null);
+  const [isExtractingData, setIsExtractingData] = useState(false);
 
   // Report persistence state
   const [savedReports, setSavedReports] = useState<SavedReport[]>([]);
@@ -112,7 +146,7 @@ export function ReportsTab({ lead }: ReportsTabProps) {
     loadReports();
   }, [lead.id]);
 
-  const canGenerate = selectedAdvisor !== null && notes.trim().length >= 50;
+  const canGenerate = selectedAdvisor !== null && notes.trim().length >= 50 && scenario !== null;
 
   // Get mortgage balance from rawData
   const rawData = lead.rawData as Record<string, unknown> | null;
@@ -120,44 +154,58 @@ export function ReportsTab({ lead }: ReportsTabProps) {
     ? parseFloat(String(rawData.balance).replace(/[^0-9.]/g, ""))
     : 0;
 
-  // Calculate savings
-  const annualSavings = mortgageBalance * 0.0125;
-  const fiveYearSavings = annualSavings * 5;
-  const cashBack = mortgageBalance * 0.03;
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("en-CA", {
-      style: "currency",
-      currency: "CAD",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
-
   const handleGeneratePreview = async () => {
+    if (!scenario) {
+      setError("Please select a scenario");
+      return;
+    }
+
     setIsGenerating(true);
+    setIsExtractingData(true);
     setError(null);
     setShowPreview(true);
 
     try {
-      const response = await fetch("/api/ai/generate-bullets", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ notes }),
-      });
+      // Generate bullets and extract data in parallel
+      const [bulletsResponse, extractResponse] = await Promise.all([
+        fetch("/api/ai/generate-bullets", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ notes }),
+        }),
+        fetch("/api/ai/extract-mortgage-data", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            notes,
+            scenario,
+            leadRawData: lead.rawData,
+          }),
+        }),
+      ]);
 
-      if (!response.ok) {
-        const data = await response.json();
+      if (!bulletsResponse.ok) {
+        const data = await bulletsResponse.json();
         throw new Error(data.error || "Failed to generate bullets");
       }
 
-      const data = await response.json();
-      setBullets(data.bullets);
+      const bulletsData = await bulletsResponse.json();
+      setBullets(bulletsData.bullets);
+
+      if (extractResponse.ok) {
+        const extractData = await extractResponse.json();
+        setExtractedData(extractData.extractedData);
+      } else {
+        // Don't fail entirely if extraction fails, just show warning
+        console.error("Failed to extract mortgage data");
+        setExtractedData(null);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
       setBullets([]);
     } finally {
       setIsGenerating(false);
+      setIsExtractingData(false);
     }
   };
 
@@ -179,6 +227,77 @@ export function ReportsTab({ lead }: ReportsTabProps) {
     setBullets([...bullets, ""]);
   };
 
+  // Handle editing extracted data with automatic recalculation
+  const handleExtractedDataChange = (field: keyof ExtractedData, value: string) => {
+    if (!extractedData) return;
+
+    let parsedValue: number | null = null;
+    if (value.trim() !== "") {
+      // Clean the input value
+      const cleanValue = value.replace(/[^0-9.]/g, "");
+      const numValue = parseFloat(cleanValue);
+
+      if (!isNaN(numValue)) {
+        // Handle rate fields (user enters percentage like 4.5, we store as decimal 0.045)
+        if (field.includes("Rate")) {
+          parsedValue = numValue / 100;
+        } else {
+          parsedValue = numValue;
+        }
+      }
+    }
+
+    // Create updated data with new field value
+    const updatedData = {
+      ...extractedData,
+      [field]: parsedValue,
+    };
+
+    // Recalculate derived values based on scenario
+    if (scenario === 1) {
+      // Recalculate Scenario 1 values when relevant fields change
+      const relevantFields = ["mortgageAmount", "currentAmortization", "previousRate", "currentMarketRate"];
+      if (relevantFields.includes(field)) {
+        const mortgageAmount = updatedData.mortgageAmount || 0;
+        const currentAmortization = updatedData.currentAmortization || 20;
+        const previousRate = updatedData.previousRate || 0;
+        const currentMarketRate = updatedData.currentMarketRate || 0;
+
+        if (mortgageAmount > 0 && previousRate > 0 && currentMarketRate > 0) {
+          const calculated = calculateScenario1Data({
+            mortgageAmount,
+            currentAmortization,
+            previousRate,
+            currentMarketRate,
+          });
+          updatedData.oldPayment = calculated.oldPayment;
+          updatedData.newPayment = calculated.newPayment;
+          updatedData.paymentDifference = calculated.paymentDifference;
+          updatedData.fiveYearsOfPayments = calculated.fiveYearsOfPayments;
+        }
+      }
+    } else if (scenario === 2) {
+      // Recalculate Scenario 2 values when relevant fields change
+      const relevantFields = ["mortgageAmount", "originalRate", "lockInRate"];
+      if (relevantFields.includes(field)) {
+        const mortgageAmount = updatedData.mortgageAmount || 0;
+        const originalRate = updatedData.originalRate || 0;
+        const lockInRate = updatedData.lockInRate || 0;
+
+        if (mortgageAmount > 0 && originalRate > 0 && lockInRate > 0) {
+          const calculated = calculateScenario2Data({
+            mortgageAmount,
+            originalRate,
+            lockInRate,
+          });
+          updatedData.estimatedExtraInterest = calculated.estimatedExtraInterest;
+        }
+      }
+    }
+
+    setExtractedData(updatedData);
+  };
+
   const handleDownloadPDF = async () => {
     if (bullets.length === 0) {
       alert("Please generate bullet points first");
@@ -190,13 +309,14 @@ export function ReportsTab({ lead }: ReportsTabProps) {
       return;
     }
 
+    if (!scenario) {
+      alert("Please select a scenario");
+      return;
+    }
+
     setIsGeneratingPDF(true);
 
     try {
-      // Dynamic import to avoid SSR issues
-      const { pdf } = await import("@react-pdf/renderer");
-      const { ReportPDFDocument } = await import("./report-pdf-template");
-
       const clientName = `${lead.firstName || ""} ${lead.lastName || ""}`.trim() || "Client";
       const date = new Date().toLocaleDateString("en-CA", {
         year: "numeric",
@@ -204,30 +324,41 @@ export function ReportsTab({ lead }: ReportsTabProps) {
         day: "numeric",
       });
 
-      // Generate the PDF blob with full advisor details
-      const blob = await pdf(
-        ReportPDFDocument({
+      // Generate PDF using Puppeteer API endpoint
+      const pdfResponse = await fetch("/api/reports/generate-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           clientName,
           date,
           consultant: {
             name: selectedAdvisor.name,
             email: selectedAdvisor.email,
-            phone: selectedAdvisor.phone || undefined,
-            calLink: selectedAdvisor.calLink || undefined,
+            phone: selectedAdvisor.phone || "",
+            calLink: selectedAdvisor.calLink || "",
           },
           bullets,
-          mortgageAmount: formatCurrency(mortgageBalance),
-          annualSavings: formatCurrency(annualSavings),
-          fiveYearSavings: formatCurrency(fiveYearSavings),
-          cashBack: formatCurrency(cashBack),
-        })
-      ).toBlob();
+          mortgageAmount: formatCurrency(extractedData?.mortgageAmount || mortgageBalance),
+          scenario,
+          includeDebtConsolidation,
+          applicationLink: "https://www.inspired.mortgage/start-here",
+          extractedData: extractedData || {},
+        }),
+      });
+
+      if (!pdfResponse.ok) {
+        const errorData = await pdfResponse.json();
+        throw new Error(errorData.error || "Failed to generate PDF");
+      }
+
+      // Get the PDF blob from the response
+      const blob = await pdfResponse.blob();
 
       // Create download link and trigger download
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `${clientName.replace(/\s+/g, "-")}-Mortgage-Strategy-Report.pdf`;
+      link.download = `${clientName.replace(/\s+/g, "-")}-Post-Discovery-Report.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -242,7 +373,10 @@ export function ReportsTab({ lead }: ReportsTabProps) {
           advisorId: selectedAdvisor.id,
           consultantName: selectedAdvisor.name,
           bullets,
-          mortgageAmount: mortgageBalance,
+          mortgageAmount: extractedData?.mortgageAmount || mortgageBalance,
+          scenario,
+          includeDebtConsolidation,
+          extractedData,
         }),
       });
 
@@ -254,7 +388,7 @@ export function ReportsTab({ lead }: ReportsTabProps) {
       }
     } catch (err) {
       console.error("PDF generation error:", err);
-      alert("Failed to generate PDF. Please try again.");
+      alert(err instanceof Error ? err.message : "Failed to generate PDF. Please try again.");
     } finally {
       setIsGeneratingPDF(false);
     }
@@ -265,9 +399,6 @@ export function ReportsTab({ lead }: ReportsTabProps) {
     setDownloadingReportId(report.id);
 
     try {
-      const { pdf } = await import("@react-pdf/renderer");
-      const { ReportPDFDocument } = await import("./report-pdf-template");
-
       const clientName = `${lead.firstName || ""} ${lead.lastName || ""}`.trim() || "Client";
       const date = new Date(report.createdAt).toLocaleDateString("en-CA", {
         year: "numeric",
@@ -275,41 +406,46 @@ export function ReportsTab({ lead }: ReportsTabProps) {
         day: "numeric",
       });
 
-      // Use the saved data from the report
-      const savedMortgageAmount = report.mortgageAmount;
-      const savedAnnualSavings = savedMortgageAmount * 0.0125;
-      const savedFiveYearSavings = savedAnnualSavings * 5;
-      const savedCashBack = savedMortgageAmount * 0.03;
-
-      const blob = await pdf(
-        ReportPDFDocument({
+      // Generate PDF using Puppeteer API endpoint
+      const pdfResponse = await fetch("/api/reports/generate-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           clientName,
           date,
           consultant: {
             name: report.consultantName,
             email: report.generatedBy.email,
-            phone: report.generatedBy.phone || undefined,
-            calLink: report.generatedBy.calLink || undefined,
+            phone: report.generatedBy.phone || "",
+            calLink: report.generatedBy.calLink || "",
           },
           bullets: report.bullets,
-          mortgageAmount: formatCurrency(savedMortgageAmount),
-          annualSavings: formatCurrency(savedAnnualSavings),
-          fiveYearSavings: formatCurrency(savedFiveYearSavings),
-          cashBack: formatCurrency(savedCashBack),
-        })
-      ).toBlob();
+          mortgageAmount: formatCurrency(report.mortgageAmount),
+          scenario: (report.scenario as 1 | 2 | 3) || 1,
+          includeDebtConsolidation: report.includeDebtConsolidation || false,
+          applicationLink: "https://www.inspired.mortgage/start-here",
+          extractedData: report.extractedData || {},
+        }),
+      });
+
+      if (!pdfResponse.ok) {
+        const errorData = await pdfResponse.json();
+        throw new Error(errorData.error || "Failed to generate PDF");
+      }
+
+      const blob = await pdfResponse.blob();
 
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `${clientName.replace(/\s+/g, "-")}-Mortgage-Strategy-Report.pdf`;
+      link.download = `${clientName.replace(/\s+/g, "-")}-Post-Discovery-Report.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error("PDF generation error:", err);
-      alert("Failed to generate PDF. Please try again.");
+      alert(err instanceof Error ? err.message : "Failed to generate PDF. Please try again.");
     } finally {
       setDownloadingReportId(null);
     }
@@ -372,6 +508,35 @@ export function ReportsTab({ lead }: ReportsTabProps) {
     });
   };
 
+  // Get scenario label for display
+  const getScenarioLabel = (scenarioNum: number) => {
+    const option = SCENARIO_OPTIONS.find((o) => o.value === scenarioNum);
+    return option ? `Scenario ${scenarioNum}` : `Scenario ${scenarioNum}`;
+  };
+
+  // Check for missing required data based on scenario
+  const getMissingFields = (): string[] => {
+    if (!extractedData || !scenario) return [];
+
+    const missing: string[] = [];
+
+    if (!extractedData.mortgageAmount) missing.push("Mortgage Amount");
+    if (!extractedData.currentAmortization) missing.push("Current Amortization");
+
+    if (scenario === 1) {
+      if (!extractedData.previousRate) missing.push("Previous Rate");
+      if (!extractedData.currentMarketRate) missing.push("Current Market Rate");
+    } else if (scenario === 2) {
+      if (!extractedData.originalRate) missing.push("Original Rate");
+      if (!extractedData.lockInRate) missing.push("Lock-In Rate");
+    } else if (scenario === 3) {
+      if (!extractedData.originalRate) missing.push("Original Rate");
+      if (!extractedData.fixedPayment) missing.push("Fixed Payment");
+    }
+
+    return missing;
+  };
+
   return (
     <div className="p-4 space-y-4">
       {/* Report Generator Card */}
@@ -419,6 +584,48 @@ export function ReportsTab({ lead }: ReportsTabProps) {
               )}
             </div>
 
+            {/* Scenario Selection */}
+            <div>
+              <label className="block text-sm font-medium text-[#1C1B1A] mb-2">
+                Client Scenario <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={scenario || ""}
+                onChange={(e) => setScenario(e.target.value ? (parseInt(e.target.value) as 1 | 2 | 3) : null)}
+                className="w-full border border-[#E5E0D8] rounded-xl p-3 text-sm text-[#1C1B1A] bg-white focus:outline-none focus:ring-2 focus:ring-[#B1AFFF] focus:border-[#625FFF] transition-all duration-150"
+              >
+                <option value="">Select scenario...</option>
+                {SCENARIO_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              {scenario && (
+                <p className="text-xs text-[#8E8983] mt-1">
+                  {SCENARIO_OPTIONS.find((o) => o.value === scenario)?.description}
+                </p>
+              )}
+            </div>
+
+            {/* Debt Consolidation Checkbox */}
+            <div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={includeDebtConsolidation}
+                  onChange={(e) => setIncludeDebtConsolidation(e.target.checked)}
+                  className="w-4 h-4 rounded border-[#E5E0D8] text-[#625FFF] focus:ring-[#B1AFFF]"
+                />
+                <span className="text-sm text-[#1C1B1A]">
+                  Include debt consolidation section
+                </span>
+              </label>
+              <p className="text-xs text-[#8E8983] mt-1 ml-6">
+                Add this when the client has mentioned other debts on the call
+              </p>
+            </div>
+
             {/* Granola Notes Textarea */}
             <div>
               <label className="block text-sm font-medium text-[#1C1B1A] mb-2">
@@ -446,6 +653,10 @@ export function ReportsTab({ lead }: ReportsTabProps) {
             >
               {isGenerating ? "Generating..." : "Generate Preview"}
             </Button>
+
+            {!scenario && notes.length >= 50 && selectedAdvisor && (
+              <p className="text-xs text-amber-600">Please select a scenario to continue</p>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -530,38 +741,172 @@ export function ReportsTab({ lead }: ReportsTabProps) {
               ) : null}
             </div>
 
-            {/* Calculated Values Section */}
-            <div className="mt-6">
-              <h4 className="text-sm font-semibold text-[#1C1B1A] mb-3">
-                Calculated Values
-              </h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-[#8E8983]">Mortgage Amount</p>
-                  <p className="text-sm font-semibold text-[#1C1B1A]">
-                    {formatCurrency(mortgageBalance)}
-                  </p>
+            {/* Extracted Data Section */}
+            {scenario && (
+              <div className="mt-6">
+                <h4 className="text-sm font-semibold text-[#1C1B1A] mb-3">
+                  Extracted Mortgage Data
+                  {isExtractingData && (
+                    <span className="ml-2 text-xs text-[#8E8983] font-normal">
+                      (extracting...)
+                    </span>
+                  )}
+                </h4>
+
+                {getMissingFields().length > 0 && (
+                  <div className="mb-3 p-2 bg-amber-50 border border-amber-200 rounded-lg">
+                    <p className="text-xs text-amber-700">
+                      Missing: {getMissingFields().join(", ")}
+                    </p>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Common Fields */}
+                  <div>
+                    <label className="text-xs text-[#8E8983]">Mortgage Amount</label>
+                    <input
+                      type="number"
+                      step="1000"
+                      value={extractedData?.mortgageAmount || ""}
+                      onChange={(e) => handleExtractedDataChange("mortgageAmount", e.target.value)}
+                      placeholder="e.g., 500000"
+                      className="w-full border border-[#E5E0D8] rounded-lg px-3 py-2 text-sm text-[#1C1B1A] bg-white focus:outline-none focus:ring-2 focus:ring-[#B1AFFF] focus:border-[#625FFF]"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-[#8E8983]">Current Amortization (years)</label>
+                    <input
+                      type="number"
+                      step="1"
+                      value={extractedData?.currentAmortization || ""}
+                      onChange={(e) => handleExtractedDataChange("currentAmortization", e.target.value)}
+                      placeholder="e.g., 20"
+                      className="w-full border border-[#E5E0D8] rounded-lg px-3 py-2 text-sm text-[#1C1B1A] bg-white focus:outline-none focus:ring-2 focus:ring-[#B1AFFF] focus:border-[#625FFF]"
+                    />
+                  </div>
+
+                  {/* Scenario 1 Fields */}
+                  {scenario === 1 && (
+                    <>
+                      <div>
+                        <label className="text-xs text-[#8E8983]">Previous Rate (%)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={extractedData?.previousRate ? Math.round(extractedData.previousRate * 10000) / 100 : ""}
+                          onChange={(e) => handleExtractedDataChange("previousRate", e.target.value)}
+                          placeholder="e.g., 1.89"
+                          className="w-full border border-[#E5E0D8] rounded-lg px-3 py-2 text-sm text-[#1C1B1A] bg-white focus:outline-none focus:ring-2 focus:ring-[#B1AFFF] focus:border-[#625FFF]"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-[#8E8983]">Current Market Rate (%)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={extractedData?.currentMarketRate ? Math.round(extractedData.currentMarketRate * 10000) / 100 : ""}
+                          onChange={(e) => handleExtractedDataChange("currentMarketRate", e.target.value)}
+                          placeholder="e.g., 4.5"
+                          className="w-full border border-[#E5E0D8] rounded-lg px-3 py-2 text-sm text-[#1C1B1A] bg-white focus:outline-none focus:ring-2 focus:ring-[#B1AFFF] focus:border-[#625FFF]"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {/* Scenario 2 Fields */}
+                  {scenario === 2 && (
+                    <>
+                      <div>
+                        <label className="text-xs text-[#8E8983]">Original Rate (%)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={extractedData?.originalRate ? Math.round(extractedData.originalRate * 10000) / 100 : ""}
+                          onChange={(e) => handleExtractedDataChange("originalRate", e.target.value)}
+                          placeholder="e.g., 1.45"
+                          className="w-full border border-[#E5E0D8] rounded-lg px-3 py-2 text-sm text-[#1C1B1A] bg-white focus:outline-none focus:ring-2 focus:ring-[#B1AFFF] focus:border-[#625FFF]"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-[#8E8983]">Lock-In Rate (%)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={extractedData?.lockInRate ? Math.round(extractedData.lockInRate * 10000) / 100 : ""}
+                          onChange={(e) => handleExtractedDataChange("lockInRate", e.target.value)}
+                          placeholder="e.g., 5.79"
+                          className="w-full border border-[#E5E0D8] rounded-lg px-3 py-2 text-sm text-[#1C1B1A] bg-white focus:outline-none focus:ring-2 focus:ring-[#B1AFFF] focus:border-[#625FFF]"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {/* Scenario 3 Fields */}
+                  {scenario === 3 && (
+                    <>
+                      <div>
+                        <label className="text-xs text-[#8E8983]">Original Rate (%)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={extractedData?.originalRate ? Math.round(extractedData.originalRate * 10000) / 100 : ""}
+                          onChange={(e) => handleExtractedDataChange("originalRate", e.target.value)}
+                          placeholder="e.g., 1.89"
+                          className="w-full border border-[#E5E0D8] rounded-lg px-3 py-2 text-sm text-[#1C1B1A] bg-white focus:outline-none focus:ring-2 focus:ring-[#B1AFFF] focus:border-[#625FFF]"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-[#8E8983]">Fixed Payment</label>
+                        <input
+                          type="number"
+                          step="10"
+                          value={extractedData?.fixedPayment || ""}
+                          onChange={(e) => handleExtractedDataChange("fixedPayment", e.target.value)}
+                          placeholder="e.g., 2500"
+                          className="w-full border border-[#E5E0D8] rounded-lg px-3 py-2 text-sm text-[#1C1B1A] bg-white focus:outline-none focus:ring-2 focus:ring-[#B1AFFF] focus:border-[#625FFF]"
+                        />
+                      </div>
+                    </>
+                  )}
                 </div>
-                <div>
-                  <p className="text-xs text-[#8E8983]">Annual Savings</p>
-                  <p className="text-sm font-semibold text-[#1C1B1A]">
-                    {formatCurrency(annualSavings)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-[#8E8983]">5-Year Savings</p>
-                  <p className="text-sm font-semibold text-[#1C1B1A]">
-                    {formatCurrency(fiveYearSavings)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-[#8E8983]">Cash Back</p>
-                  <p className="text-sm font-semibold text-[#1C1B1A]">
-                    {formatCurrency(cashBack)}
-                  </p>
-                </div>
+
+                {/* Calculated Values (read-only display) */}
+                {scenario === 1 && extractedData && (
+                  <div className="mt-4 p-3 bg-white rounded-lg">
+                    <p className="text-xs text-[#8E8983] mb-2">Calculated Values</p>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <span className="text-[#8E8983]">Old Payment:</span>{" "}
+                        <span className="font-medium">{extractedData.oldPayment ? formatCurrency(extractedData.oldPayment) : "N/A"}</span>
+                      </div>
+                      <div>
+                        <span className="text-[#8E8983]">New Payment:</span>{" "}
+                        <span className="font-medium">{extractedData.newPayment ? formatCurrency(extractedData.newPayment) : "N/A"}</span>
+                      </div>
+                      <div>
+                        <span className="text-[#8E8983]">Difference:</span>{" "}
+                        <span className="font-medium text-red-600">{extractedData.paymentDifference ? `+${formatCurrency(extractedData.paymentDifference)}` : "N/A"}</span>
+                      </div>
+                      <div>
+                        <span className="text-[#8E8983]">5 Years of Payments:</span>{" "}
+                        <span className="font-medium">{extractedData.fiveYearsOfPayments ? formatCurrency(extractedData.fiveYearsOfPayments) : "N/A"}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {scenario === 2 && extractedData && (
+                  <div className="mt-4 p-3 bg-white rounded-lg">
+                    <p className="text-xs text-[#8E8983] mb-2">Calculated Values</p>
+                    <div className="text-sm">
+                      <span className="text-[#8E8983]">Estimated Extra Interest:</span>{" "}
+                      <span className="font-medium text-red-600">{extractedData.estimatedExtraInterest ? formatCurrency(extractedData.estimatedExtraInterest) : "N/A"}</span>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
+            )}
 
             {/* Action Buttons */}
             <div className="flex gap-3 mt-6">
@@ -575,7 +920,7 @@ export function ReportsTab({ lead }: ReportsTabProps) {
               <Button
                 variant="primary"
                 onClick={handleDownloadPDF}
-                disabled={isGeneratingPDF || bullets.length === 0}
+                disabled={isGeneratingPDF || bullets.length === 0 || !scenario}
               >
                 {isGeneratingPDF ? "Generating PDF..." : "Download PDF"}
               </Button>
@@ -598,7 +943,7 @@ export function ReportsTab({ lead }: ReportsTabProps) {
                     : undefined
                 }
               >
-                {sendingReportId === currentReportId ? "Sending..." : "Send to Client"}
+                {sendingReportId && sendingReportId === currentReportId ? "Sending..." : "Send to Client"}
               </Button>
             </div>
           </CardContent>
@@ -661,14 +1006,24 @@ export function ReportsTab({ lead }: ReportsTabProps) {
                           {formatDate(report.createdAt)}
                         </span>
                       </div>
-                      <div className="mt-1 flex items-center gap-2">
+                      <div className="mt-1 flex items-center gap-2 flex-wrap">
                         <span className="text-xs text-[#8E8983]">
                           by {report.consultantName}
+                        </span>
+                        <span className="text-xs text-[#8E8983]">•</span>
+                        <span className="text-xs text-[#625FFF] font-medium">
+                          {getScenarioLabel(report.scenario)}
                         </span>
                         <span className="text-xs text-[#8E8983]">•</span>
                         <span className="text-xs text-[#8E8983]">
                           {formatCurrency(report.mortgageAmount)}
                         </span>
+                        {report.includeDebtConsolidation && (
+                          <>
+                            <span className="text-xs text-[#8E8983]">•</span>
+                            <span className="text-xs text-amber-600">+ Debt Consol.</span>
+                          </>
+                        )}
                         {report.sentAt ? (
                           <>
                             <span className="text-xs text-[#8E8983]">•</span>

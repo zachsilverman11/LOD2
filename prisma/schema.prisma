@@ -472,18 +472,21 @@ enum UserRole {
 
 // Report Generation
 model Report {
-  id             String    @id @default(cuid())
-  leadId         String
-  lead           Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  generatedById  String
-  generatedBy    User      @relation(fields: [generatedById], references: [id])
-  consultantName String    // Snapshot at time of generation
-  bullets        Json      // The "What You Told Us" bullets
-  mortgageAmount Float
-  pdfUrl         String?   // If we store the PDF
-  sentToEmail    String?   // Email it was sent to
-  sentAt         DateTime?
-  createdAt      DateTime  @default(now())
+  id                     String    @id @default(cuid())
+  leadId                 String
+  lead                   Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  generatedById          String
+  generatedBy            User      @relation(fields: [generatedById], references: [id])
+  consultantName         String    // Snapshot at time of generation
+  bullets                Json      // The "What You Told Us" bullets
+  mortgageAmount         Float
+  scenario               Int       @default(1) // 1, 2, or 3
+  includeDebtConsolidation Boolean @default(false)
+  extractedData          Json?     // AI-extracted mortgage data from notes
+  pdfUrl                 String?   // If we store the PDF
+  sentToEmail            String?   // Email it was sent to
+  sentAt                 DateTime?
+  createdAt              DateTime  @default(now())
 
   @@index([leadId])
   @@index([generatedById])

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { generateReportPDF } from "@/lib/generate-report-pdf";
+import { generateReportHTML } from "@/lib/generate-report-html";
+import { generatePDFFromHTML } from "@/lib/generate-report-puppeteer";
 
 export async function POST(
   request: NextRequest,
@@ -61,23 +62,36 @@ export async function POST(
       );
     }
 
-    // Generate the PDF
+    // Generate the PDF using Puppeteer
     const clientName = `${report.lead.firstName || ""} ${report.lead.lastName || ""}`.trim() || "Client";
-    const pdfBuffer = await generateReportPDF({
+    const date = report.createdAt.toLocaleDateString("en-CA", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+
+    // Generate HTML first
+    const html = generateReportHTML({
       clientName,
+      date,
       consultant: {
         name: report.consultantName,
         email: report.generatedBy.email,
-        phone: report.generatedBy.phone || undefined,
-        calLink: report.generatedBy.calLink || undefined,
+        phone: report.generatedBy.phone || "",
+        calLink: report.generatedBy.calLink || "",
       },
       bullets: report.bullets as string[],
-      mortgageAmount: report.mortgageAmount,
-      date: report.createdAt.toLocaleDateString("en-CA", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      }),
+      mortgageAmount: String(report.mortgageAmount),
+      scenario: (report.scenario as 1 | 2 | 3) || 1,
+      includeDebtConsolidation: report.includeDebtConsolidation || false,
+      applicationLink: "https://www.inspired.mortgage/start-here",
+      extractedData: (report.extractedData as Record<string, unknown>) || {},
+    });
+
+    // Convert HTML to PDF using Puppeteer
+    const pdfBuffer = await generatePDFFromHTML({
+      html,
+      printBackground: true,
     });
 
     // Convert buffer to base64 for email attachment
