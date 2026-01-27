@@ -48,10 +48,10 @@ export function KanbanColumn({
       {/* Column Body - fixed height with internal scrolling */}
       <div
         ref={setNodeRef}
-        className={`bg-white rounded-b-xl min-h-[200px] max-h-[calc(100vh-220px)] overflow-y-auto p-3 space-y-3 border border-t-0 transition-all scrollbar-thin scrollbar-thumb-[#E5E0D8] scrollbar-track-transparent ${
+        className={`bg-white dark:bg-gray-800 rounded-b-xl min-h-[200px] max-h-[calc(100vh-220px)] overflow-y-auto p-3 space-y-3 border border-t-0 transition-all scrollbar-thin scrollbar-thumb-[#E5E0D8] dark:scrollbar-thumb-gray-600 scrollbar-track-transparent ${
           isOver
-            ? "border-[#625FFF] bg-[#625FFF]/5 shadow-md"
-            : "border-[#E5E0D8] shadow-sm"
+            ? "border-[#625FFF] bg-[#625FFF]/5 dark:bg-[#625FFF]/10 shadow-md"
+            : "border-[#E5E0D8] dark:border-gray-700 shadow-sm"
         }`}
       >
         <SortableContext
@@ -70,9 +70,9 @@ export function KanbanColumn({
 
         {/* Empty State */}
         {leads.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-40 border-2 border-dashed border-[#E5E0D8] rounded-xl bg-[#FAFAF9]/50">
+          <div className="flex flex-col items-center justify-center h-40 border-2 border-dashed border-[#E5E0D8] dark:border-gray-600 rounded-xl bg-[#FAFAF9]/50 dark:bg-gray-900/50">
             <svg
-              className="w-8 h-8 text-[#D1CDC7] mb-2"
+              className="w-8 h-8 text-[#D1CDC7] dark:text-gray-600 mb-2"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -84,7 +84,7 @@ export function KanbanColumn({
                 d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
               />
             </svg>
-            <p className="text-xs text-[#8E8983] text-center px-4">No leads in this stage</p>
+            <p className="text-xs text-[#8E8983] dark:text-gray-500 text-center px-4">No leads in this stage</p>
           </div>
         )}
       </div>

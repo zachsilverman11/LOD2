@@ -41,7 +41,7 @@ type TabListProps = {
 export function TabList({ children, className = "" }: TabListProps) {
   return (
     <div
-      className={`flex gap-6 border-b border-[#E5E0D8] ${className}`}
+      className={`flex gap-6 border-b border-[#E5E0D8] dark:border-gray-700 ${className}`}
       role="tablist"
     >
       {children}
@@ -68,8 +68,8 @@ export function Tab({ value, children, className = "" }: TabProps) {
         relative px-1 py-3 text-sm transition-all duration-200
         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B1AFFF] focus-visible:ring-offset-2 rounded-sm
         ${isActive
-          ? "text-[#1C1B1A] font-medium"
-          : "text-[#8E8983] hover:text-[#55514D]"
+          ? "text-[#1C1B1A] dark:text-gray-100 font-medium"
+          : "text-[#8E8983] dark:text-gray-500 hover:text-[#55514D] dark:hover:text-gray-300"
         }
         ${className}
       `}

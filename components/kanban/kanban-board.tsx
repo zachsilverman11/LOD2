@@ -211,7 +211,7 @@ export function KanbanBoard({ onLeadClick, selectedLeadId }: KanbanBoardProps) {
       <div className="flex justify-center items-center h-96">
         <div className="flex flex-col items-center gap-3">
           <div className="animate-spin w-8 h-8 border-2 border-[#625FFF] border-t-transparent rounded-full"></div>
-          <p className="text-sm text-[#8E8983]">Loading pipeline...</p>
+          <p className="text-sm text-[#8E8983] dark:text-gray-500">Loading pipeline...</p>
         </div>
       </div>
     );
@@ -228,8 +228,8 @@ export function KanbanBoard({ onLeadClick, selectedLeadId }: KanbanBoardProps) {
         {notification && (
           <div className={`fixed top-20 right-6 z-50 px-5 py-3 rounded-xl shadow-lg border transition-all ${
             notification.type === 'success'
-              ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-              : 'bg-red-50 border-red-200 text-red-800'
+              ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200'
+              : 'bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800 text-red-800 dark:text-red-200'
           }`}>
             <div className="flex items-center gap-2">
               {notification.type === 'success' ? (
@@ -249,12 +249,12 @@ export function KanbanBoard({ onLeadClick, selectedLeadId }: KanbanBoardProps) {
         {/* Left scroll button - always visible when scrollable */}
         <button
           onClick={() => scrollByColumn('left')}
-          className={`absolute left-0 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white border border-[#E5E0D8] shadow-lg flex items-center justify-center hover:bg-[#FAFAF9] hover:border-[#625FFF] transition-all ${
+          className={`absolute left-0 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white dark:bg-gray-800 border border-[#E5E0D8] dark:border-gray-600 shadow-lg flex items-center justify-center hover:bg-[#FAFAF9] dark:hover:bg-gray-700 hover:border-[#625FFF] transition-all ${
             canScrollLeft ? "opacity-100" : "opacity-0 pointer-events-none"
           }`}
           aria-label="Scroll left"
         >
-          <svg className="w-5 h-5 text-[#55514D]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-5 h-5 text-[#55514D] dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
@@ -262,26 +262,26 @@ export function KanbanBoard({ onLeadClick, selectedLeadId }: KanbanBoardProps) {
         {/* Right scroll button - always visible when scrollable */}
         <button
           onClick={() => scrollByColumn('right')}
-          className={`absolute right-0 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white border border-[#E5E0D8] shadow-lg flex items-center justify-center hover:bg-[#FAFAF9] hover:border-[#625FFF] transition-all ${
+          className={`absolute right-0 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white dark:bg-gray-800 border border-[#E5E0D8] dark:border-gray-600 shadow-lg flex items-center justify-center hover:bg-[#FAFAF9] dark:hover:bg-gray-700 hover:border-[#625FFF] transition-all ${
             canScrollRight ? "opacity-100" : "opacity-0 pointer-events-none"
           }`}
           aria-label="Scroll right"
         >
-          <svg className="w-5 h-5 text-[#55514D]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-5 h-5 text-[#55514D] dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
         </button>
 
         {/* Left scroll shadow */}
         <div
-          className={`absolute left-0 top-0 bottom-4 w-12 bg-gradient-to-r from-[#FAFAF9] to-transparent pointer-events-none z-10 transition-opacity duration-200 ${
+          className={`absolute left-0 top-0 bottom-4 w-12 bg-gradient-to-r from-[#FAFAF9] dark:from-gray-900 to-transparent pointer-events-none z-10 transition-opacity duration-200 ${
             canScrollLeft ? "opacity-100" : "opacity-0"
           }`}
         />
 
         {/* Right scroll shadow */}
         <div
-          className={`absolute right-0 top-0 bottom-4 w-12 bg-gradient-to-l from-[#FAFAF9] to-transparent pointer-events-none z-10 transition-opacity duration-200 ${
+          className={`absolute right-0 top-0 bottom-4 w-12 bg-gradient-to-l from-[#FAFAF9] dark:from-gray-900 to-transparent pointer-events-none z-10 transition-opacity duration-200 ${
             canScrollRight ? "opacity-100" : "opacity-0"
           }`}
         />

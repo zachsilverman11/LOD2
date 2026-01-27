@@ -19,10 +19,10 @@ export default function DashboardPage() {
 
 function DashboardSkeleton() {
   return (
-    <div className="min-h-screen bg-[#FAFAF9]">
+    <div className="min-h-screen bg-[#FAFAF9] dark:bg-gray-900">
       <DashboardHeader subtitle="Pipeline" />
       <main className="max-w-full mx-auto px-6 lg:px-8 py-6">
-        <div className="animate-pulse bg-white/50 rounded-xl h-96" />
+        <div className="animate-pulse bg-white/50 dark:bg-gray-800/50 rounded-xl h-96" />
       </main>
     </div>
   );
@@ -53,11 +53,11 @@ function DashboardContent() {
   const handleClosePanel = () => setSelectedLead(null);
 
   return (
-    <div className="min-h-screen bg-[#FAFAF9]">
+    <div className="min-h-screen bg-[#FAFAF9] dark:bg-gray-900">
       <DashboardHeader subtitle="Pipeline" />
 
       {/* Secondary Toolbar - Search & UI Toggle */}
-      <div className="bg-white border-b border-[#E5E0D8]">
+      <div className="bg-white dark:bg-gray-800 border-b border-[#E5E0D8] dark:border-gray-700">
         <div className="max-w-full mx-auto px-6 lg:px-8 py-3">
           <div className="flex items-center justify-between gap-6">
             {/* Search Bar */}
@@ -68,15 +68,15 @@ function DashboardContent() {
             {/* UI Toggle */}
             {isLoaded && (
               <div className="flex items-center gap-2 flex-shrink-0">
-                <span className="text-xs text-[#8E8983] hidden sm:block">View:</span>
-                <div className="flex rounded-lg border border-[#E5E0D8] bg-[#FAFAF9] p-0.5">
+                <span className="text-xs text-[#8E8983] dark:text-gray-500 hidden sm:block">View:</span>
+                <div className="flex rounded-lg border border-[#E5E0D8] dark:border-gray-600 bg-[#FAFAF9] dark:bg-gray-900 p-0.5">
                   <button
                     onClick={() => setPreference("classic")}
                     disabled={isOverriddenByUrl}
                     className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
                       preference === "classic"
-                        ? "bg-white text-[#1C1B1A] shadow-sm"
-                        : "text-[#55514D] hover:text-[#1C1B1A]"
+                        ? "bg-white dark:bg-gray-700 text-[#1C1B1A] dark:text-gray-100 shadow-sm"
+                        : "text-[#55514D] dark:text-gray-400 hover:text-[#1C1B1A] dark:hover:text-gray-100"
                     } ${isOverriddenByUrl ? "cursor-not-allowed opacity-60" : ""}`}
                   >
                     Classic
@@ -86,15 +86,15 @@ function DashboardContent() {
                     disabled={isOverriddenByUrl}
                     className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
                       preference === "new"
-                        ? "bg-white text-[#1C1B1A] shadow-sm"
-                        : "text-[#55514D] hover:text-[#1C1B1A]"
+                        ? "bg-white dark:bg-gray-700 text-[#1C1B1A] dark:text-gray-100 shadow-sm"
+                        : "text-[#55514D] dark:text-gray-400 hover:text-[#1C1B1A] dark:hover:text-gray-100"
                     } ${isOverriddenByUrl ? "cursor-not-allowed opacity-60" : ""}`}
                   >
                     New UI
                   </button>
                 </div>
                 {isOverriddenByUrl && (
-                  <span className="text-xs text-[#8E8983]" title="UI preference set via URL parameter">
+                  <span className="text-xs text-[#8E8983] dark:text-gray-500" title="UI preference set via URL parameter">
                     (URL)
                   </span>
                 )}
@@ -125,7 +125,7 @@ function DashboardContent() {
             onClick={handleClosePanel}
           >
             <div
-              className="w-[520px] h-full bg-white shadow-2xl"
+              className="w-[520px] h-full bg-white dark:bg-gray-800 shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
               <LeadDetailPanel

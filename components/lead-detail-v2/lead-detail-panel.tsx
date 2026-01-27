@@ -123,10 +123,10 @@ export function LeadDetailPanel({ leadId, onClose }: LeadDetailPanelProps) {
 
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center bg-white border-l-[3px] border-l-[#625FFF]">
+      <div className="h-full flex items-center justify-center bg-white dark:bg-gray-800 border-l-[3px] border-l-[#625FFF]">
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-[#625FFF] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-sm text-[#8E8983]">Loading lead details...</p>
+          <p className="text-sm text-[#8E8983] dark:text-gray-500">Loading lead details...</p>
         </div>
       </div>
     );
@@ -134,9 +134,9 @@ export function LeadDetailPanel({ leadId, onClose }: LeadDetailPanelProps) {
 
   if (error || !lead) {
     return (
-      <div className="h-full flex items-center justify-center bg-white border-l-[3px] border-l-[#625FFF]">
+      <div className="h-full flex items-center justify-center bg-white dark:bg-gray-800 border-l-[3px] border-l-[#625FFF]">
         <div className="text-center">
-          <p className="text-sm text-[#DC2626] mb-3">{error || "Lead not found"}</p>
+          <p className="text-sm text-[#DC2626] dark:text-red-400 mb-3">{error || "Lead not found"}</p>
           <Button variant="secondary" size="sm" onClick={onClose}>
             Close
           </Button>
@@ -149,14 +149,14 @@ export function LeadDetailPanel({ leadId, onClose }: LeadDetailPanelProps) {
   const isHollyActive = !lead.hollyDisabled;
 
   return (
-    <div className="h-full flex flex-col bg-white border-l-[3px] border-l-[#625FFF]">
+    <div className="h-full flex flex-col bg-white dark:bg-gray-800 border-l-[3px] border-l-[#625FFF]">
       {/* Header */}
-      <header className="px-6 py-5 border-b border-[#E5E0D8]">
+      <header className="px-6 py-5 border-b border-[#E5E0D8] dark:border-gray-700">
         {/* Top row: Close button and Holly indicator */}
         <div className="flex items-center justify-between mb-4">
           <button
             onClick={onClose}
-            className="p-1.5 text-[#8E8983] hover:text-[#1C1B1A] hover:bg-[#FBF3E7] rounded-lg transition-all duration-150"
+            className="p-1.5 text-[#8E8983] dark:text-gray-400 hover:text-[#1C1B1A] dark:hover:text-gray-100 hover:bg-[#FBF3E7] dark:hover:bg-gray-700 rounded-lg transition-all duration-150"
             aria-label="Close panel"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -167,9 +167,9 @@ export function LeadDetailPanel({ leadId, onClose }: LeadDetailPanelProps) {
           {/* Holly indicator */}
           <div className="flex items-center gap-2">
             <div
-              className={`w-2 h-2 rounded-full ${isHollyActive ? "bg-[#76C63E]" : "bg-[#8E8983]"}`}
+              className={`w-2 h-2 rounded-full ${isHollyActive ? "bg-[#76C63E]" : "bg-[#8E8983] dark:bg-gray-500"}`}
             />
-            <span className="text-xs font-medium text-[#8E8983]">
+            <span className="text-xs font-medium text-[#8E8983] dark:text-gray-400">
               Holly {isHollyActive ? "Active" : "Paused"}
             </span>
           </div>
@@ -187,7 +187,7 @@ export function LeadDetailPanel({ leadId, onClose }: LeadDetailPanelProps) {
                     value={editedFirstName}
                     onChange={(e) => setEditedFirstName(e.target.value)}
                     placeholder="First Name"
-                    className="text-lg font-semibold text-[#1C1B1A] border border-[#E5E0D8] rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#625FFF] focus:ring-1 focus:ring-[#625FFF] flex-1"
+                    className="text-lg font-semibold text-[#1C1B1A] dark:text-gray-100 border border-[#E5E0D8] dark:border-gray-600 bg-white dark:bg-gray-700 rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#625FFF] focus:ring-1 focus:ring-[#625FFF] flex-1"
                     autoFocus
                   />
                   <input
@@ -195,29 +195,29 @@ export function LeadDetailPanel({ leadId, onClose }: LeadDetailPanelProps) {
                     value={editedLastName}
                     onChange={(e) => setEditedLastName(e.target.value)}
                     placeholder="Last Name"
-                    className="text-lg font-semibold text-[#1C1B1A] border border-[#E5E0D8] rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#625FFF] focus:ring-1 focus:ring-[#625FFF] flex-1"
+                    className="text-lg font-semibold text-[#1C1B1A] dark:text-gray-100 border border-[#E5E0D8] dark:border-gray-600 bg-white dark:bg-gray-700 rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#625FFF] focus:ring-1 focus:ring-[#625FFF] flex-1"
                   />
                 </div>
                 {/* Email field */}
                 <div>
-                  <label className="block text-xs text-[#8E8983] mb-1">Email</label>
+                  <label className="block text-xs text-[#8E8983] dark:text-gray-400 mb-1">Email</label>
                   <input
                     type="email"
                     value={editedEmail}
                     onChange={(e) => setEditedEmail(e.target.value)}
                     placeholder="Email"
-                    className="w-full text-sm text-[#1C1B1A] border border-[#E5E0D8] rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#625FFF] focus:ring-1 focus:ring-[#625FFF]"
+                    className="w-full text-sm text-[#1C1B1A] dark:text-gray-100 border border-[#E5E0D8] dark:border-gray-600 bg-white dark:bg-gray-700 rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#625FFF] focus:ring-1 focus:ring-[#625FFF]"
                   />
                 </div>
                 {/* Phone field */}
                 <div>
-                  <label className="block text-xs text-[#8E8983] mb-1">Phone</label>
+                  <label className="block text-xs text-[#8E8983] dark:text-gray-400 mb-1">Phone</label>
                   <input
                     type="tel"
                     value={editedPhone}
                     onChange={(e) => setEditedPhone(e.target.value)}
                     placeholder="Phone"
-                    className="w-full text-sm text-[#1C1B1A] border border-[#E5E0D8] rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#625FFF] focus:ring-1 focus:ring-[#625FFF]"
+                    className="w-full text-sm text-[#1C1B1A] dark:text-gray-100 border border-[#E5E0D8] dark:border-gray-600 bg-white dark:bg-gray-700 rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#625FFF] focus:ring-1 focus:ring-[#625FFF]"
                   />
                 </div>
                 {/* Action buttons */}
@@ -241,7 +241,7 @@ export function LeadDetailPanel({ leadId, onClose }: LeadDetailPanelProps) {
                 </div>
               </div>
             ) : (
-              <h1 className="text-xl font-semibold text-[#1C1B1A] truncate mb-2">
+              <h1 className="text-xl font-semibold text-[#1C1B1A] dark:text-gray-100 truncate mb-2">
                 {leadName}
               </h1>
             )}
@@ -287,7 +287,7 @@ export function LeadDetailPanel({ leadId, onClose }: LeadDetailPanelProps) {
           <Tab value="reports">Reports</Tab>
         </TabList>
 
-        <div className="flex-1 overflow-y-auto bg-[#FAFAF9]">
+        <div className="flex-1 overflow-y-auto bg-[#FAFAF9] dark:bg-gray-900">
           <TabPanel value="overview">
             <OverviewTab lead={lead} onRefresh={fetchLead} onLogCallOutcome={handleLogCallOutcome} />
           </TabPanel>

@@ -17,22 +17,22 @@ const variantStyles: Record<ButtonVariant, string> = {
     disabled:bg-[#625FFF]/50 disabled:shadow-none
   `,
   secondary: `
-    bg-white text-[#1C1B1A] border border-[#E5E0D8] shadow-sm
-    hover:bg-[#FBF3E7] hover:border-[#E5E0D8]
-    active:bg-[#F5EDE0]
-    disabled:bg-white/50 disabled:text-[#1C1B1A]/50 disabled:shadow-none
+    bg-white dark:bg-gray-800 text-[#1C1B1A] dark:text-gray-100 border border-[#E5E0D8] dark:border-gray-600 shadow-sm
+    hover:bg-[#FBF3E7] dark:hover:bg-gray-700 hover:border-[#E5E0D8] dark:hover:border-gray-500
+    active:bg-[#F5EDE0] dark:active:bg-gray-600
+    disabled:bg-white/50 dark:disabled:bg-gray-800/50 disabled:text-[#1C1B1A]/50 dark:disabled:text-gray-100/50 disabled:shadow-none
   `,
   ghost: `
-    bg-transparent text-[#55514D]
-    hover:bg-[#FBF3E7] hover:text-[#1C1B1A]
-    active:bg-[#F5EDE0]
-    disabled:text-[#55514D]/50
+    bg-transparent text-[#55514D] dark:text-gray-400
+    hover:bg-[#FBF3E7] dark:hover:bg-gray-800 hover:text-[#1C1B1A] dark:hover:text-gray-100
+    active:bg-[#F5EDE0] dark:active:bg-gray-700
+    disabled:text-[#55514D]/50 dark:disabled:text-gray-400/50
   `,
   danger: `
-    bg-red-50 text-[#DC2626] border border-red-200
-    hover:bg-red-100 hover:border-red-300
-    active:bg-red-200
-    disabled:bg-red-50/50 disabled:text-[#DC2626]/50
+    bg-red-50 dark:bg-red-900/20 text-[#DC2626] dark:text-red-400 border border-red-200 dark:border-red-800
+    hover:bg-red-100 dark:hover:bg-red-900/30 hover:border-red-300 dark:hover:border-red-700
+    active:bg-red-200 dark:active:bg-red-900/40
+    disabled:bg-red-50/50 dark:disabled:bg-red-900/10 disabled:text-[#DC2626]/50 dark:disabled:text-red-400/50
   `,
 };
 
