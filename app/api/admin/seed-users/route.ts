@@ -34,6 +34,12 @@ const teamMembers = [
     role: "ADMIN" as const,
     isActive: true,
   },
+  {
+    email: "harper.clawdbot@gmail.com",
+    name: "Harper",
+    role: "ADMIN" as const,
+    isActive: true,
+  },
 ];
 
 // One-time use endpoint to seed users
