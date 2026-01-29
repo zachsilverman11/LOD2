@@ -72,7 +72,7 @@ export function LeadCard({ lead, onClick, isSelected }: LeadCardProps) {
 
       {/* Top Row: Name + Holly Status */}
       <div className="flex items-center justify-between mb-1">
-        <h3 className="font-medium text-[#1C1B1A] dark:text-gray-100 text-sm truncate pr-6">
+        <h3 className="font-medium text-[#1C1B1A] dark:text-gray-50 text-sm truncate pr-6">
           {lead.firstName} {lead.lastName}
         </h3>
         {/* Holly Status Dot with Tooltip */}
@@ -92,12 +92,12 @@ export function LeadCard({ lead, onClick, isSelected }: LeadCardProps) {
       </div>
 
       {/* Middle: Email */}
-      <p className="text-xs text-[#8E8983] dark:text-gray-400 truncate mb-3">{lead.email}</p>
+      <p className="text-xs text-[#8E8983] dark:text-gray-300 truncate mb-3">{lead.email}</p>
 
       {/* Bottom Row: Timestamp + Indicators */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className={`text-xs ${isStale ? "text-orange-600 dark:text-orange-400 font-medium" : "text-[#8E8983] dark:text-gray-500"}`}>
+          <span className={`text-xs ${isStale ? "text-orange-600 dark:text-orange-400 font-medium" : "text-[#8E8983] dark:text-gray-400"}`}>
             {getRelativeTime()}
           </span>
           {/* Stale indicator */}
