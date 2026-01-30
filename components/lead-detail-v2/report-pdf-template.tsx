@@ -7,6 +7,7 @@ import {
   Text,
   View,
   StyleSheet,
+  Link,
   Svg,
   Rect,
   Line,
@@ -14,6 +15,8 @@ import {
   Path,
 } from "@react-pdf/renderer";
 import { formatCurrency, formatPercent } from "@/lib/mortgage-calculations";
+import { REPORT_COPY } from "@/lib/report-copy";
+import { replaceVariables, buildVariableMap, replaceAndSplit } from "@/lib/report-helpers";
 
 // Consultant/Advisor details
 export type ConsultantInfo = {
@@ -52,8 +55,10 @@ export type ReportPDFProps = {
   consultant: ConsultantInfo;
   bullets: string[];
   mortgageAmount: string;
-  scenario: 1 | 2 | 3;
+  scenario: 0 | 1 | 2 | 3 | null;
   includeDebtConsolidation: boolean;
+  includeCashBack: boolean;
+  applicationLink: string;
   extractedData: ExtractedData;
 };
 
@@ -943,6 +948,7 @@ function CoverPage({
   date: string;
   consultant: ConsultantInfo;
 }) {
+  const copy = REPORT_COPY.cover;
   return (
     <Page size="LETTER" style={styles.coverPage}>
       {/* Navy header band */}
@@ -951,60 +957,48 @@ function CoverPage({
           <Text style={styles.coverLogoInspired}>inspired </Text>
           <Text style={styles.coverLogoMortgage}>mortgage.</Text>
         </View>
-        <Text style={styles.coverTagline}>See lenders compete for your business</Text>
+        <Text style={styles.coverTagline}>{copy.tagline}</Text>
       </View>
 
       {/* Main content */}
       <View style={styles.coverMain}>
-        <Text style={styles.coverPreparedLabel}>Prepared for</Text>
+        <Text style={styles.coverPreparedLabel}>{copy.preparedForLabel}</Text>
         <Text style={styles.coverClientName}>{clientName}</Text>
         <Text style={styles.coverDate}>{date}</Text>
 
         {/* Invitation box */}
         <View style={styles.coverInviteBox}>
-          <Text style={styles.coverInviteTitle}>
-            Your Personalized Mortgage Strategy
-          </Text>
           <Text style={styles.coverInviteText}>
-            The application isn&apos;t a commitment—it&apos;s how we get lenders to compete for your business. Complete your application and receive a personalized Lender Comparison Report showing:
+            {copy.applicationNotice}
           </Text>
-          <View style={styles.coverInviteBullet}>
-            <View style={styles.coverInviteBulletIcon}>
-              <CheckIcon color={colors.primary} />
+          {copy.benefits.map((benefit, i) => (
+            <View key={i} style={styles.coverInviteBullet}>
+              <View style={styles.coverInviteBulletIcon}>
+                <CheckIcon color={colors.primary} />
+              </View>
+              <Text style={styles.coverInviteBulletText}>{benefit}</Text>
             </View>
-            <Text style={styles.coverInviteBulletText}>
-              Strategy options designed around where markets are heading
-            </Text>
-          </View>
-          <View style={styles.coverInviteBullet}>
-            <View style={styles.coverInviteBulletIcon}>
-              <CheckIcon color={colors.primary} />
-            </View>
-            <Text style={styles.coverInviteBulletText}>
-              A clear recommendation based on your goals and risk tolerance
-            </Text>
-          </View>
-          <View style={styles.coverInviteBullet}>
-            <View style={styles.coverInviteBulletIcon}>
-              <CheckIcon color={colors.primary} />
-            </View>
-            <Text style={styles.coverInviteBulletText}>
-              A side-by-side comparison to any offer you&apos;ve already received
-            </Text>
-          </View>
+          ))}
         </View>
 
         <Text style={styles.coverNote}>
-          This report takes about 10 minutes to read. The decisions ahead—rate type, lender, timing—will impact your finances for years. This document was built specifically for your situation.
+          {copy.readingTime}
+        </Text>
+        <Text style={[styles.coverNote, { marginTop: 8 }]}>
+          {copy.readingEncouragement}
+        </Text>
+        <Text style={[styles.coverNote, { marginTop: 12, fontFamily: "Helvetica-Bold" }]}>
+          {copy.closingLine}
         </Text>
       </View>
 
       {/* Footer */}
       <View style={styles.coverFooter}>
-        <Text style={styles.coverAdvisorLabel}>Your Advisor</Text>
+        <Text style={styles.coverAdvisorLabel}>{copy.advisorLabel}</Text>
         <Text style={styles.coverAdvisorName}>{consultant.name}</Text>
         <Text style={styles.coverAdvisorTitle}>Mortgage Advisor, Inspired Mortgage</Text>
-        <Text style={styles.coverWebsite}>inspired.mortgage</Text>
+        {consultant.email && <Text style={styles.coverWebsite}>{consultant.email}</Text>}
+        {consultant.phone && <Text style={[styles.coverWebsite, { color: colors.bodyText }]}>{consultant.phone}</Text>}
       </View>
     </Page>
   );
@@ -1013,15 +1007,19 @@ function CoverPage({
 // ============================================================================
 // WHAT YOU TOLD US PAGE
 // ============================================================================
-function WhatYouToldUsPages({ bullets }: { bullets: string[] }) {
+function WhatYouToldUsPages({ bullets, clientName, vars }: { bullets: string[]; clientName: string; vars: Record<string, string> }) {
+  const copy = REPORT_COPY.whatYouToldUs;
+  const introParagraphs = replaceAndSplit(copy.intro, vars);
+  const outroParagraphs = replaceAndSplit(copy.outro, vars);
+
   return (
     <Page size="LETTER" style={styles.page}>
       <PageHeader />
-      <SectionHeader>What You Told Us</SectionHeader>
+      <SectionHeader>{copy.heading}</SectionHeader>
 
-      <Text style={styles.paragraph}>
-        During our discovery call, you shared the following about your situation and goals:
-      </Text>
+      {introParagraphs.map((p, i) => (
+        <Text key={`intro-${i}`} style={styles.paragraph}>{p}</Text>
+      ))}
 
       <View style={styles.bulletContainer}>
         {bullets.map((bullet, index) => (
@@ -1034,9 +1032,9 @@ function WhatYouToldUsPages({ bullets }: { bullets: string[] }) {
         ))}
       </View>
 
-      <Text style={[styles.paragraph, { marginTop: 20 }]}>
-        We&apos;ve designed your mortgage strategy based on these goals. The following pages explain what happened on your last term and how we can help you move forward differently.
-      </Text>
+      {outroParagraphs.map((p, i) => (
+        <Text key={`outro-${i}`} style={[styles.paragraph, i === 0 ? { marginTop: 20 } : {}]}>{p}</Text>
+      ))}
 
       <PageFooter pageNum={2} />
     </Page>
@@ -1531,349 +1529,368 @@ function DebtConsolidationPage() {
 }
 
 // ============================================================================
-// OUR APPROACH - GREG VERSION
+// OUR APPROACH (Uses approved copy from REPORT_COPY)
 // ============================================================================
-function GregApproachPage() {
+function OurApproachPage({ consultant, vars }: { consultant: ConsultantInfo; vars: Record<string, string> }) {
+  const copy = REPORT_COPY.ourApproach;
   return (
     <Page size="LETTER" style={styles.page}>
       <PageHeader />
-      <SectionHeader>Our Approach</SectionHeader>
+      <SectionHeader>{copy.heading}</SectionHeader>
 
-      <Text style={styles.sectionTitle}>Why We Do Things Differently</Text>
+      {replaceAndSplit(copy.intro, vars).map((p, i) => (
+        <Text key={i} style={styles.paragraph}>{p}</Text>
+      ))}
 
-      <Text style={styles.paragraph}>
-        I&apos;ve been in this industry for over 30 years. I&apos;ve seen every rate cycle, every market panic, every &quot;this time is different&quot; moment. And here&apos;s what I&apos;ve learned: the mortgage industry is built to serve lenders, not clients.
-      </Text>
-
-      <Text style={styles.paragraph}>
-        Banks want you to sign and forget. They profit when you don&apos;t ask questions, don&apos;t shop around, and don&apos;t realize there&apos;s a better option. The entire system is designed to keep you passive.
-      </Text>
-
-      <Text style={styles.paragraph}>
-        We built Inspired Mortgage to be the opposite.
-      </Text>
-
-      <Text style={styles.sectionTitle}>What That Means in Practice</Text>
+      <Text style={styles.sectionTitle}>{copy.differentiators.heading}</Text>
 
       <View style={styles.bulletContainer}>
-        <View style={styles.bulletRow}>
-          <View style={styles.bulletIcon}>
-            <CheckIcon />
+        {copy.differentiators.items.map((item, i) => (
+          <View key={i} style={styles.bulletRow}>
+            <View style={styles.bulletIcon}>
+              <CheckIcon />
+            </View>
+            <Text style={styles.bulletText}>
+              <Text style={{ fontFamily: "Helvetica-Bold" }}>{item.title}</Text> {item.body}
+            </Text>
           </View>
-          <Text style={styles.bulletText}>
-            <Text style={{ fontFamily: "Helvetica-Bold" }}>We don&apos;t disappear after closing.</Text> We stay in touch throughout your term, watching for opportunities to save you money or accelerate your payoff.
-          </Text>
-        </View>
-        <View style={styles.bulletRow}>
-          <View style={styles.bulletIcon}>
-            <CheckIcon />
-          </View>
-          <Text style={styles.bulletText}>
-            <Text style={{ fontFamily: "Helvetica-Bold" }}>We explain the &quot;why,&quot; not just the &quot;what.&quot;</Text> You&apos;ll understand your options well enough to make confident decisions.
-          </Text>
-        </View>
-        <View style={styles.bulletRow}>
-          <View style={styles.bulletIcon}>
-            <CheckIcon />
-          </View>
-          <Text style={styles.bulletText}>
-            <Text style={{ fontFamily: "Helvetica-Bold" }}>We look for the play your bank won&apos;t mention.</Text> Debt consolidation, rate relocks, penalty arbitrage—there&apos;s often a move that changes your trajectory.
-          </Text>
-        </View>
-        <View style={styles.bulletRow}>
-          <View style={styles.bulletIcon}>
-            <CheckIcon />
-          </View>
-          <Text style={styles.bulletText}>
-            <Text style={{ fontFamily: "Helvetica-Bold" }}>We put our money where our mouth is.</Text> Our $5,000 Penalty Guarantee isn&apos;t marketing—it&apos;s our commitment that you&apos;ll never be trapped.
-          </Text>
-        </View>
+        ))}
       </View>
 
-      <Text style={styles.paragraph}>
-        After 30 years, I could have retired. Instead, I built this. Because I got tired of watching good people get taken advantage of by a system that doesn&apos;t care about them.
-      </Text>
+      <Text style={styles.paragraph}>{copy.closing}</Text>
 
-      <Text style={styles.paragraphBold}>
-        You deserve better. Let us show you what that looks like.
-      </Text>
+      <View style={styles.calloutBox}>
+        <Text style={[styles.paragraph, { fontFamily: "Helvetica-Bold", marginBottom: 8 }]}>
+          {copy.promise.heading}
+        </Text>
+        <Text style={styles.paragraph}>{copy.promise.body}</Text>
+      </View>
 
       <View style={styles.advisorBox}>
-        <Text style={styles.contactName}>Greg Williamson</Text>
-        <Text style={styles.contactTitle}>Founder, Inspired Mortgage</Text>
-        <Text style={[styles.contactDetail, { fontFamily: "Helvetica-Oblique" }]}>
-          30+ years in mortgage lending
+        <Text style={styles.contactName}>{consultant.name}</Text>
+        <Text style={styles.contactTitle}>
+          {consultant.name.toLowerCase().includes("greg") ? "Founder" : "Mortgage Advisor"}, Inspired Mortgage
         </Text>
       </View>
 
-      <PageFooter pageNum={7} />
+      <PageFooter pageNum={0} />
     </Page>
   );
 }
 
 // ============================================================================
-// OUR APPROACH - JAKUB VERSION
+// APPLICATION LINK BLOCK
 // ============================================================================
-function JakubApproachPage() {
+function ApplicationLinkBlock({ applicationLink, message }: { applicationLink: string; message?: string }) {
+  const defaultMessage = "Ready to see which strategies fit your situation? Complete your application and we'll build your personalized Lender Comparison Report.";
+  return (
+    <View style={{ marginVertical: 20 }}>
+      <View style={styles.ctaBox}>
+        <Text style={styles.ctaText}>{message || defaultMessage}</Text>
+        <Link src={applicationLink}>
+          <Text style={styles.ctaLink}>Start Your Application →</Text>
+        </Link>
+      </View>
+    </View>
+  );
+}
+
+// ============================================================================
+// $5,000 PENALTY GUARANTEE PAGE
+// ============================================================================
+function GuaranteePage() {
+  const copy = REPORT_COPY.guarantee;
   return (
     <Page size="LETTER" style={styles.page}>
       <PageHeader />
-      <SectionHeader>Our Approach</SectionHeader>
+      <SectionHeader>{copy.heading}</SectionHeader>
 
-      <Text style={styles.sectionTitle}>Why We Do Things Differently</Text>
-
-      <Text style={styles.paragraph}>
-        I got into real estate 10 years ago because I loved helping people find their homes. But I kept seeing the same thing: clients would find the perfect house, then get crushed by a mortgage process that treated them like a number.
-      </Text>
-
-      <Text style={styles.paragraph}>
-        Banks and big brokerages move fast. Close the deal, collect the commission, move on. Nobody asks what happens to that family over the next five years. Nobody checks if rates move. Nobody optimizes.
-      </Text>
-
-      <Text style={styles.paragraph}>
-        That&apos;s not how I work.
-      </Text>
-
-      <Text style={styles.sectionTitle}>What That Means in Practice</Text>
-
-      <View style={styles.bulletContainer}>
-        <View style={styles.bulletRow}>
-          <View style={styles.bulletIcon}>
-            <CheckIcon />
-          </View>
-          <Text style={styles.bulletText}>
-            <Text style={{ fontFamily: "Helvetica-Bold" }}>I treat every file like it&apos;s my own mortgage.</Text> Because I&apos;ve been there. I know what it feels like to wonder if you&apos;re getting a fair deal.
-          </Text>
+      {/* Certificate Style */}
+      <View style={styles.guaranteeCertificate}>
+        <View style={styles.guaranteeSeal}>
+          <SealIcon />
         </View>
-        <View style={styles.bulletRow}>
-          <View style={styles.bulletIcon}>
-            <CheckIcon />
-          </View>
-          <Text style={styles.bulletText}>
-            <Text style={{ fontFamily: "Helvetica-Bold" }}>I stay in your corner for the whole term.</Text> Not just at signing, not just at renewal—throughout. When there&apos;s an opportunity, I&apos;ll reach out.
-          </Text>
-        </View>
-        <View style={styles.bulletRow}>
-          <View style={styles.bulletIcon}>
-            <CheckIcon />
-          </View>
-          <Text style={styles.bulletText}>
-            <Text style={{ fontFamily: "Helvetica-Bold" }}>I explain everything until it makes sense.</Text> No jargon, no pressure. If you have questions, we answer them.
-          </Text>
-        </View>
-        <View style={styles.bulletRow}>
-          <View style={styles.bulletIcon}>
-            <CheckIcon />
-          </View>
-          <Text style={styles.bulletText}>
-            <Text style={{ fontFamily: "Helvetica-Bold" }}>I look for the angle your bank misses.</Text> Whether it&apos;s consolidating debt, timing a rate lock, or finding a better lender fit.
-          </Text>
-        </View>
-      </View>
-
-      <Text style={styles.paragraph}>
-        The mortgage industry has enough people who see you as a transaction. I see you as a relationship. And I&apos;m going to earn that relationship by doing things differently.
-      </Text>
-
-      <View style={styles.advisorBox}>
-        <Text style={styles.contactName}>Jakub Zajac</Text>
-        <Text style={styles.contactTitle}>Mortgage Advisor, Inspired Mortgage</Text>
-        <Text style={[styles.contactDetail, { fontFamily: "Helvetica-Oblique" }]}>
-          10 years in real estate and mortgage lending
+        <Text style={styles.guaranteeAmount}>{copy.certificate.amount}</Text>
+        <Text style={styles.guaranteeTitle}>{copy.certificate.title}</Text>
+        <Text style={styles.guaranteeText}>{copy.certificate.body}</Text>
+        <Text style={[styles.guaranteeText, { marginTop: 8, fontFamily: "Helvetica-Bold" }]}>
+          {copy.certificate.subtext}
         </Text>
       </View>
 
-      <PageFooter pageNum={7} />
+      <Text style={styles.sectionTitle}>{copy.howItWorks.heading}</Text>
+
+      <View style={styles.bulletContainer}>
+        {copy.howItWorks.examples.map((example, i) => (
+          <View key={i} style={styles.bulletRow}>
+            <View style={styles.bulletIcon}>
+              <CheckIcon />
+            </View>
+            <Text style={styles.bulletText}>{example}</Text>
+          </View>
+        ))}
+      </View>
+
+      <Text style={styles.paragraph}>{copy.howItWorks.explanation}</Text>
+
+      {/* Ask Your Bank Box */}
+      <View style={styles.calloutHighlight}>
+        <Text style={[styles.paragraph, { fontFamily: "Helvetica-Bold", marginBottom: 8 }]}>
+          {copy.askYourBank.heading}
+        </Text>
+        <Text style={[styles.paragraph, { fontFamily: "Helvetica-Oblique" }]}>
+          {copy.askYourBank.prompt}
+        </Text>
+        <Text style={[styles.paragraph, { fontFamily: "Helvetica-Bold", marginTop: 8, marginBottom: 0 }]}>
+          {copy.askYourBank.punchline}
+        </Text>
+      </View>
+
+      <PageFooter pageNum={0} />
     </Page>
   );
 }
 
 // ============================================================================
-// STRATEGIES PAGES
+// FIXED RATE STRATEGY PAGES (FULL REWRITE FROM APPROVED COPY)
 // ============================================================================
-function StrategiesPages() {
+function FixedRatePages() {
+  const copy = REPORT_COPY.fixedRate;
   return (
     <>
-      {/* Fixed Rate Strategy */}
+      {/* Page 1: Intro + When + What We Do + Monthly Monitoring */}
       <Page size="LETTER" style={styles.page}>
         <PageHeader />
-        <SectionHeader>Fixed Rate Strategy</SectionHeader>
+        <SectionHeader>{copy.heading}</SectionHeader>
 
-        <Text style={styles.paragraph}>
-          A fixed rate mortgage locks in your interest rate for the entire term—typically 3 to 5 years. Your payment stays exactly the same no matter what happens in the market.
-        </Text>
+        <Text style={styles.paragraph}>{copy.intro}</Text>
 
-        <Text style={styles.sectionTitle}>When Fixed Makes Sense</Text>
-
+        <Text style={styles.sectionTitle}>{copy.whenItMakesSense.heading}</Text>
         <View style={styles.bulletContainer}>
-          <View style={styles.bulletRow}>
-            <View style={styles.bulletIcon}>
-              <CheckIcon />
+          {copy.whenItMakesSense.items.map((item, i) => (
+            <View key={i} style={styles.bulletRow}>
+              <View style={styles.bulletIcon}><CheckIcon /></View>
+              <Text style={styles.bulletText}>{item}</Text>
             </View>
-            <Text style={styles.bulletText}>
-              You prefer predictability and want to know exactly what your payment will be
-            </Text>
-          </View>
-          <View style={styles.bulletRow}>
-            <View style={styles.bulletIcon}>
-              <CheckIcon />
-            </View>
-            <Text style={styles.bulletText}>
-              You&apos;re budgeting tightly and can&apos;t absorb payment increases
-            </Text>
-          </View>
-          <View style={styles.bulletRow}>
-            <View style={styles.bulletIcon}>
-              <CheckIcon />
-            </View>
-            <Text style={styles.bulletText}>
-              You believe rates are likely to rise from current levels
-            </Text>
-          </View>
+          ))}
         </View>
 
-        <Text style={styles.sectionTitle}>What We Do Differently</Text>
+        <Text style={styles.sectionTitle}>{copy.whatWeDoDifferently.heading}</Text>
+        {replaceAndSplit(copy.whatWeDoDifferently.body, {}).map((p, i) => (
+          <Text key={i} style={styles.paragraph}>{p}</Text>
+        ))}
 
-        <Text style={styles.paragraph}>
-          Most people sign their fixed rate and forget about it. We don&apos;t let that happen. Throughout your term, we monitor rates. If they drop significantly, we&apos;ll calculate whether breaking and relocking makes financial sense.
-        </Text>
+        <Text style={styles.sectionTitle}>{copy.monthlyMonitoring.heading}</Text>
+        {replaceAndSplit(copy.monthlyMonitoring.body, {}).map((p, i) => (
+          <Text key={i} style={styles.paragraph}>{p}</Text>
+        ))}
 
-        <View style={styles.calloutHighlight}>
-          <Text style={styles.paragraph}>
-            <Text style={{ fontFamily: "Helvetica-Bold" }}>Real example: </Text>
-            Client locked in at 5.2% for 5 years. Rates dropped to 3.9% in year 2. Breaking early cost $4,200 in penalty but saved $11,000 over the remaining term. <Text style={{ fontFamily: "Helvetica-Bold" }}>Net savings: $6,800.</Text>
-          </Text>
-        </View>
-
-        <PageFooter pageNum={8} />
+        <PageFooter pageNum={0} />
       </Page>
 
-      {/* Variable Rate Strategy */}
+      {/* Page 2: Strategic Relock + Borrower Comparison */}
       <Page size="LETTER" style={styles.page}>
         <PageHeader />
-        <SectionHeader>Variable Rate Strategy</SectionHeader>
 
-        <Text style={styles.paragraph}>
-          A variable rate mortgage moves with the Bank of Canada&apos;s prime rate. When the BOC raises or lowers rates, your mortgage rate adjusts accordingly.
-        </Text>
-
-        <Text style={styles.sectionTitle}>When Variable Makes Sense</Text>
-
+        <Text style={styles.sectionTitle}>{copy.strategicRelock.heading}</Text>
+        <Text style={styles.paragraph}>{copy.strategicRelock.body}</Text>
         <View style={styles.bulletContainer}>
-          <View style={styles.bulletRow}>
-            <View style={styles.bulletIcon}>
-              <CheckIcon />
+          {copy.strategicRelock.steps.map((step, i) => (
+            <View key={i} style={styles.bulletRow}>
+              <View style={styles.bulletIcon}><CheckIcon /></View>
+              <Text style={styles.bulletText}>{step}</Text>
             </View>
-            <Text style={styles.bulletText}>
-              You can handle some payment fluctuation
-            </Text>
+          ))}
+        </View>
+        <Text style={styles.paragraph}>{copy.strategicRelock.closing}</Text>
+
+        <Text style={styles.sectionTitle}>{copy.borrowerComparison.heading}</Text>
+        <Text style={styles.paragraph}>{copy.borrowerComparison.intro}</Text>
+
+        {/* Borrower A */}
+        <View style={[styles.pathBox, styles.pathBoxBank, { marginTop: 12 }]}>
+          <View style={styles.pathHeader}>
+            <Text style={[styles.pathLabel, styles.pathLabelBank]}>{copy.borrowerComparison.borrowerA.label}</Text>
           </View>
-          <View style={styles.bulletRow}>
-            <View style={styles.bulletIcon}>
-              <CheckIcon />
+          {copy.borrowerComparison.borrowerA.steps.map((step, i) => (
+            <View key={i} style={styles.pathStep}>
+              <View style={[styles.pathStepDot, { backgroundColor: colors.lightGray }]} />
+              <Text style={styles.pathStepText}>{step}</Text>
             </View>
-            <Text style={styles.bulletText}>
-              You believe rates are likely to stay flat or decrease
-            </Text>
-          </View>
-          <View style={styles.bulletRow}>
-            <View style={styles.bulletIcon}>
-              <CheckIcon />
-            </View>
-            <Text style={styles.bulletText}>
-              You want lower penalties if you need to break your mortgage
-            </Text>
-          </View>
-          <View style={styles.bulletRow}>
-            <View style={styles.bulletIcon}>
-              <CheckIcon />
-            </View>
-            <Text style={styles.bulletText}>
-              Historically, variable rates have beaten fixed more often than not
-            </Text>
-          </View>
+          ))}
         </View>
 
-        <Text style={styles.sectionTitle}>What We Do Differently</Text>
-
-        <Text style={styles.paragraph}>
-          We set up &quot;trigger points&quot; for your mortgage—specific rate levels where we&apos;ll reach out to discuss locking in. If the BOC starts hiking aggressively, you&apos;ll hear from us before panic sets in.
-        </Text>
-
-        <View style={styles.calloutHighlight}>
-          <Text style={styles.paragraph}>
-            <Text style={{ fontFamily: "Helvetica-Bold" }}>Real example: </Text>
-            Client took variable at prime - 0.9% in early 2022. When prime crossed 4.5% in Q3 2022, we reached out and discussed locking in at 4.89%—before the worst hikes hit. <Text style={{ fontFamily: "Helvetica-Bold" }}>They avoided 18 months at 6%+.</Text>
-          </Text>
+        {/* Borrower B */}
+        <View style={[styles.pathBox, styles.pathBoxUs]}>
+          <View style={styles.pathHeader}>
+            <Text style={[styles.pathLabel, styles.pathLabelUs]}>{copy.borrowerComparison.borrowerB.label}</Text>
+          </View>
+          {copy.borrowerComparison.borrowerB.steps.map((step, i) => (
+            <View key={i} style={styles.pathStep}>
+              <View style={[styles.pathStepDot, { backgroundColor: colors.success }]} />
+              <Text style={styles.pathStepText}>{step}</Text>
+            </View>
+          ))}
         </View>
 
-        <PageFooter pageNum={9} />
+        <PageFooter pageNum={0} />
       </Page>
 
-      {/* $5,000 Penalty Guarantee */}
+      {/* Page 3: The Difference + Ask Your Bank */}
       <Page size="LETTER" style={styles.page}>
         <PageHeader />
-        <SectionHeader>The $5,000 Penalty Guarantee</SectionHeader>
 
-        {/* Certificate Style */}
-        <View style={styles.guaranteeCertificate}>
-          <View style={styles.guaranteeSeal}>
-            <SealIcon />
-          </View>
-          <Text style={styles.guaranteeAmount}>$5,000</Text>
-          <Text style={styles.guaranteeTitle}>Maximum Penalty Guarantee</Text>
-          <Text style={styles.guaranteeText}>
-            If your mortgage penalty ever exceeds $5,000 when refinancing with us, we&apos;ll cover the difference — guaranteed.
-          </Text>
+        <View style={styles.impactBox}>
+          <Text style={styles.impactText}>{copy.borrowerComparison.result.heading}</Text>
         </View>
 
-        <Text style={styles.sectionTitle}>How It Works</Text>
+        {replaceAndSplit(copy.borrowerComparison.result.body, {}).map((p, i) => (
+          <Text key={i} style={[styles.paragraph, i === 0 ? { fontFamily: "Helvetica-Bold" } : {}]}>{p}</Text>
+        ))}
 
-        <Text style={styles.paragraph}>
-          Traditional lenders often lock you into mortgages with steep penalties—sometimes tens of thousands of dollars—if you need to refinance early. Our No Penalty Program partners with lenders who offer fair, capped penalties.
-        </Text>
-
+        <Text style={styles.sectionTitle}>Ask Your Bank</Text>
         <View style={styles.calloutHighlight}>
-          <Text style={styles.paragraph}>
-            <Text style={{ fontFamily: "Helvetica-Bold" }}>Example: </Text>
-            If your penalty is $8,000, you pay $5,000 and we cover $3,000. If your penalty is $12,000, you pay $5,000 and we cover $7,000.
-          </Text>
+          {replaceAndSplit(copy.askYourBank, {}).map((p, i) => (
+            <Text key={i} style={[styles.paragraph, { fontFamily: i === 0 ? "Helvetica-Oblique" : "Helvetica-Bold", marginBottom: i === 0 ? 8 : 0 }]}>{p}</Text>
+          ))}
         </View>
 
-        <Text style={styles.sectionTitle}>Why This Matters</Text>
+        <PageFooter pageNum={0} />
+      </Page>
+    </>
+  );
+}
 
+// ============================================================================
+// VARIABLE RATE STRATEGY PAGES (FULL REWRITE FROM APPROVED COPY)
+// ============================================================================
+function VariableRatePages({ vars }: { vars: Record<string, string> }) {
+  const copy = REPORT_COPY.variableRate;
+  return (
+    <>
+      {/* Page 1: Intro + When + What We Do + Strategy + How It Plays Out */}
+      <Page size="LETTER" style={styles.page}>
+        <PageHeader />
+        <SectionHeader>{copy.heading}</SectionHeader>
+
+        {replaceAndSplit(copy.intro, vars).map((p, i) => (
+          <Text key={i} style={styles.paragraph}>{p}</Text>
+        ))}
+
+        <Text style={styles.sectionTitle}>{copy.whenItMakesSense.heading}</Text>
         <View style={styles.bulletContainer}>
-          <View style={styles.bulletRow}>
-            <View style={styles.bulletIcon}>
-              <CheckIcon />
+          {copy.whenItMakesSense.items.map((item, i) => (
+            <View key={i} style={styles.bulletRow}>
+              <View style={styles.bulletIcon}><CheckIcon /></View>
+              <Text style={styles.bulletText}>{item}</Text>
             </View>
-            <Text style={styles.bulletText}>
-              Life changes—job relocations, family growth—shouldn&apos;t cost you thousands
-            </Text>
+          ))}
+        </View>
+
+        <Text style={styles.sectionTitle}>{copy.whatWeDoDifferently.heading}</Text>
+        <Text style={styles.paragraph}>{replaceVariables(copy.whatWeDoDifferently.body, vars)}</Text>
+
+        <Text style={styles.sectionTitle}>{copy.strategy.heading}</Text>
+        <Text style={styles.paragraph}>{replaceVariables(copy.strategy.body, vars)}</Text>
+
+        <PageFooter pageNum={0} />
+      </Page>
+
+      {/* Page 2: How It Plays Out + Danger of Going It Alone */}
+      <Page size="LETTER" style={styles.page}>
+        <PageHeader />
+
+        <Text style={styles.sectionTitle}>{copy.howItPlaysOut.heading}</Text>
+        {replaceAndSplit(copy.howItPlaysOut.body, vars).map((p, i) => (
+          <Text key={i} style={styles.paragraph}>{p}</Text>
+        ))}
+
+        <Text style={styles.sectionTitle}>{copy.dangerOfGoingItAlone.heading}</Text>
+        {replaceAndSplit(copy.dangerOfGoingItAlone.body, vars).map((p, i) => (
+          <Text key={i} style={[styles.paragraph, { fontSize: i >= 5 ? 10 : 11 }]}>{p}</Text>
+        ))}
+
+        <PageFooter pageNum={0} />
+      </Page>
+    </>
+  );
+}
+
+// ============================================================================
+// CASH BACK STRATEGY PAGES (NEW — FROM APPROVED COPY)
+// ============================================================================
+function CashBackPages({ vars }: { vars: Record<string, string> }) {
+  const copy = REPORT_COPY.cashBack;
+  return (
+    <>
+      {/* Page 1: Intro + When + What We Do + True Story */}
+      <Page size="LETTER" style={styles.page}>
+        <PageHeader />
+        <SectionHeader>{copy.heading}</SectionHeader>
+
+        {replaceAndSplit(copy.intro, vars).map((p, i) => (
+          <Text key={i} style={styles.paragraph}>{p}</Text>
+        ))}
+
+        <Text style={styles.sectionTitle}>{copy.whenItMakesSense.heading}</Text>
+        <View style={styles.bulletContainer}>
+          {copy.whenItMakesSense.items.map((item, i) => (
+            <View key={i} style={styles.bulletRow}>
+              <View style={styles.bulletIcon}><CheckIcon /></View>
+              <Text style={styles.bulletText}>{item}</Text>
+            </View>
+          ))}
+        </View>
+
+        <Text style={styles.sectionTitle}>{copy.whatWeDoDifferently.heading}</Text>
+        {replaceAndSplit(copy.whatWeDoDifferently.body, vars).map((p, i) => (
+          <Text key={i} style={styles.paragraph}>{p}</Text>
+        ))}
+
+        <Text style={styles.sectionTitle}>{copy.trueStory.heading}</Text>
+        {replaceAndSplit(copy.trueStory.body, vars).map((p, i) => (
+          <Text key={i} style={styles.paragraph}>{p}</Text>
+        ))}
+
+        <PageFooter pageNum={0} />
+      </Page>
+
+      {/* Page 2: Math + Outcome + Verification + How It Could Work */}
+      <Page size="LETTER" style={styles.page}>
+        <PageHeader />
+
+        <Text style={styles.sectionTitle}>{copy.trueStory.math.heading}</Text>
+        <View style={styles.bulletContainer}>
+          {copy.trueStory.math.lines.map((line, i) => (
+            <View key={i} style={styles.bulletRow}>
+              <View style={styles.bulletIcon}><CheckIcon /></View>
+              <Text style={styles.bulletText}>{line}</Text>
+            </View>
+          ))}
+        </View>
+
+        {replaceAndSplit(copy.trueStory.outcome, vars).map((p, i) => (
+          <Text key={i} style={styles.paragraph}>{p}</Text>
+        ))}
+
+        {/* Verification Box */}
+        <View style={styles.verificationBox}>
+          <View style={styles.verificationHeader}>
+            <Text style={styles.verificationHeaderText}>{copy.verificationBox.heading}</Text>
+            <Text style={styles.verificationCopyHint}>COPY & PASTE</Text>
           </View>
-          <View style={styles.bulletRow}>
-            <View style={styles.bulletIcon}>
-              <CheckIcon />
-            </View>
-            <Text style={styles.bulletText}>
-              Take advantage of falling rates without being trapped
-            </Text>
-          </View>
-          <View style={styles.bulletRow}>
-            <View style={styles.bulletIcon}>
-              <CheckIcon />
-            </View>
-            <Text style={styles.bulletText}>
-              Access your home equity when you need it, on your terms
-            </Text>
+          <View style={styles.verificationBody}>
+            <Text style={styles.verificationInstruction}>{copy.verificationBox.instruction}</Text>
+            <Text style={styles.verificationPrompt}>{copy.verificationBox.prompt}</Text>
           </View>
         </View>
 
-        <Text style={[styles.paragraph, { fontSize: 9, color: colors.lightGray, marginTop: 15 }]}>
-          Terms and conditions apply. The guarantee covers the difference between your actual penalty and $5,000 when refinancing through Inspired Mortgage within your current term.
-        </Text>
+        <Text style={styles.sectionTitle}>{copy.howItCouldWork.heading}</Text>
+        {replaceAndSplit(copy.howItCouldWork.body, vars).map((p, i) => (
+          <Text key={i} style={styles.paragraph}>{p}</Text>
+        ))}
 
-        <PageFooter pageNum={10} />
+        <PageFooter pageNum={0} />
       </Page>
     </>
   );
@@ -1882,56 +1899,37 @@ function StrategiesPages() {
 // ============================================================================
 // WHAT HAPPENS NEXT PAGE
 // ============================================================================
-function WhatHappensNextPage({ consultant }: { consultant: ConsultantInfo }) {
+function WhatHappensNextPage({ consultant, applicationLink, vars }: { consultant: ConsultantInfo; applicationLink: string; vars: Record<string, string> }) {
+  const copy = REPORT_COPY.whatHappensNext;
   return (
     <Page size="LETTER" style={styles.page}>
       <PageHeader />
-      <SectionHeader>What Happens Next</SectionHeader>
-
-      <Text style={styles.paragraph}>
-        Getting started is simple. Here&apos;s what to expect:
-      </Text>
+      <SectionHeader>{copy.heading}</SectionHeader>
 
       {/* Visual Steps */}
       <View style={styles.stepsRow}>
-        <View style={styles.stepBox}>
-          <View style={styles.stepCircle}>
-            <Text style={styles.stepCircleNumber}>1</Text>
+        {copy.steps.map((step) => (
+          <View key={step.number} style={styles.stepBox}>
+            <View style={styles.stepCircle}>
+              <Text style={styles.stepCircleNumber}>{step.number}</Text>
+            </View>
+            <Text style={styles.stepTitle}>{step.title}</Text>
+            <Text style={styles.stepDesc}>{step.description}</Text>
           </View>
-          <Text style={styles.stepTitle}>Complete Your Application</Text>
-          <Text style={styles.stepDesc}>
-            10-15 minutes. Does not affect your credit score.
-          </Text>
-        </View>
-
-        <View style={styles.stepBox}>
-          <View style={styles.stepCircle}>
-            <Text style={styles.stepCircleNumber}>2</Text>
-          </View>
-          <Text style={styles.stepTitle}>Receive Your Report</Text>
-          <Text style={styles.stepDesc}>
-            Within 24-48 hours. Compare 30+ lenders side by side.
-          </Text>
-        </View>
-
-        <View style={styles.stepBox}>
-          <View style={styles.stepCircle}>
-            <Text style={styles.stepCircleNumber}>3</Text>
-          </View>
-          <Text style={styles.stepTitle}>Make Your Decision</Text>
-          <Text style={styles.stepDesc}>
-            No pressure. Just clear information.
-          </Text>
-        </View>
+        ))}
       </View>
 
+      {/* CTA Box with application link */}
       <View style={styles.ctaBox}>
-        <Text style={styles.ctaText}>Ready to see what&apos;s possible?</Text>
-        <Text style={styles.ctaLink}>Your application link has been sent to your email</Text>
+        <Text style={styles.ctaText}>{copy.ctaBox.heading}</Text>
+        <Link src={applicationLink}>
+          <Text style={styles.ctaLink}>Start Your Application →</Text>
+        </Link>
       </View>
 
+      {/* Advisor Contact */}
       <View style={styles.contactBox}>
-        <Text style={styles.contactLabel}>Questions? Reach out anytime</Text>
+        <Text style={styles.contactLabel}>{copy.advisorBlock.label}</Text>
         <Text style={styles.contactName}>{consultant.name}</Text>
         <Text style={styles.contactTitle}>Mortgage Advisor, Inspired Mortgage</Text>
         <Text style={styles.contactDetail}>{consultant.email}</Text>
@@ -1943,7 +1941,7 @@ function WhatHappensNextPage({ consultant }: { consultant: ConsultantInfo }) {
         )}
       </View>
 
-      <PageFooter pageNum={11} />
+      <PageFooter pageNum={0} />
     </Page>
   );
 }
@@ -1958,34 +1956,89 @@ export function ReportPDFDocument({
   bullets,
   scenario,
   includeDebtConsolidation,
+  includeCashBack,
+  applicationLink,
   extractedData,
 }: ReportPDFProps) {
-  const isGreg = consultant.name.toLowerCase().includes("greg");
+  // Build variable map for template replacement
+  const vars = buildVariableMap({
+    clientName,
+    clientFirstName: clientName.split(" ")[0],
+    date,
+    advisorName: consultant.name,
+    advisorEmail: consultant.email,
+    advisorPhone: consultant.phone,
+    applicationLink,
+    mortgageAmount: extractedData.mortgageAmount ?? undefined,
+    theirPreviousRate: extractedData.previousRate ?? undefined,
+    originalAmortization: extractedData.originalAmortization ?? undefined,
+    currentAmortization: extractedData.currentAmortization ?? undefined,
+    oldPayment: extractedData.oldPayment ?? undefined,
+    newPayment: extractedData.newPayment ?? undefined,
+    paymentDifference: extractedData.paymentDifference ?? undefined,
+    fiveYearsOfPayments: extractedData.fiveYearsOfPayments ?? undefined,
+    theirOriginalRate: extractedData.originalRate ?? undefined,
+    theirLockRate: extractedData.lockInRate ?? undefined,
+    estimatedExtraInterest: extractedData.estimatedExtraInterest ?? undefined,
+    theirPayment: extractedData.fixedPayment ?? undefined,
+  });
+
+  // Narrow scenario to valid scenario number (1, 2, or 3) or null
+  const activeScenario: 1 | 2 | 3 | null = (scenario === 1 || scenario === 2 || scenario === 3) ? scenario : null;
 
   return (
     <Document>
-      {/* Page 1: Cover */}
+      {/* 1. Cover Page */}
       <CoverPage clientName={clientName} date={date} consultant={consultant} />
 
-      {/* Page 2: What You Told Us */}
-      <WhatYouToldUsPages bullets={bullets} />
+      {/* 2. What You Told Us */}
+      <WhatYouToldUsPages bullets={bullets} clientName={clientName} vars={vars} />
 
-      {/* Pages 3-5: Scenario-specific content */}
-      {scenario === 1 && <Scenario1Pages data={extractedData} />}
-      {scenario === 2 && <Scenario2Pages data={extractedData} />}
-      {scenario === 3 && <Scenario3Pages data={extractedData} />}
+      {/* 3. Scenario (if selected, skip if "None"/0/null) */}
+      {activeScenario === 1 && <Scenario1Pages data={extractedData} />}
+      {activeScenario === 2 && <Scenario2Pages data={extractedData} />}
+      {activeScenario === 3 && <Scenario3Pages data={extractedData} />}
 
-      {/* Optional: Debt Consolidation */}
+      {/* APP LINK #1: After scenario (or after What You Told Us if no scenario) */}
+      <Page size="LETTER" style={styles.page}>
+        <PageHeader />
+        <ApplicationLinkBlock
+          applicationLink={applicationLink}
+          message="Ready to see which strategies fit your situation? Complete your application and we'll build your personalized Lender Comparison Report—including real numbers from 30+ lenders competing for your business."
+        />
+        <PageFooter pageNum={0} />
+      </Page>
+
+      {/* 4. Debt Consolidation (if checkbox selected) */}
       {includeDebtConsolidation && <DebtConsolidationPage />}
 
-      {/* Our Approach (Greg or Jakub version) */}
-      {isGreg ? <GregApproachPage /> : <JakubApproachPage />}
+      {/* 5. Our Approach */}
+      <OurApproachPage consultant={consultant} vars={vars} />
 
-      {/* Strategies */}
-      <StrategiesPages />
+      {/* 6. $5,000 Penalty Guarantee */}
+      <GuaranteePage />
 
-      {/* What Happens Next */}
-      <WhatHappensNextPage consultant={consultant} />
+      {/* APP LINK #2: After $5,000 Guarantee */}
+      <Page size="LETTER" style={styles.page}>
+        <PageHeader />
+        <ApplicationLinkBlock
+          applicationLink={applicationLink}
+          message="See what this looks like for your mortgage. Complete your application to unlock your Lender Comparison Report—including which lenders offer fair penalties and how the $5,000 Guarantee applies to your specific situation."
+        />
+        <PageFooter pageNum={0} />
+      </Page>
+
+      {/* 7. Strategy: Fixed Rate Mortgage */}
+      <FixedRatePages />
+
+      {/* 8. Strategy: Variable Rate Mortgage */}
+      <VariableRatePages vars={vars} />
+
+      {/* 9. Strategy: Cash Back Mortgage (if checkbox selected) */}
+      {includeCashBack && <CashBackPages vars={vars} />}
+
+      {/* 10. What Happens Next (CTA) — APP LINK #3 */}
+      <WhatHappensNextPage consultant={consultant} applicationLink={applicationLink} vars={vars} />
     </Document>
   );
 }
