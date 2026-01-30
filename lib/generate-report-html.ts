@@ -137,8 +137,9 @@ export function generateReportHTML(props: ReportHTMLProps): string {
   pages.push(generateApplicationLinkPage(
     clientName,
     applicationLink,
-    "Ready to see which strategies fit your situation? Complete your application and we'll build your personalized Lender Comparison Report—including real numbers from 30+ lenders competing for your business.",
-    pages.length + 1
+    REPORT_COPY.ctaPages.afterScenario.message,
+    pages.length + 1,
+    "afterScenario"
   ));
 
   // 4. Debt Consolidation (if checkbox selected)
@@ -163,8 +164,9 @@ export function generateReportHTML(props: ReportHTMLProps): string {
   pages.push(generateApplicationLinkPage(
     clientName,
     applicationLink,
-    "See what this looks like for your mortgage. Complete your application to unlock your Lender Comparison Report—including which lenders offer fair penalties and how the $5,000 Guarantee applies to your specific situation.",
-    pages.length + 1
+    REPORT_COPY.ctaPages.afterGuarantee.message,
+    pages.length + 1,
+    "afterGuarantee"
   ));
 
   // 7. Strategy: Fixed Rate Mortgage
@@ -1091,15 +1093,14 @@ function generateCoverPage(
             <div class="label">${copy.advisorLabel}</div>
             <div class="name">${consultant.name}</div>
             <div class="contact">${consultant.email}</div>
+            ${consultant.phone ? `<div class="contact" style="color: ${colors.slate};">${consultant.phone}</div>` : ""}
           </div>
         </div>
       </div>
       <div class="cover-footer-note">
         <p>${copy.readingTime}</p>
-        ${copy.readingEncouragement.split('\n\n').map(p => `<p style="font-size: 12px; color: rgba(255,255,255,0.7); margin-top: 8px; line-height: 1.5;">${p}</p>`).join('\n        ')}
-      </div>
-      <div class="cover-closing" style="text-align: center; margin-top: 12px; font-style: italic; color: rgba(255,255,255,0.8); font-size: 14px;">
-        ${copy.closingLine}
+        ${copy.readingEncouragement.split('\n\n').filter(p => p.trim()).map(p => `<p style="font-size: 12px; color: #9ca3af; margin-top: 8px; line-height: 1.5;">${p}</p>`).join('\n        ')}
+        <p style="font-size: 13px; color: #6B7280; margin-top: 12px; font-weight: 700; font-style: italic;">${copy.closingLine}</p>
       </div>
     </div>
   `;
@@ -1613,17 +1614,63 @@ function generateApplicationLinkPage(
   clientName: string,
   applicationLink: string,
   message: string,
-  pageNumber: number
+  pageNumber: number,
+  variant: "afterScenario" | "afterGuarantee" = "afterScenario"
 ): string {
+  const ctaCopy = REPORT_COPY.ctaPages[variant];
+
+  const benefitsList = ctaCopy.benefits.map(b => `
+    <li>
+      <span class="checkmark" style="color: ${colors.brandPurple}; font-weight: 700; font-size: 16px; flex-shrink: 0; margin-top: 1px;">✓</span>
+      <span>${b}</span>
+    </li>
+  `).join("");
+
+  const guaranteeCopy = REPORT_COPY.ctaPages.afterGuarantee;
+  const testimonialHtml = variant === "afterGuarantee" ? `
+    <div style="background: ${colors.cream}; border-left: 4px solid ${colors.gold}; border-radius: 0 8px 8px 0; padding: 20px 24px; margin: 24px 0; text-align: left;">
+      <p style="font-size: 15px; font-style: italic; color: ${colors.charcoal}; line-height: 1.6; margin-bottom: 8px;">${guaranteeCopy.testimonial.quote}</p>
+      <p style="font-size: 13px; color: ${colors.slate}; font-weight: 600;">${guaranteeCopy.testimonial.attribution}</p>
+    </div>
+  ` : "";
+
   return `
     <div class="page">
       <div class="page-inner">
         ${pageHeader(clientName)}
-        <div class="page-content" style="display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;">
-          <div class="cta-box" style="max-width: 520px;">
-            <p style="color: rgba(255,255,255,0.9); font-size: 16px; margin-bottom: 20px; line-height: 1.7;">${message}</p>
+        <div class="page-content">
+          <div class="section-header">
+            <h2>${ctaCopy.heading}</h2>
+            <div class="underline"></div>
+          </div>
+
+          <p style="font-size: 16px; color: ${colors.slate}; line-height: 1.7; margin-bottom: 24px;">${ctaCopy.message}</p>
+
+          <h3 style="font-size: 18px; font-weight: 600; color: ${colors.charcoal}; margin-bottom: 16px;">${ctaCopy.subheading}</h3>
+
+          <ul style="list-style: none; padding: 0; margin-bottom: 24px;">
+            ${benefitsList}
+          </ul>
+
+          <div class="cta-box" style="margin-bottom: 24px;">
+            <h3 style="color: ${colors.white}; font-size: 20px; margin-bottom: 12px;">Ready to See What's Possible?</h3>
+            <p style="color: rgba(255,255,255,0.9); font-size: 14px; margin-bottom: 16px;">10-15 minutes · No credit impact · No obligation</p>
             <a href="${applicationLink}" style="display: inline-block; background: ${colors.white}; color: ${colors.brandPurple}; padding: 14px 32px; border-radius: 8px; font-weight: 700; font-size: 16px; text-decoration: none;">Start Your Application →</a>
           </div>
+
+          ${testimonialHtml}
+
+          <div style="background: ${colors.lightGray}; border-radius: 12px; padding: 20px 24px; margin-top: 16px;">
+            <h4 style="font-size: 15px; font-weight: 600; color: ${colors.charcoal}; margin-bottom: 8px;">${ctaCopy.reassurance.heading}</h4>
+            <p style="font-size: 14px; color: ${colors.slate}; line-height: 1.6;">${ctaCopy.reassurance.body}</p>
+          </div>
+
+          ${variant === "afterScenario" ? `
+          <div style="background: ${colors.cream}; border-radius: 12px; padding: 20px 24px; margin-top: 16px;">
+            <h4 style="font-size: 15px; font-weight: 600; color: ${colors.charcoal}; margin-bottom: 8px;">${(ctaCopy as typeof REPORT_COPY.ctaPages.afterScenario).urgency.heading}</h4>
+            <p style="font-size: 14px; color: ${colors.slate}; line-height: 1.6;">${(ctaCopy as typeof REPORT_COPY.ctaPages.afterScenario).urgency.body}</p>
+          </div>
+          ` : ""}
         </div>
         ${pageFooter(pageNumber)}
       </div>
@@ -2074,6 +2121,7 @@ function generateWhatHappensNextPage(
               <div class="label">Contact</div>
               <div class="name">${consultant.name}</div>
               <div class="contact">${consultant.email}</div>
+              ${consultant.phone ? `<div class="contact" style="color: ${colors.slate};">${consultant.phone}</div>` : ""}
             </div>
           </div>
         </div>

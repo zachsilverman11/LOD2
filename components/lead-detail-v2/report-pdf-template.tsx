@@ -1467,6 +1467,119 @@ function ApplicationLinkBlock({ applicationLink, message }: { applicationLink: s
 }
 
 // ============================================================================
+// FULL CTA PAGE (After Scenario)
+// ============================================================================
+function CtaPageAfterScenario({ applicationLink }: { applicationLink: string }) {
+  const copy = REPORT_COPY.ctaPages.afterScenario;
+  return (
+    <Page size="LETTER" style={styles.page}>
+      <PageHeader />
+      <SectionHeader>{copy.heading}</SectionHeader>
+
+      <Text style={styles.paragraph}>{copy.message}</Text>
+
+      <Text style={styles.sectionTitle}>{copy.subheading}</Text>
+      <View style={styles.bulletContainer}>
+        {copy.benefits.map((benefit, i) => (
+          <View key={i} style={styles.bulletRow}>
+            <View style={styles.bulletIcon}>
+              <CheckIcon color={colors.primary} />
+            </View>
+            <Text style={styles.bulletText}>{benefit}</Text>
+          </View>
+        ))}
+      </View>
+
+      <View style={styles.ctaBox}>
+        <Text style={[styles.ctaText, { fontSize: 14, fontFamily: "Helvetica-Bold", marginBottom: 4 }]}>
+          Ready to See What&apos;s Possible?
+        </Text>
+        <Text style={[styles.ctaText, { fontSize: 10, marginBottom: 8 }]}>
+          10-15 minutes · No credit impact · No obligation
+        </Text>
+        <Link src={applicationLink}>
+          <Text style={styles.ctaLink}>Start Your Application →</Text>
+        </Link>
+      </View>
+
+      <View style={[styles.calloutBox, { marginTop: 20 }]}>
+        <Text style={[styles.paragraph, { fontFamily: "Helvetica-Bold", marginBottom: 6 }]}>
+          {copy.reassurance.heading}
+        </Text>
+        <Text style={[styles.paragraph, { marginBottom: 0 }]}>{copy.reassurance.body}</Text>
+      </View>
+
+      <View style={[styles.calloutHighlight, { marginTop: 16 }]}>
+        <Text style={[styles.paragraph, { fontFamily: "Helvetica-Bold", marginBottom: 6 }]}>
+          {copy.urgency.heading}
+        </Text>
+        <Text style={[styles.paragraph, { marginBottom: 0 }]}>{copy.urgency.body}</Text>
+      </View>
+
+      <PageFooter pageNum={0} />
+    </Page>
+  );
+}
+
+// ============================================================================
+// FULL CTA PAGE (After Guarantee)
+// ============================================================================
+function CtaPageAfterGuarantee({ applicationLink }: { applicationLink: string }) {
+  const copy = REPORT_COPY.ctaPages.afterGuarantee;
+  return (
+    <Page size="LETTER" style={styles.page}>
+      <PageHeader />
+      <SectionHeader>{copy.heading}</SectionHeader>
+
+      <Text style={styles.paragraph}>{copy.message}</Text>
+
+      <Text style={styles.sectionTitle}>{copy.subheading}</Text>
+      <View style={styles.bulletContainer}>
+        {copy.benefits.map((benefit, i) => (
+          <View key={i} style={styles.bulletRow}>
+            <View style={styles.bulletIcon}>
+              <CheckIcon color={colors.primary} />
+            </View>
+            <Text style={styles.bulletText}>{benefit}</Text>
+          </View>
+        ))}
+      </View>
+
+      <View style={styles.ctaBox}>
+        <Text style={[styles.ctaText, { fontSize: 14, fontFamily: "Helvetica-Bold", marginBottom: 4 }]}>
+          Ready to See What&apos;s Possible?
+        </Text>
+        <Text style={[styles.ctaText, { fontSize: 10, marginBottom: 8 }]}>
+          10-15 minutes · No credit impact · No obligation
+        </Text>
+        <Link src={applicationLink}>
+          <Text style={styles.ctaLink}>Start Your Application →</Text>
+        </Link>
+      </View>
+
+      {/* Testimonial */}
+      <View style={{ backgroundColor: colors.cream, borderLeftWidth: 4, borderLeftColor: colors.gold, borderRadius: 8, padding: 16, marginTop: 20 }}>
+        <Text style={[styles.paragraph, { fontFamily: "Helvetica-Oblique", marginBottom: 6 }]}>
+          {copy.testimonial.quote}
+        </Text>
+        <Text style={{ fontSize: 10, fontFamily: "Helvetica-Bold", color: colors.lightGray }}>
+          {copy.testimonial.attribution}
+        </Text>
+      </View>
+
+      <View style={[styles.calloutBox, { marginTop: 16 }]}>
+        <Text style={[styles.paragraph, { fontFamily: "Helvetica-Bold", marginBottom: 6 }]}>
+          {copy.reassurance.heading}
+        </Text>
+        <Text style={[styles.paragraph, { marginBottom: 0 }]}>{copy.reassurance.body}</Text>
+      </View>
+
+      <PageFooter pageNum={0} />
+    </Page>
+  );
+}
+
+// ============================================================================
 // $5,000 PENALTY GUARANTEE PAGE
 // ============================================================================
 function GuaranteePage() {
@@ -1868,14 +1981,7 @@ export function ReportPDFDocument({
       {activeScenario === 3 && <Scenario3Pages data={extractedData} vars={vars} />}
 
       {/* APP LINK #1: After scenario (or after What You Told Us if no scenario) */}
-      <Page size="LETTER" style={styles.page}>
-        <PageHeader />
-        <ApplicationLinkBlock
-          applicationLink={applicationLink}
-          message="Ready to see which strategies fit your situation? Complete your application and we'll build your personalized Lender Comparison Report—including real numbers from 30+ lenders competing for your business."
-        />
-        <PageFooter pageNum={0} />
-      </Page>
+      <CtaPageAfterScenario applicationLink={applicationLink} />
 
       {/* 4. Debt Consolidation (if checkbox selected) */}
       {includeDebtConsolidation && <DebtConsolidationPage />}
@@ -1887,14 +1993,7 @@ export function ReportPDFDocument({
       <GuaranteePage />
 
       {/* APP LINK #2: After $5,000 Guarantee */}
-      <Page size="LETTER" style={styles.page}>
-        <PageHeader />
-        <ApplicationLinkBlock
-          applicationLink={applicationLink}
-          message="See what this looks like for your mortgage. Complete your application to unlock your Lender Comparison Report—including which lenders offer fair penalties and how the $5,000 Guarantee applies to your specific situation."
-        />
-        <PageFooter pageNum={0} />
-      </Page>
+      <CtaPageAfterGuarantee applicationLink={applicationLink} />
 
       {/* 7. Strategy: Fixed Rate Mortgage */}
       <FixedRatePages />

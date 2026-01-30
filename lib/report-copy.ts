@@ -566,6 +566,53 @@ The key is using it strategically. That's exactly what we'll analyze in your Len
   },
 
   // ===========================================================================
+  // CTA / APPLICATION LINK PAGES
+  // ===========================================================================
+  ctaPages: {
+    // CTA Page #1: After scenario section
+    afterScenario: {
+      message: `Ready to see which strategies fit your situation? Complete your application and we'll build your personalized Lender Comparison Report—including real numbers from 30+ lenders competing for your business.`,
+      heading: "Your Next Step",
+      subheading: "What the Application Unlocks",
+      benefits: [
+        "Access to 30+ lenders competing for your business",
+        "A side-by-side Lender Comparison Report with real rates",
+        "Personalized strategy recommendations based on your full financial picture",
+        "Our $5,000 Penalty Guarantee — protection no bank will offer",
+      ],
+      reassurance: {
+        heading: "No Commitment Required",
+        body: `The application is not a commitment to proceed. It's how we gather the information needed to make lenders compete for your business. There's no credit impact, no obligation, and no pressure. You'll receive your personalized Lender Comparison Report within 24-48 hours—and then you decide.`,
+      },
+      urgency: {
+        heading: "Why Timing Matters",
+        body: `Mortgage rates change daily. The rates available today may not be available next week. By completing your application now, we can lock in today's best options while you review your report and make your decision.`,
+      },
+    },
+
+    // CTA Page #2: After $5,000 Guarantee section
+    afterGuarantee: {
+      message: `See what this looks like for your mortgage. Complete your application to unlock your Lender Comparison Report—including which lenders offer fair penalties and how the $5,000 Guarantee applies to your specific situation.`,
+      heading: "See the $5,000 Guarantee in Action",
+      subheading: "What You'll Receive",
+      benefits: [
+        "Your exact penalty amount from each lender",
+        "How the $5,000 Guarantee applies to your situation",
+        "A clear comparison showing which lenders offer fair terms",
+        "The math behind whether breaking your current mortgage makes sense",
+      ],
+      reassurance: {
+        heading: "We Do the Heavy Lifting",
+        body: `Once you complete the application, our team reviews your full financial picture and shops your mortgage to 30+ lenders. You don't need to call anyone, negotiate anything, or fill out multiple applications. One application. Every option. Delivered to you in a clear, easy-to-read report.`,
+      },
+      testimonial: {
+        quote: `"I had no idea I was overpaying until Inspired Mortgage showed me the numbers. The $5,000 Penalty Guarantee made the decision easy—I'm saving over $400 a month now."`,
+        attribution: "— Recent Inspired Mortgage Client",
+      },
+    },
+  },
+
+  // ===========================================================================
   // WHAT HAPPENS NEXT
   // ===========================================================================
   whatHappensNext: {
