@@ -47,6 +47,7 @@ const scenario1Props: ReportHTMLProps = {
   scenario: 1,
   includeDebtConsolidation: true,
   applicationLink,
+  includeCashBack: false,
   extractedData: {
     mortgageAmount: 485000,
     originalAmortization: 25,
@@ -82,6 +83,7 @@ const scenario2Props: ReportHTMLProps = {
   scenario: 2,
   includeDebtConsolidation: false,
   applicationLink,
+  includeCashBack: false,
   extractedData: {
     mortgageAmount: 520000,
     originalAmortization: 25,
@@ -110,6 +112,7 @@ const scenario3Props: ReportHTMLProps = {
   scenario: 3,
   includeDebtConsolidation: false,
   applicationLink,
+  includeCashBack: false,
   extractedData: {
     mortgageAmount: 415000,
     originalAmortization: 25,

@@ -55,6 +55,8 @@ export async function generateReportPDF(
     mortgageAmount: formatCurrency(mortgageAmount),
     scenario,
     includeDebtConsolidation,
+    includeCashBack: false,
+    applicationLink: "https://stressfree.mtg-app.com/signup",
     extractedData: extractedData || {},
   };
 

@@ -3,6 +3,9 @@
  * Premium design using HTML/CSS for Puppeteer PDF generation
  */
 
+import { REPORT_COPY } from "@/lib/report-copy";
+import { replaceVariables, buildVariableMap } from "@/lib/report-helpers";
+
 export interface ReportHTMLProps {
   clientName: string;
   date: string;
@@ -15,8 +18,9 @@ export interface ReportHTMLProps {
   };
   bullets: string[];
   mortgageAmount: string;
-  scenario: 1 | 2 | 3;
+  scenario: 0 | 1 | 2 | 3 | null;
   includeDebtConsolidation: boolean;
+  includeCashBack: boolean;
   applicationLink: string; // The actual application URL to include in the report
   extractedData: {
     mortgageAmount?: number;
@@ -81,29 +85,63 @@ export function generateReportHTML(props: ReportHTMLProps): string {
     bullets,
     scenario,
     includeDebtConsolidation,
+    includeCashBack,
     applicationLink,
     extractedData,
   } = props;
 
-  // Build pages array
+  // Build variable map for template replacement
+  const vars = buildVariableMap({
+    clientName,
+    clientFirstName: clientName.split(" ")[0],
+    date,
+    advisorName: consultant.name,
+    advisorEmail: consultant.email,
+    advisorPhone: consultant.phone,
+    applicationLink,
+    mortgageAmount: extractedData.mortgageAmount ?? undefined,
+    theirPreviousRate: extractedData.previousRate ?? undefined,
+    originalAmortization: extractedData.originalAmortization ?? undefined,
+    currentAmortization: extractedData.currentAmortization ?? undefined,
+    oldPayment: extractedData.oldPayment ?? undefined,
+    newPayment: extractedData.newPayment ?? undefined,
+    paymentDifference: extractedData.paymentDifference ?? undefined,
+    fiveYearsOfPayments: extractedData.fiveYearsOfPayments ?? undefined,
+    theirOriginalRate: extractedData.originalRate ?? undefined,
+    theirLockRate: extractedData.lockInRate ?? undefined,
+    estimatedExtraInterest: extractedData.estimatedExtraInterest ?? undefined,
+    theirPayment: extractedData.fixedPayment ?? undefined,
+  });
+
+  const activeScenario: 1 | 2 | 3 | null = (scenario === 1 || scenario === 2 || scenario === 3) ? scenario : null;
+
+  // Build pages array — APPROVED PAGE ORDER
   const pages: string[] = [];
 
-  // Page 1: Cover
+  // 1. Cover Page
   pages.push(generateCoverPage(clientName, date, consultant));
 
-  // Page 2-3: What You Told Us
-  pages.push(generateWhatYouToldUsPage(clientName, bullets, 2));
+  // 2. What You Told Us
+  pages.push(generateWhatYouToldUsPage(clientName, bullets, pages.length + 1, vars));
 
-  // Pages 4-6: Scenario-specific content
-  if (scenario === 1) {
+  // 3. Scenario (if selected, skip if "None"/0/null)
+  if (activeScenario === 1) {
     pages.push(...generateScenario1Pages(clientName, extractedData));
-  } else if (scenario === 2) {
+  } else if (activeScenario === 2) {
     pages.push(...generateScenario2Pages(clientName, extractedData));
-  } else {
+  } else if (activeScenario === 3) {
     pages.push(...generateScenario3Pages(clientName, extractedData));
   }
 
-  // Page 7: Debt Consolidation (optional)
+  // APP LINK #1: After scenario (or after What You Told Us if no scenario)
+  pages.push(generateApplicationLinkPage(
+    clientName,
+    applicationLink,
+    "Ready to see which strategies fit your situation? Complete your application and we'll build your personalized Lender Comparison Report—including real numbers from 30+ lenders competing for your business.",
+    pages.length + 1
+  ));
+
+  // 4. Debt Consolidation (if checkbox selected)
   if (includeDebtConsolidation && extractedData.otherDebts?.length) {
     pages.push(
       generateDebtConsolidationPage(
@@ -115,16 +153,32 @@ export function generateReportHTML(props: ReportHTMLProps): string {
     );
   }
 
-  // Our Approach + $5K Guarantee (combined as per feedback - guarantee at end of approach)
-  pages.push(...generateOurApproachPages(clientName, consultant, pages.length + 1));
+  // 5. Our Approach
+  pages.push(generateOurApproachPage(clientName, consultant, pages.length + 1, vars));
 
-  // Fixed Rate Strategy
-  pages.push(generateFixedRateStrategyPage(clientName, pages.length + 1));
+  // 6. $5,000 Penalty Guarantee
+  pages.push(generateGuaranteePage(clientName, pages.length + 1));
 
-  // Variable Rate Strategy
-  pages.push(generateVariableRateStrategyPage(clientName, pages.length + 1));
+  // APP LINK #2: After $5,000 Guarantee
+  pages.push(generateApplicationLinkPage(
+    clientName,
+    applicationLink,
+    "See what this looks like for your mortgage. Complete your application to unlock your Lender Comparison Report—including which lenders offer fair penalties and how the $5,000 Guarantee applies to your specific situation.",
+    pages.length + 1
+  ));
 
-  // What Happens Next
+  // 7. Strategy: Fixed Rate Mortgage
+  pages.push(...generateFixedRateStrategyPages(clientName, pages.length + 1));
+
+  // 8. Strategy: Variable Rate Mortgage
+  pages.push(...generateVariableRateStrategyPages(clientName, pages.length + 1, vars));
+
+  // 9. Strategy: Cash Back Mortgage (if checkbox selected)
+  if (includeCashBack) {
+    pages.push(...generateCashBackStrategyPages(clientName, pages.length + 1, vars));
+  }
+
+  // 10. What Happens Next (CTA) — APP LINK #3
   pages.push(
     generateWhatHappensNextPage(clientName, consultant, applicationLink, pages.length + 1)
   );
@@ -995,13 +1049,20 @@ function pageFooter(pageNumber: number): string {
 }
 
 /**
- * Generate Cover Page
+ * Generate Cover Page — Uses REPORT_COPY.cover for all text
  */
 function generateCoverPage(
   clientName: string,
   date: string,
   consultant: { name: string; email: string; phone: string }
 ): string {
+  const copy = REPORT_COPY.cover;
+  const benefitsList = copy.benefits.map(b => `
+            <li>
+              <span class="checkmark">✓</span>
+              <span>${b}</span>
+            </li>`).join("");
+
   return `
     <div class="page cover-page">
       <div class="cover-header">
@@ -1010,36 +1071,25 @@ function generateCoverPage(
       </div>
       <div class="cover-body">
         <div class="cover-tagline">
-          <h1>See Lenders Compete<br>For Your Business</h1>
+          <h1>${copy.tagline}</h1>
         </div>
         <div class="cover-divider"></div>
         <div class="cover-client-info">
-          <div class="prepared-for">Prepared for</div>
+          <div class="prepared-for">${copy.preparedForLabel}</div>
           <div class="client-name">${clientName}</div>
           <div class="date">${date}</div>
         </div>
         <div class="cover-callout">
           <p class="callout-text">
-            The application isn't a commitment—it's how we get lenders to compete for your business. Here's what it unlocks:
+            ${copy.applicationNotice}
           </p>
           <ul class="callout-list">
-            <li>
-              <span class="checkmark">✓</span>
-              <span>Access to 30+ lenders, not just one</span>
-            </li>
-            <li>
-              <span class="checkmark">✓</span>
-              <span>Real numbers customized for your goals</span>
-            </li>
-            <li>
-              <span class="checkmark">✓</span>
-              <span>Side-by-side comparison to your current offer</span>
-            </li>
+            ${benefitsList}
           </ul>
         </div>
         <div class="cover-advisor">
           <div class="advisor-card">
-            <div class="label">Your Advisor</div>
+            <div class="label">${copy.advisorLabel}</div>
             <div class="name">${consultant.name}</div>
             <div class="contact">${consultant.email}</div>
             <div class="contact">${consultant.phone}</div>
@@ -1047,7 +1097,11 @@ function generateCoverPage(
         </div>
       </div>
       <div class="cover-footer-note">
-        This report takes about 10 minutes to read.
+        <p>${copy.readingTime}</p>
+        <p style="font-size: 12px; color: rgba(255,255,255,0.7); margin-top: 8px; line-height: 1.5;">${copy.readingEncouragement.split('\n\n')[0]}</p>
+      </div>
+      <div class="cover-closing" style="text-align: center; margin-top: 12px; font-style: italic; color: rgba(255,255,255,0.8); font-size: 14px;">
+        ${copy.closingLine}
       </div>
     </div>
   `;
@@ -1059,9 +1113,12 @@ function generateCoverPage(
 function generateWhatYouToldUsPage(
   clientName: string,
   bullets: string[],
-  pageNumber: number
+  pageNumber: number,
+  vars: Record<string, string> = {}
 ): string {
-  const firstName = clientName.split(" ")[0];
+  const copy = REPORT_COPY.whatYouToldUs;
+  const introText = replaceVariables(copy.intro, vars);
+  const outroText = replaceVariables(copy.outro, vars);
 
   const bulletItems = bullets
     .map(
@@ -1074,31 +1131,31 @@ function generateWhatYouToldUsPage(
     )
     .join("");
 
+  const introParagraphs = introText.split(/\n\n+/).filter(p => p.trim()).map(p =>
+    `<p style="color: ${colors.slate}; margin-bottom: 16px; font-size: 16px; line-height: 1.7;">${p}</p>`
+  ).join("");
+
+  const outroParagraphs = outroText.split(/\n\n+/).filter(p => p.trim()).map(p =>
+    `<p style="color: ${colors.slate}; margin-bottom: 16px; font-size: 16px; line-height: 1.7;">${p}</p>`
+  ).join("");
+
   return `
     <div class="page">
       <div class="page-inner">
         ${pageHeader(clientName)}
         <div class="page-content">
           <div class="section-header">
-            <h2>What You Told Us</h2>
+            <h2>${copy.heading}</h2>
             <div class="underline"></div>
           </div>
 
-          <div class="callout-box" style="background: ${colors.lightPurple}; border-left: 4px solid ${colors.brandPurple}; margin-bottom: 24px;">
-            <p style="font-size: 17px; color: ${colors.charcoal}; margin: 0; line-height: 1.7;">
-              <strong>${firstName}, thank you for sharing your story with us.</strong> Your mortgage isn't just numbers on a page—it's your home, your family's security, and years of hard work. We take that seriously.
-            </p>
-          </div>
-
-          <p class="mb-4" style="color: ${colors.bodyText};">Here's what we heard during our conversation:</p>
+          ${introParagraphs}
 
           <ul class="bullet-list" style="background: ${colors.cream}; padding: 24px 24px 24px 40px; border-radius: 12px; margin-bottom: 24px;">
             ${bulletItems}
           </ul>
 
-          <p style="color: ${colors.bodyText}; margin-bottom: 16px;">We've designed the rest of this report around <em>your</em> specific situation. No generic advice—just a clear-eyed look at what happened on your last term, what it means for you today, and what we can do differently going forward.</p>
-
-          <p style="color: ${colors.bodyText};">Take your time with the following pages. We want you to understand not just <em>what</em> we recommend, but <em>why</em>—so you can make the best decision for your family.</p>
+          ${outroParagraphs}
         </div>
         ${pageFooter(pageNumber)}
       </div>
@@ -1503,7 +1560,7 @@ function generateScenario3Pages(
 }
 
 /**
- * Generate Debt Consolidation Page
+ * Generate Debt Consolidation Page — Uses REPORT_COPY.debtConsolidation for all text
  */
 function generateDebtConsolidationPage(
   clientName: string,
@@ -1511,6 +1568,7 @@ function generateDebtConsolidationPage(
   otherDebts: Array<{ type: string; balance: number; payment: number }>,
   pageNumber: number
 ): string {
+  const copy = REPORT_COPY.debtConsolidation;
   const totalDebt =
     mortgageAmount + otherDebts.reduce((sum, d) => sum + d.balance, 0);
   const totalPayments = otherDebts.reduce((sum, d) => sum + d.payment, 0);
@@ -1527,53 +1585,56 @@ function generateDebtConsolidationPage(
     )
     .join("");
 
+  // Build example debts from approved copy
+  const exampleDebtRows = copy.example.debts.map(d => `
+      <tr><td>${d.type}</td><td class="text-right">${formatCurrency(d.balance)}</td><td class="text-right">${formatCurrency(d.payment)}/mo</td></tr>
+  `).join("");
+
   return `
     <div class="page">
       <div class="page-inner">
         ${pageHeader(clientName)}
         <div class="page-content">
           <div class="section-header">
-            <h2>The Opportunity You Might Not See</h2>
+            <h2>${copy.heading}</h2>
             <div class="underline"></div>
           </div>
 
-          <p class="mb-4">You mentioned other debts during our conversation. Here's what consolidating them into your mortgage could look like:</p>
+          ${copy.intro.split('\n\n').map(p => `<p class="mb-4">${p}</p>`).join('')}
+
+          <h3 class="mt-6">${copy.example.heading}</h3>
+          <p class="mb-4">${copy.example.setup}</p>
 
           <table class="data-table">
             <thead>
               <tr>
-                <th>Current Debts</th>
+                <th>Debt</th>
                 <th class="text-right">Balance</th>
                 <th class="text-right">Payment</th>
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td>Mortgage</td>
-                <td class="text-right">${formatCurrency(mortgageAmount)}</td>
-                <td class="text-right">—</td>
-              </tr>
-              ${debtRows}
-              <tr>
-                <td>Total</td>
-                <td class="text-right">${formatCurrency(totalDebt)}</td>
-                <td class="text-right">${formatCurrency(totalPayments)}/mo (other debts)</td>
-              </tr>
+              ${exampleDebtRows}
             </tbody>
           </table>
 
+          <p class="mb-4">${copy.example.totalOutflow}</p>
+          <p class="mb-4">${copy.example.bankPath}</p>
+
+          <h3 class="mt-6">${copy.solution.heading}</h3>
+          <p class="mb-4">${copy.solution.body}</p>
+
           <div class="cta-box">
-            <h3>After Consolidation</h3>
-            <p>Same ${formatCurrency(totalPayments)}/month toward debt → Debt-free in 10 years, not 20</p>
+            <p style="font-size: 18px; font-weight: 700;">${copy.solution.impactLine}</p>
           </div>
 
-          <div class="pullquote">
-            <p>Consolidating doesn't add debt. It repositions it—often at a fraction of the interest rate you're currently paying.</p>
-          </div>
+          <p class="mb-4" style="font-style: italic;">${copy.solution.clientReaction}</p>
 
-          <p class="mt-4">Your car loan might be at 7%. Your line of credit at 9%. Your mortgage rate? Likely under 5%. By consolidating, you pay the same amount each month—but more goes toward principal instead of interest.</p>
+          <h3 class="mt-6">${copy.noteOnIncreasingMortgage.heading}</h3>
+          ${copy.noteOnIncreasingMortgage.body.split('\n\n').map(p => `<p class="mb-4">${p}</p>`).join('')}
 
-          <p class="mt-4">We'll run the exact numbers for your situation. For many clients, consolidation shaves years off their total debt payoff timeline.</p>
+          <h3 class="mt-6">${copy.relevance.heading}</h3>
+          ${copy.relevance.body.split('\n\n').map(p => `<p class="mb-4">${p}</p>`).join('')}
         </div>
         ${pageFooter(pageNumber)}
       </div>
@@ -1582,10 +1643,144 @@ function generateDebtConsolidationPage(
 }
 
 /**
- * Generate Our Approach Pages (includes $5K Guarantee at end)
- * Returns array of pages: Approach page + Guarantee page
+ * Generate Application Link Page
  */
-function generateOurApproachPages(
+function generateApplicationLinkPage(
+  clientName: string,
+  applicationLink: string,
+  message: string,
+  pageNumber: number
+): string {
+  return `
+    <div class="page">
+      <div class="page-inner">
+        ${pageHeader(clientName)}
+        <div class="page-content" style="display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;">
+          <div class="cta-box" style="max-width: 520px;">
+            <p style="color: rgba(255,255,255,0.9); font-size: 16px; margin-bottom: 20px; line-height: 1.7;">${message}</p>
+            <a href="${applicationLink}" style="display: inline-block; background: ${colors.white}; color: ${colors.brandPurple}; padding: 14px 32px; border-radius: 8px; font-weight: 700; font-size: 16px; text-decoration: none;">Start Your Application →</a>
+          </div>
+        </div>
+        ${pageFooter(pageNumber)}
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Generate Our Approach Page (single page, uses REPORT_COPY)
+ */
+function generateOurApproachPage(
+  clientName: string,
+  consultant: { name: string; email: string; phone: string },
+  pageNumber: number,
+  vars: Record<string, string> = {}
+): string {
+  const copy = REPORT_COPY.ourApproach;
+  const introText = replaceVariables(copy.intro, vars);
+  const introParagraphs = introText.split(/\n\n+/).filter(p => p.trim()).map(p =>
+    `<p class="mb-4">${p}</p>`
+  ).join("");
+
+  const differentiatorItems = copy.differentiators.items.map(item => `
+    <li>
+      <span class="bullet"></span>
+      <span><strong>${item.title}</strong> ${item.body}</span>
+    </li>
+  `).join("");
+
+  return `
+    <div class="page">
+      <div class="page-inner">
+        ${pageHeader(clientName)}
+        <div class="page-content">
+          <div class="section-header">
+            <h2>${copy.heading}</h2>
+            <div class="underline"></div>
+          </div>
+
+          ${introParagraphs}
+
+          <h3 class="mb-2">${copy.differentiators.heading}</h3>
+          <ul class="bullet-list">
+            ${differentiatorItems}
+          </ul>
+
+          <p class="mt-4">${copy.closing}</p>
+
+          <div class="callout-box">
+            <h4>${copy.promise.heading}</h4>
+            <p>${copy.promise.body}</p>
+          </div>
+
+          <div class="signature-block">
+            <div class="name">${consultant.name}</div>
+            <div class="title">${consultant.name.toLowerCase().includes("greg") ? "Founder" : "Mortgage Advisor"}, Inspired Mortgage</div>
+          </div>
+        </div>
+        ${pageFooter(pageNumber)}
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Generate $5,000 Penalty Guarantee Page (uses REPORT_COPY)
+ */
+function generateGuaranteePage(
+  clientName: string,
+  pageNumber: number
+): string {
+  const copy = REPORT_COPY.guarantee;
+
+  const exampleItems = copy.howItWorks.examples.map(example => `
+    <li>
+      <span class="bullet"></span>
+      <span>${example}</span>
+    </li>
+  `).join("");
+
+  return `
+    <div class="page">
+      <div class="page-inner">
+        ${pageHeader(clientName)}
+        <div class="page-content">
+          <div class="section-header">
+            <h2>${copy.heading}</h2>
+            <div class="underline"></div>
+          </div>
+
+          <div class="guarantee-certificate">
+            <div class="amount">${copy.certificate.amount}</div>
+            <div class="title">${copy.certificate.title}</div>
+            <p>${copy.certificate.body}</p>
+            <p style="font-weight: 700; margin-top: 12px;">${copy.certificate.subtext}</p>
+          </div>
+
+          <h3 class="mb-2">${copy.howItWorks.heading}</h3>
+          <ul class="bullet-list mb-4">
+            ${exampleItems}
+          </ul>
+
+          <p class="mb-4">${copy.howItWorks.explanation}</p>
+
+          <div class="callout-box">
+            <h4>${copy.askYourBank.heading}</h4>
+            <p style="font-style: italic;">${copy.askYourBank.prompt}</p>
+            <p style="font-weight: 700; margin-top: 12px;">${copy.askYourBank.punchline}</p>
+          </div>
+        </div>
+        ${pageFooter(pageNumber)}
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * OLD: Generate Our Approach Pages — REPLACED by generateOurApproachPage + generateGuaranteePage
+ * Keeping for reference during migration, will be removed
+ */
+function _deprecated_generateOurApproachPages(
   clientName: string,
   consultant: { name: string; email: string; phone: string },
   startPageNumber: number
@@ -1692,116 +1887,296 @@ function generateOurApproachPages(
 }
 
 /**
- * Generate Fixed Rate Strategy Page
+ * Generate Fixed Rate Strategy Pages (FULL REWRITE FROM APPROVED COPY)
  */
-function generateFixedRateStrategyPage(
+function generateFixedRateStrategyPages(
   clientName: string,
-  pageNumber: number
-): string {
-  return `
+  startPageNumber: number
+): string[] {
+  const copy = REPORT_COPY.fixedRate;
+
+  const whenItems = copy.whenItMakesSense.items.map(item => `
+    <li><span class="bullet"></span><span>${item}</span></li>
+  `).join("");
+
+  const relockSteps = copy.strategicRelock.steps.map(step => `
+    <li><span class="bullet"></span><span>${step}</span></li>
+  `).join("");
+
+  const borrowerASteps = copy.borrowerComparison.borrowerA.steps.map(step => `
+    <li><span class="bullet"></span><span>${step}</span></li>
+  `).join("");
+
+  const borrowerBSteps = copy.borrowerComparison.borrowerB.steps.map(step => `
+    <li><span class="bullet"></span><span>${step}</span></li>
+  `).join("");
+
+  const whatWeDoParagraphs = copy.whatWeDoDifferently.body.split(/\n\n+/).filter(p => p.trim()).map(p =>
+    `<p class="mb-4">${p}</p>`
+  ).join("");
+
+  const monitoringParagraphs = copy.monthlyMonitoring.body.split(/\n\n+/).filter(p => p.trim()).map(p =>
+    `<p class="mb-4">${p}</p>`
+  ).join("");
+
+  const resultParagraphs = copy.borrowerComparison.result.body.split(/\n\n+/).filter(p => p.trim()).map(p =>
+    `<p class="mb-4">${p}</p>`
+  ).join("");
+
+  const askYourBankParagraphs = copy.askYourBank.split(/\n\n+/).filter(p => p.trim());
+
+  // Page 1: Intro + When + What We Do + Monthly Monitoring
+  const page1 = `
     <div class="page">
       <div class="page-inner">
         ${pageHeader(clientName)}
         <div class="page-content">
           <div class="section-header">
-            <h2>Strategy: Fixed Rate Mortgage</h2>
+            <h2>${copy.heading}</h2>
             <div class="underline"></div>
           </div>
 
-          <p class="mb-4">A fixed rate locks in your interest rate for the entire term—typically 5 years. Your payment stays exactly the same, no matter what happens in the market.</p>
+          <p class="mb-4">${copy.intro}</p>
 
-          <h3 class="mb-2">When Fixed Makes Sense</h3>
-          <ul class="bullet-list mb-6">
-            <li>
-              <span class="bullet"></span>
-              <span>You value predictability and want to know exactly what you'll pay each month</span>
-            </li>
-            <li>
-              <span class="bullet"></span>
-              <span>Your budget is tight and you can't absorb payment increases</span>
-            </li>
-            <li>
-              <span class="bullet"></span>
-              <span>You believe rates will rise significantly during your term</span>
-            </li>
-            <li>
-              <span class="bullet"></span>
-              <span>You sleep better knowing your rate won't change</span>
-            </li>
-          </ul>
+          <h3 class="mb-2">${copy.whenItMakesSense.heading}</h3>
+          <ul class="bullet-list mb-6">${whenItems}</ul>
 
-          <h3 class="mb-2">What We Do Differently</h3>
-          <p class="mb-4">Most people just take the rate their bank offers. We make lenders compete—and the difference can be significant.</p>
+          <h3 class="mb-2">${copy.whatWeDoDifferently.heading}</h3>
+          ${whatWeDoParagraphs}
 
-          <div class="callout-box">
-            <h4>Real Example: The $6,800 Difference</h4>
-            <p>A client came to us with a 5.29% renewal offer from their bank. After shopping their mortgage to 30+ lenders, we secured 4.79%—the same term, same lender type, just 0.50% lower. Over 5 years, that saved them $6,800 in interest.</p>
-          </div>
+          <h3 class="mb-2">${copy.monthlyMonitoring.heading}</h3>
+          ${monitoringParagraphs}
         </div>
-        ${pageFooter(pageNumber)}
+        ${pageFooter(startPageNumber)}
       </div>
     </div>
   `;
+
+  // Page 2: Strategic Relock + Borrower Comparison
+  const page2 = `
+    <div class="page">
+      <div class="page-inner">
+        ${pageHeader(clientName)}
+        <div class="page-content">
+          <h3 class="mb-2">${copy.strategicRelock.heading}</h3>
+          <p class="mb-4">${copy.strategicRelock.body}</p>
+          <ul class="bullet-list mb-4">${relockSteps}</ul>
+          <p class="mb-4">${copy.strategicRelock.closing}</p>
+
+          <h3 class="mb-2 mt-6">${copy.borrowerComparison.heading}</h3>
+          <p class="mb-4">${copy.borrowerComparison.intro}</p>
+
+          <div style="display: flex; gap: 16px; margin: 20px 0;">
+            <div style="flex: 1; background: ${colors.lightGray}; border-radius: 12px; padding: 20px;">
+              <h4 style="font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: ${colors.slate}; margin-bottom: 12px;">${copy.borrowerComparison.borrowerA.label}</h4>
+              <ul class="bullet-list" style="margin: 0;">${borrowerASteps}</ul>
+            </div>
+            <div style="flex: 1; background: #ECFDF5; border: 2px solid #059669; border-radius: 12px; padding: 20px;">
+              <h4 style="font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: #059669; margin-bottom: 12px;">${copy.borrowerComparison.borrowerB.label}</h4>
+              <ul class="bullet-list" style="margin: 0;">${borrowerBSteps}</ul>
+            </div>
+          </div>
+        </div>
+        ${pageFooter(startPageNumber + 1)}
+      </div>
+    </div>
+  `;
+
+  // Page 3: The Difference + Ask Your Bank
+  const page3 = `
+    <div class="page">
+      <div class="page-inner">
+        ${pageHeader(clientName)}
+        <div class="page-content">
+          <div class="impact-statement" style="margin-top: 0;">
+            <h2>${copy.borrowerComparison.result.heading}</h2>
+          </div>
+
+          ${resultParagraphs}
+
+          <h3 class="mb-2 mt-6">Ask Your Bank</h3>
+          <div class="callout-box">
+            <p style="font-style: italic;">${askYourBankParagraphs[0] || ""}</p>
+            ${askYourBankParagraphs.length > 1 ? `<p style="font-weight: 700; margin-top: 12px;">${askYourBankParagraphs[1]}</p>` : ""}
+          </div>
+        </div>
+        ${pageFooter(startPageNumber + 2)}
+      </div>
+    </div>
+  `;
+
+  return [page1, page2, page3];
 }
 
 /**
- * Generate Variable Rate Strategy Page
+ * Generate Variable Rate Strategy Pages (FULL REWRITE FROM APPROVED COPY)
  */
-function generateVariableRateStrategyPage(
+function generateVariableRateStrategyPages(
   clientName: string,
-  pageNumber: number
-): string {
-  return `
+  startPageNumber: number,
+  vars: Record<string, string> = {}
+): string[] {
+  const copy = REPORT_COPY.variableRate;
+
+  const whenItems = copy.whenItMakesSense.items.map(item => `
+    <li><span class="bullet"></span><span>${item}</span></li>
+  `).join("");
+
+  const introParagraphs = replaceVariables(copy.intro, vars).split(/\n\n+/).filter(p => p.trim()).map(p =>
+    `<p class="mb-4">${p}</p>`
+  ).join("");
+
+  const howItPlaysOutParagraphs = replaceVariables(copy.howItPlaysOut.body, vars).split(/\n\n+/).filter(p => p.trim()).map(p =>
+    `<p class="mb-4">${p}</p>`
+  ).join("");
+
+  const dangerParagraphs = replaceVariables(copy.dangerOfGoingItAlone.body, vars).split(/\n\n+/).filter(p => p.trim()).map(p =>
+    `<p class="mb-4">${p}</p>`
+  ).join("");
+
+  // Page 1: Intro + When + What We Do + Strategy
+  const page1 = `
     <div class="page">
       <div class="page-inner">
         ${pageHeader(clientName)}
         <div class="page-content">
           <div class="section-header">
-            <h2>Strategy: Variable Rate Mortgage</h2>
+            <h2>${copy.heading}</h2>
             <div class="underline"></div>
           </div>
 
-          <p class="mb-4">A variable rate moves with the Bank of Canada's prime rate. When prime goes up, your rate goes up. When prime goes down, your rate goes down.</p>
+          ${introParagraphs}
 
-          <h3 class="mb-2">When Variable Makes Sense</h3>
-          <ul class="bullet-list mb-6">
-            <li>
-              <span class="bullet"></span>
-              <span>You can handle some payment fluctuation</span>
-            </li>
-            <li>
-              <span class="bullet"></span>
-              <span>You believe rates will stay flat or decrease</span>
-            </li>
-            <li>
-              <span class="bullet"></span>
-              <span>You want lower penalties if you need to break your mortgage early</span>
-            </li>
-            <li>
-              <span class="bullet"></span>
-              <span>Historically, variable rates have outperformed fixed rates over time</span>
-            </li>
-          </ul>
+          <h3 class="mb-2">${copy.whenItMakesSense.heading}</h3>
+          <ul class="bullet-list mb-6">${whenItems}</ul>
 
-          <h3 class="mb-2">What We Do Differently</h3>
-          <p class="mb-4">We don't just set it and forget it. We actively monitor your mortgage and contact you at key trigger points.</p>
+          <h3 class="mb-2">${copy.whatWeDoDifferently.heading}</h3>
+          <p class="mb-4">${replaceVariables(copy.whatWeDoDifferently.body, vars)}</p>
 
-          <div class="callout-box">
-            <h4>Active Management Trigger Points</h4>
-            <p><strong>Trigger Rate:</strong> We alert you before your payment no longer covers the interest.<br><br>
-            <strong>Trigger Point:</strong> We alert you before your amortization extends beyond the original term.<br><br>
-            <strong>Lock-In Opportunities:</strong> We alert you when fixed rates drop to attractive levels.</p>
-          </div>
+          <h3 class="mb-2">${copy.strategy.heading}</h3>
+          <p class="mb-4">${replaceVariables(copy.strategy.body, vars)}</p>
         </div>
-        ${pageFooter(pageNumber)}
+        ${pageFooter(startPageNumber)}
       </div>
     </div>
   `;
+
+  // Page 2: How It Plays Out + Danger of Going It Alone
+  const page2 = `
+    <div class="page">
+      <div class="page-inner">
+        ${pageHeader(clientName)}
+        <div class="page-content">
+          <h3 class="mb-2">${copy.howItPlaysOut.heading}</h3>
+          ${howItPlaysOutParagraphs}
+
+          <h3 class="mb-2 mt-6">${copy.dangerOfGoingItAlone.heading}</h3>
+          ${dangerParagraphs}
+        </div>
+        ${pageFooter(startPageNumber + 1)}
+      </div>
+    </div>
+  `;
+
+  return [page1, page2];
 }
 
+/**
+ * Generate Cash Back Strategy Pages (NEW — FROM APPROVED COPY)
+ */
+function generateCashBackStrategyPages(
+  clientName: string,
+  startPageNumber: number,
+  vars: Record<string, string> = {}
+): string[] {
+  const copy = REPORT_COPY.cashBack;
+
+  const whenItems = copy.whenItMakesSense.items.map(item => `
+    <li><span class="bullet"></span><span>${item}</span></li>
+  `).join("");
+
+  const whatWeDoParagraphs = replaceVariables(copy.whatWeDoDifferently.body, vars).split(/\n\n+/).filter(p => p.trim()).map(p =>
+    `<p class="mb-4">${p}</p>`
+  ).join("");
+
+  const storyParagraphs = replaceVariables(copy.trueStory.body, vars).split(/\n\n+/).filter(p => p.trim()).map(p =>
+    `<p class="mb-4">${p}</p>`
+  ).join("");
+
+  const mathLines = copy.trueStory.math.lines.map(line => `
+    <li><span class="bullet"></span><span>${line}</span></li>
+  `).join("");
+
+  const outcomeParagraphs = replaceVariables(copy.trueStory.outcome, vars).split(/\n\n+/).filter(p => p.trim()).map(p =>
+    `<p class="mb-4">${p}</p>`
+  ).join("");
+
+  const howItCouldWorkParagraphs = replaceVariables(copy.howItCouldWork.body, vars).split(/\n\n+/).filter(p => p.trim()).map(p =>
+    `<p class="mb-4">${p}</p>`
+  ).join("");
+
+  // Page 1: Intro + When + What We Do + True Story
+  const page1 = `
+    <div class="page">
+      <div class="page-inner">
+        ${pageHeader(clientName)}
+        <div class="page-content">
+          <div class="section-header">
+            <h2>${copy.heading}</h2>
+            <div class="underline"></div>
+          </div>
+
+          <p class="mb-4">${replaceVariables(copy.intro, vars)}</p>
+
+          <h3 class="mb-2">${copy.whenItMakesSense.heading}</h3>
+          <ul class="bullet-list mb-6">${whenItems}</ul>
+
+          <h3 class="mb-2">${copy.whatWeDoDifferently.heading}</h3>
+          ${whatWeDoParagraphs}
+
+          <h3 class="mb-2">${copy.trueStory.heading}</h3>
+          ${storyParagraphs}
+        </div>
+        ${pageFooter(startPageNumber)}
+      </div>
+    </div>
+  `;
+
+  // Page 2: Math + Outcome + Verification + How It Could Work
+  const page2 = `
+    <div class="page">
+      <div class="page-inner">
+        ${pageHeader(clientName)}
+        <div class="page-content">
+          <h3 class="mb-2">${copy.trueStory.math.heading}</h3>
+          <ul class="bullet-list mb-4">${mathLines}</ul>
+
+          ${outcomeParagraphs}
+
+          <div class="verification-box">
+            <div class="verification-header">
+              <span class="title">${copy.verificationBox.heading}</span>
+              <span class="copy-hint">Copy prompt below</span>
+            </div>
+            <div class="verification-body">
+              <p class="instruction">${copy.verificationBox.instruction}</p>
+              <div class="verification-prompt">${copy.verificationBox.prompt}</div>
+            </div>
+          </div>
+
+          <h3 class="mb-2 mt-6">${copy.howItCouldWork.heading}</h3>
+          ${howItCouldWorkParagraphs}
+        </div>
+        ${pageFooter(startPageNumber + 1)}
+      </div>
+    </div>
+  `;
+
+  return [page1, page2];
+}
 
 /**
- * Generate What Happens Next Page
+ * Generate What Happens Next Page (uses REPORT_COPY)
  */
 function generateWhatHappensNextPage(
   clientName: string,
@@ -1809,43 +2184,38 @@ function generateWhatHappensNextPage(
   applicationLink: string,
   pageNumber: number
 ): string {
+  const copy = REPORT_COPY.whatHappensNext;
+
+  const stepsHtml = copy.steps.map((step, i) => `
+    <div class="step">
+      <div class="step-number">${step.number}</div>
+      <h4>${step.title}</h4>
+      <p>${step.description}</p>
+    </div>
+    ${i < copy.steps.length - 1 ? '<div class="step-arrow">→</div>' : ""}
+  `).join("");
+
   return `
     <div class="page">
       <div class="page-inner">
         ${pageHeader(clientName)}
         <div class="page-content">
           <div class="section-header">
-            <h2>What Happens Next</h2>
+            <h2>${copy.heading}</h2>
             <div class="underline"></div>
           </div>
 
           <div class="steps-container">
-            <div class="step">
-              <div class="step-number">1</div>
-              <h4>Complete Your Application</h4>
-              <p>10-15 minutes. No credit impact. Click here to get started: <a href="${applicationLink}" style="color: ${colors.brandPurple}; text-decoration: underline;">${applicationLink}</a></p>
-            </div>
-            <div class="step-arrow">→</div>
-            <div class="step">
-              <div class="step-number">2</div>
-              <h4>Receive Your Lender Comparison Report</h4>
-              <p>Within 24-48 hours of receiving your completed application, we'll shop your mortgage to 30+ lenders and send you real rates with a side-by-side comparison.</p>
-            </div>
-            <div class="step-arrow">→</div>
-            <div class="step">
-              <div class="step-number">3</div>
-              <h4>Make Your Decision</h4>
-              <p>No pressure. No obligation. Just clear information to decide what's best.</p>
-            </div>
+            ${stepsHtml}
           </div>
 
           <div class="cta-box">
-            <h3>Ready to See What's Possible?</h3>
-            <p>Click here to get started: <a href="${applicationLink}" style="color: ${colors.white}; text-decoration: underline;">${applicationLink}</a></p>
+            <h3>${copy.ctaBox.heading}</h3>
+            <a href="${applicationLink}" style="display: inline-block; background: ${colors.white}; color: ${colors.brandPurple}; padding: 14px 32px; border-radius: 8px; font-weight: 700; font-size: 16px; text-decoration: none; margin-top: 12px;">Start Your Application →</a>
           </div>
 
           <div class="mt-6">
-            <h3 class="mb-4">Your Advisor</h3>
+            <h3 class="mb-4">${copy.advisorBlock.label}</h3>
             <div class="advisor-card">
               <div class="label">Contact</div>
               <div class="name">${consultant.name}</div>
