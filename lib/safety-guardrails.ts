@@ -16,13 +16,17 @@ export interface ValidationResult {
 
 export interface HollyDecision {
   thinking: string;
-  action: 'send_sms' | 'send_booking_link' | 'send_application_link' | 'move_stage' | 'wait' | 'escalate';
+  action: 'send_sms' | 'send_booking_link' | 'send_application_link' | 'book_directly' | 'move_stage' | 'wait' | 'escalate';
   message?: string;
   newStage?: 'CONTACTED' | 'ENGAGED' | 'NURTURING' | 'WAITING_FOR_APPLICATION' | 'LOST';
   waitHours?: number;
   nextCheckCondition?: string;
   suggestedAction?: string;
   confidence: 'high' | 'medium' | 'low';
+  // Cal.com direct booking fields (used when action is 'book_directly')
+  bookingStartTime?: string;
+  bookingLeadName?: string;
+  bookingLeadEmail?: string;
 }
 
 interface DecisionContext {

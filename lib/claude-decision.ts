@@ -23,6 +23,7 @@ import { getConversationGuidance, SALES_PSYCHOLOGY } from './sales-psychology';
 import { getRelevantExamples } from './holly-training-examples';
 import { LEARNED_EXAMPLES } from './holly-learned-examples';
 import { getLocalTime, getLocalTimeString } from './timezone-utils';
+import { getAvailableSlots, getTimezoneForProvince, TimeSlot } from './calcom';
 import {
   detectConversationStage,
   buildStageEnforcementPrompt,
@@ -386,6 +387,48 @@ Supportive, helpful, customer-service oriented. NOT sales-y.
 
 `
       : '';
+
+  // Pre-fetch 7-day availability so Holly can offer specific times
+  let availabilitySummary = "";
+  try {
+    const tz = getTimezoneForProvince(province);
+    const today = new Date();
+    const startDate = today.toLocaleDateString("en-CA"); // YYYY-MM-DD
+    const endDate = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString("en-CA");
+
+    const slots = await getAvailableSlots(startDate, endDate, tz);
+
+    if (slots.length > 0) {
+      const slotsByDay: Record<string, TimeSlot[]> = {};
+      for (const slot of slots) {
+        const dayKey = new Date(slot.time).toLocaleDateString("en-US", {
+          timeZone: tz,
+          weekday: "long",
+          month: "short",
+          day: "numeric",
+        });
+        if (!slotsByDay[dayKey]) slotsByDay[dayKey] = [];
+        slotsByDay[dayKey].push(slot);
+      }
+
+      const lines: string[] = [];
+      for (const [day, daySlots] of Object.entries(slotsByDay)) {
+        const times = daySlots.map((s) =>
+          new Date(s.time).toLocaleTimeString("en-US", {
+            timeZone: tz,
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true,
+          })
+        );
+        lines.push(`**${day}:** ${times.join(", ")}`);
+      }
+      availabilitySummary = lines.join("\n");
+    }
+  } catch (err) {
+    console.error("[Cal.com] Failed to pre-fetch availability for decision engine:", err);
+    // Non-fatal — Holly can still use send_booking_link as fallback
+  }
 
   const prompt = `${stageEnforcementBlock}${convertedLeadInstructions}# ⏰ CURRENT DATE & TIME (CRITICAL CONTEXT)
 
@@ -791,9 +834,12 @@ ${behavioralSection ? '- You have behavioral intelligence above - use it' : '- N
 {
   "thinking": "Your step-by-step reasoning covering all 5 steps above (3-5 sentences)",
   "customerMindset": "One sentence: what you believe they're feeling/thinking right now",
-  "action": "send_sms" | "send_booking_link" | "send_application_link" | "move_stage" | "wait" | "escalate",
+  "action": "send_sms" | "send_booking_link" | "send_application_link" | "book_directly" | "move_stage" | "wait" | "escalate",
   "newStage": "ENGAGED" | "NURTURING" | "WAITING_FOR_APPLICATION" | "LOST",  // ONLY if action is move_stage
   "message": "Your natural, conversational message (if sending). Use their name. Sound human. Apply what you learned from the examples.",
+  "bookingStartTime": "ISO 8601 UTC start time from the availability list",  // ONLY if action is book_directly
+  "bookingLeadName": "Lead's full name",  // ONLY if action is book_directly
+  "bookingLeadEmail": "Lead's email",  // ONLY if action is book_directly
   "waitHours": 24,
   "nextCheckCondition": "What triggers next review",
   "confidence": "high" | "medium" | "low"
@@ -804,6 +850,11 @@ ${behavioralSection ? '- You have behavioral intelligence above - use it' : '- N
 - Include "newStage" field ONLY when action is "move_stage"
 - Always combine move_stage with send_sms to explain the change to the lead
 - Valid newStage values: ENGAGED, NURTURING, WAITING_FOR_APPLICATION, LOST
+
+**Note on book_directly:**
+- Include "bookingStartTime", "bookingLeadName", "bookingLeadEmail" ONLY when action is "book_directly"
+- The startTime must be an exact ISO 8601 UTC time from the pre-loaded availability
+- Also include a "message" field for the confirmation SMS to send after booking
 
 **Remember:**
 - Use the journey context to understand their mindset
@@ -819,18 +870,24 @@ ${behavioralSection ? '- You have behavioral intelligence above - use it' : '- N
 - The system will add the correct URL for you - your job is just to write the message
 - If you write a URL yourself, it will be WRONG and confuse the customer
 
-**🚨 CRITICAL: NEVER PROMISE SPECIFIC CALL TIMES! 🚨**
-- NEVER say "Greg will call you at [time]", "I'll have someone call you at [time]", "An advisor will reach out at [time]"
-- NEVER promise that anyone will call the lead at a specific time or date
-- NEVER schedule calls manually - leads MUST use the Cal.com booking link
-- If they want to talk, use action: "send_booking_link" so THEY can choose their time
-- You can say things like "Would you like to book a quick call?" or "Want to chat with Greg?" but NEVER promise a specific call time
-- The ONLY way calls get scheduled is through Cal.com where the lead picks their own time
+**🗓️ DIRECT BOOKING CAPABILITY — OFFER SPECIFIC TIMES! 🗓️**
 
-**Why this is critical:**
-- If you promise "Greg will call at 5:30 PM" but the lead hasn't booked through Cal.com, NO ONE will call them
-- This creates broken promises and damages trust
-- Leads must self-book through Cal.com for calls to actually happen
+${availabilitySummary ? `**📅 GREG'S LIVE AVAILABILITY (next 7 days):**
+${availabilitySummary}
+
+You KNOW these times are available RIGHT NOW. Use them confidently when leads show booking intent.` : `Availability data unavailable — use "send_booking_link" as fallback.`}
+
+**When a lead wants to book or shows high intent:**
+1. **OFFER SPECIFIC TIMES** from the availability above: "Greg has openings at 2pm, 3:30pm, and 4:30pm today — which works for you?"
+2. **WHEN THEY PICK:** Use action: "book_directly" with their chosen time — you'll need their name, email, and the exact start time
+3. **FOR DATES BEYOND 7 DAYS:** Use action: "send_booking_link" so they can browse Greg's full calendar
+4. **FALLBACK:** If direct booking doesn't fit, use "send_booking_link"
+
+**Rules:**
+- Only offer times that appear in the availability list above
+- Never make up times — only use real availability data
+- When you say "I'll book that for you" — you MUST use action: "book_directly" to actually do it
+- This is a BETTER experience for leads — they don't have to navigate a booking page
 
 **Focus on conversion, not activity. Quality over quantity.**`;
 

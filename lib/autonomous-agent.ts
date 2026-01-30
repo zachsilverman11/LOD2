@@ -10,6 +10,7 @@ import { askHollyToDecide } from './claude-decision';
 import { validateDecision, detectMessageRepetition } from './safety-guardrails';
 import { detectConversationStage } from './conversation-stage';
 import { executeDecision } from './ai-conversation-enhanced';
+import { getTimezoneForProvince } from './calcom';
 import { sendSlackNotification } from './slack';
 import { trackConversationOutcome } from './conversation-outcome-tracker';
 import { getNext8AM, getLocalTimeString } from './timezone-utils';
@@ -444,17 +445,27 @@ export async function processLeadWithAutonomousAgent(
 
       return { success: true, action: 'move_stage', newStage: decision.newStage, messageSent: !!decision.message };
     } else {
-      // Send message
+      // Send message (or book directly)
       console.log(
         `[Holly Agent] ✅ ${lead.firstName}: ${decision.action.toUpperCase()} - ${decision.thinking}`
       );
 
       if (!DRY_RUN_MODE) {
+        // Map book_directly (from Claude decision engine) to book_appointment_directly (executeDecision format)
+        const executionAction = decision.action === 'book_directly' ? 'book_appointment_directly' : decision.action;
+
         // Real execution
         await executeDecision(lead.id, {
-          action: decision.action,
+          action: executionAction,
           message: decision.message,
           reasoning: decision.thinking,
+          // Pass booking fields if this is a direct booking
+          ...(decision.action === 'book_directly' && {
+            bookingStartTime: (decision as any).bookingStartTime,
+            bookingLeadName: (decision as any).bookingLeadName,
+            bookingLeadEmail: (decision as any).bookingLeadEmail,
+            bookingLeadTimezone: getTimezoneForProvince((lead.rawData as any)?.province),
+          }),
         });
 
         // Track conversation outcome for continuous learning
@@ -770,17 +781,26 @@ export async function runHollyAgentLoop() {
 
           results.waited++;
         } else {
-          // Send message
+          // Send message (or book directly)
           console.log(
             `[Holly Agent] ✅ ${lead.firstName}: ${decision.action.toUpperCase()} - ${decision.thinking}`
           );
 
           if (!DRY_RUN_MODE) {
+            // Map book_directly (from Claude decision engine) to book_appointment_directly (executeDecision format)
+            const executionAction = decision.action === 'book_directly' ? 'book_appointment_directly' : decision.action;
+
             // Real execution
             await executeDecision(lead.id, {
-              action: decision.action,
+              action: executionAction,
               message: decision.message,
               reasoning: decision.thinking,
+              ...(decision.action === 'book_directly' && {
+                bookingStartTime: (decision as any).bookingStartTime,
+                bookingLeadName: (decision as any).bookingLeadName,
+                bookingLeadEmail: (decision as any).bookingLeadEmail,
+                bookingLeadTimezone: getTimezoneForProvince((lead.rawData as any)?.province),
+              }),
             });
 
             // Schedule next review based on temperature

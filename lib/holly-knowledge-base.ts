@@ -4,6 +4,8 @@
  * Presented as INFORMATION for Claude to use intelligently, not RULES to follow
  */
 
+import { getLatestYouTubeVideoUrl } from './youtube-utils';
+
 export interface ProgramInfo {
   name: string;
   description: string;
@@ -301,8 +303,10 @@ export function buildHollyBriefing(params: {
   appointments: any[];
   callOutcome?: any;
   applicationStatus?: { started?: Date; completed?: Date };
+  youtubeLink?: string | null;
+  youtubeSharedInConversation?: boolean;
 }): string {
-  const { leadData, conversationContext, appointments, callOutcome, applicationStatus } = params;
+  const { leadData, conversationContext, appointments, callOutcome, applicationStatus, youtubeLink, youtubeSharedInConversation } = params;
 
   // Determine lead type and relevant program
   const loanType = leadData.loanType || leadData.lead_type || 'unknown';
@@ -667,5 +671,42 @@ ${selectedHook.followUpNudge}
 **Remember:** Adapt this to the conversation — don't copy-paste. The hook is the ANGLE, not a script.
 `;
 
+  // Add YouTube show hook (trust-building, NOT a booking pitch)
+  if (youtubeLink) {
+    briefing += `
+---
+
+## 🎬 GREG'S YOUTUBE SHOW (Trust Builder — Use Once Per Conversation)
+
+${youtubeSharedInConversation ? `⚠️ **ALREADY SHARED** — You already mentioned the YouTube show in this conversation. Do NOT mention it again.` : `📺 **THE YOUTUBE SHOW** — Use this ONCE per conversation as a trust-building value-add.
+
+**When to use:** Messages 2-4, when rapport is building. NOT in your first message. NOT as a booking pitch.
+
+**How to use it naturally:**
+"By the way — our co-founder Greg Williamson has a weekly show where he breaks down what's actually happening in the mortgage market and gives you the straight goods on your best options. No fluff, no sales pitch — just a few minutes of real talk. Since you're looking at a mortgage, this week's episode is worth a watch: ${youtubeLink}"
+
+**Rules:**
+- Drop it naturally mid-conversation, not as a sales pitch
+- Use it as a credibility/trust builder ("this guy knows his stuff")
+- Do NOT follow up asking if they watched it
+- Do NOT use it in the first message
+- Once you've shared it, move on — don't dwell on it`}
+`;
+  }
+
   return briefing;
+}
+
+/**
+ * Fetch the YouTube link for use in Holly's briefing.
+ * Wrapped for easy use by callers.
+ */
+export async function fetchYouTubeLinkForBriefing(): Promise<string | null> {
+  try {
+    const result = await getLatestYouTubeVideoUrl();
+    return result?.url || null;
+  } catch (error) {
+    console.warn('[Holly Knowledge Base] Failed to fetch YouTube link:', error);
+    return null;
+  }
 }
