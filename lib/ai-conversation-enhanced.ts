@@ -7,9 +7,16 @@ import { quickDelay } from "./human-delay";
 import { getAvailableSlots, getAvailableSlotsForDay, createDirectBooking, getTimezoneForProvince, TimeSlot } from "./calcom";
 import { fetchYouTubeLinkForBriefing } from "./holly-knowledge-base";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazy-init to prevent build-time crash on Vercel (OPENAI_API_KEY not available during static collection)
+let _openai: OpenAI | null = null;
+function getOpenAI(): OpenAI {
+  if (!_openai) {
+    _openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY || "placeholder-for-build",
+    });
+  }
+  return _openai;
+}
 
 interface LeadContext {
   lead: any;
@@ -1170,7 +1177,7 @@ Remember: The goal of message #1 is NOT to book them. It's to demonstrate you re
     });
   }
 
-  const response = await openai.chat.completions.create({
+  const response = await getOpenAI().chat.completions.create({
     model: "gpt-4o",
     messages: [
       { role: "system", content: systemPrompt },
