@@ -4,7 +4,7 @@ import { sendSms } from "./sms";
 import { sendEmail } from "./email";
 import { sendErrorAlert } from "./slack";
 import { quickDelay } from "./human-delay";
-import { getAvailableSlotsForDay, createDirectBooking, getTimezoneForProvince } from "./calcom";
+import { getAvailableSlots, getAvailableSlotsForDay, createDirectBooking, getTimezoneForProvince, TimeSlot } from "./calcom";
 import { fetchYouTubeLinkForBriefing } from "./holly-knowledge-base";
 
 const openai = new OpenAI({
@@ -130,7 +130,7 @@ export async function buildLeadContext(leadId: string): Promise<LeadContext> {
 /**
  * Generate enhanced system prompt with Inspired Mortgage training
  */
-function generateSystemPrompt(context: LeadContext, existingAppointment?: any, options?: { youtubeLink?: string | null; youtubeAlreadyShared?: boolean }): string {
+function generateSystemPrompt(context: LeadContext, existingAppointment?: any, options?: { youtubeLink?: string | null; youtubeAlreadyShared?: boolean; availabilitySummary?: string }): string {
   const data = context.leadData;
   const daysInStage = context.pipelineStatus.daysInStage;
 
@@ -799,21 +799,27 @@ ${options.youtubeAlreadyShared ? `⚠️ You've ALREADY shared the YouTube show 
 
 # 🗓️ DIRECT BOOKING (Preferred over booking link)
 
+${options?.availabilitySummary ? `**📅 GREG'S LIVE AVAILABILITY (next 7 days):**
+${options.availabilitySummary}
+
+You KNOW these times are available RIGHT NOW. Use them confidently.` : `Availability data unavailable — use \`check_availability\` tool or fall back to booking link.`}
+
 When a lead says they want to book or shows high intent:
-1. **FIRST:** Use \`check_availability\` to check Greg's available slots for a specific day
-2. **THEN:** Offer specific times: "Greg has openings at 2pm, 3:30pm, and 4:30pm today — which works for you?"
-3. **WHEN THEY PICK:** Use \`book_appointment_directly\` to book the slot immediately
-4. **FALLBACK ONLY:** If direct booking fails or they prefer self-service, use \`send_booking_link\`
+1. **OFFER SPECIFIC TIMES** from the availability above: "Greg has openings at 2pm, 3:30pm, and 4:30pm today — which works for you?"
+2. **WHEN THEY PICK:** Use \`book_appointment_directly\` to book the slot immediately — you'll need their name, email, and the exact start time from the availability list
+3. **FOR DATES BEYOND 7 DAYS:** Use \`send_booking_link\` so they can browse Greg's full calendar
+4. **FALLBACK:** If direct booking fails or they prefer self-service, use \`send_booking_link\`
 
 This is a BETTER experience for leads — they don't have to navigate a booking page. You handle it for them.
+**IMPORTANT:** Only offer times that appear in the availability list above. Never make up times.
 
 # 🛠️ TOOLS AVAILABLE
 1. **send_sms**: Send immediate SMS response
 2. **send_email**: Send professional email with detailed information
 3. **send_both**: Send coordinated SMS + Email together for maximum impact
 4. **schedule_followup**: Schedule follow-up (specify hours to wait)
-5. **check_availability**: Check Greg's available time slots for a specific day (use BEFORE offering times)
-6. **book_appointment_directly**: Book a specific time slot for the lead (use AFTER they pick a time)
+5. **check_availability**: Check Greg's available time slots for a specific date (pre-loaded data covers 7 days — use this for dates beyond that, or to refresh)
+6. **book_appointment_directly**: Book a specific time slot for the lead (use AFTER they pick a time from available slots)
 7. **send_booking_link**: Send Cal.com link as FALLBACK when direct booking doesn't work
 8. **send_application_link**: Send mortgage application link when ready to start app
 9. **move_stage**: Progress lead through pipeline
@@ -1022,9 +1028,54 @@ export async function handleConversation(
        msg.content.includes("Greg Williamson has a weekly show"))
   );
 
+  // Pre-fetch availability for the next 7 days so Holly knows real-time openings
+  let availabilitySummary = "";
+  try {
+    const province = context.leadData?.province || context.leadData?.state;
+    const tz = getTimezoneForProvince(province);
+    const today = new Date();
+    const startDate = today.toLocaleDateString("en-CA"); // YYYY-MM-DD
+    const endDate = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString("en-CA");
+
+    const slots = await getAvailableSlots(startDate, endDate, tz);
+
+    if (slots.length > 0) {
+      // Group slots by day for easy reading
+      const slotsByDay: Record<string, TimeSlot[]> = {};
+      for (const slot of slots) {
+        const dayKey = new Date(slot.time).toLocaleDateString("en-US", {
+          timeZone: tz,
+          weekday: "long",
+          month: "short",
+          day: "numeric",
+        });
+        if (!slotsByDay[dayKey]) slotsByDay[dayKey] = [];
+        slotsByDay[dayKey].push(slot);
+      }
+
+      const lines: string[] = [];
+      for (const [day, daySlots] of Object.entries(slotsByDay)) {
+        const times = daySlots.map((s) =>
+          new Date(s.time).toLocaleTimeString("en-US", {
+            timeZone: tz,
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true,
+          })
+        );
+        lines.push(`**${day}:** ${times.join(", ")}`);
+      }
+      availabilitySummary = lines.join("\n");
+    }
+  } catch (err) {
+    console.error("[Cal.com] Failed to pre-fetch availability:", err);
+    // Non-fatal — Holly can still use check_availability tool or fall back to booking link
+  }
+
   const systemPrompt = generateSystemPrompt(context, existingAppointment, {
     youtubeLink,
     youtubeAlreadyShared,
+    availabilitySummary,
   });
 
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
@@ -1176,7 +1227,7 @@ Remember: The goal of message #1 is NOT to book them. It's to demonstrate you re
         type: "function",
         function: {
           name: "check_availability",
-          description: "Check Greg's available time slots for a specific day. Use this BEFORE offering times to a lead. Returns available slots formatted for the lead's timezone.",
+          description: "Check Greg's available time slots for a specific day BEYOND the pre-loaded 7-day window. For dates within the next 7 days, use the availability already in your briefing. Only call this for dates further out.",
           parameters: {
             type: "object",
             properties: {
