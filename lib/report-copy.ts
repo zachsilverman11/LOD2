@@ -139,7 +139,7 @@ We can't promise we'll find the perfect solution for your situation. But we can 
       verificationBox: {
         heading: "Want to understand why this matters?",
         instruction: "Copy and paste this prompt into Google or any AI tool:",
-        prompt: `If a Canadian homeowner had a mortgage at 1.8% for 5 years and now renews at 4.5%, what happens to their payment? If they extend their amortization to keep payments affordable, how much progress do they lose? Over a 25-year mortgage, what's the real cost of extending amortization by 5 years at renewal?`,
+        prompt: `If a Canadian homeowner had a mortgage at 1.8% for 5 years and now renews at 4.5%, what happens to their payment? If they extend their amortization to keep payments affordable, how much progress do they lose? Over a 25-year mortgage, what's the real cost of extending amortization by 5 years at renewal? Also, what would it cost in total extra payments if I simply increase my amortization from {{CURRENT_AMORTIZATION}} years to {{EXTENDED_AMORTIZATION}} years at today's rates?`,
       },
     },
 

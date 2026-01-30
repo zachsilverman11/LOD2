@@ -998,7 +998,6 @@ function CoverPage({
         <Text style={styles.coverAdvisorName}>{consultant.name}</Text>
         <Text style={styles.coverAdvisorTitle}>Mortgage Advisor, Inspired Mortgage</Text>
         {consultant.email && <Text style={styles.coverWebsite}>{consultant.email}</Text>}
-        {consultant.phone && <Text style={[styles.coverWebsite, { color: colors.bodyText }]}>{consultant.phone}</Text>}
       </View>
     </Page>
   );
@@ -1805,9 +1804,6 @@ function WhatHappensNextPage({ consultant, applicationLink, vars }: { consultant
         <Text style={styles.contactName}>{consultant.name}</Text>
         <Text style={styles.contactTitle}>Mortgage Advisor, Inspired Mortgage</Text>
         <Text style={styles.contactDetail}>{consultant.email}</Text>
-        {consultant.phone && (
-          <Text style={styles.contactDetail}>{consultant.phone}</Text>
-        )}
         {consultant.calLink && (
           <Text style={styles.contactLink}>Book a call: {consultant.calLink}</Text>
         )}

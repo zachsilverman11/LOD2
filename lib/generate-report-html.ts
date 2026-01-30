@@ -490,7 +490,7 @@ function getBaseStyles(): string {
        SECTION STYLES
        ================================================ */
     .section-header {
-      margin-bottom: 24px;
+      margin-bottom: 16px;
     }
 
     .section-header h2 {
@@ -537,9 +537,9 @@ function getBaseStyles(): string {
     .impact-statement {
       background: ${colors.navy};
       color: ${colors.white};
-      padding: 32px 40px;
+      padding: 24px 40px;
       text-align: center;
-      margin: 16px -56px;
+      margin: 12px -56px;
     }
 
     .impact-statement h2 {
@@ -562,14 +562,14 @@ function getBaseStyles(): string {
       display: flex;
       align-items: center;
       gap: 16px;
-      margin: 24px 0;
+      margin: 18px 0;
     }
 
     .comparison-card {
       flex: 1;
       background: ${colors.lightGray};
       border-radius: 12px;
-      padding: 24px;
+      padding: 20px;
       text-align: center;
     }
 
@@ -817,7 +817,6 @@ function getBaseStyles(): string {
 
     .data-table tr:last-child td {
       border-bottom: 2px solid ${colors.charcoal};
-      font-weight: 600;
     }
 
     .data-table .text-right {
@@ -981,12 +980,12 @@ function getBaseStyles(): string {
       font-size: 17px;
       color: ${colors.charcoal};
       line-height: 1.7;
-      margin-bottom: 24px;
+      margin-bottom: 18px;
     }
 
     .signature-block {
-      margin-top: 32px;
-      padding-top: 24px;
+      margin-top: 24px;
+      padding-top: 18px;
       border-top: 1px solid ${colors.border};
     }
 
@@ -1008,10 +1007,10 @@ function getBaseStyles(): string {
     .text-left { text-align: left; }
     .mt-2 { margin-top: 8px; }
     .mt-4 { margin-top: 16px; }
-    .mt-6 { margin-top: 24px; }
+    .mt-6 { margin-top: 18px; }
     .mb-2 { margin-bottom: 8px; }
     .mb-4 { margin-bottom: 16px; }
-    .mb-6 { margin-bottom: 24px; }
+    .mb-6 { margin-bottom: 18px; }
     .font-bold { font-weight: 700; }
 
     .avoid-break {
@@ -1092,13 +1091,12 @@ function generateCoverPage(
             <div class="label">${copy.advisorLabel}</div>
             <div class="name">${consultant.name}</div>
             <div class="contact">${consultant.email}</div>
-            <div class="contact">${consultant.phone}</div>
           </div>
         </div>
       </div>
       <div class="cover-footer-note">
         <p>${copy.readingTime}</p>
-        <p style="font-size: 12px; color: rgba(255,255,255,0.7); margin-top: 8px; line-height: 1.5;">${copy.readingEncouragement.split('\n\n')[0]}</p>
+        ${copy.readingEncouragement.split('\n\n').map(p => `<p style="font-size: 12px; color: rgba(255,255,255,0.7); margin-top: 8px; line-height: 1.5;">${p}</p>`).join('\n        ')}
       </div>
       <div class="cover-closing" style="text-align: center; margin-top: 12px; font-style: italic; color: rgba(255,255,255,0.8); font-size: 14px;">
         ${copy.closingLine}
@@ -1151,7 +1149,7 @@ function generateWhatYouToldUsPage(
 
           ${introParagraphs}
 
-          <ul class="bullet-list" style="background: ${colors.cream}; padding: 24px 24px 24px 40px; border-radius: 12px; margin-bottom: 24px;">
+          <ul class="bullet-list" style="background: ${colors.cream}; padding: 20px 20px 20px 36px; border-radius: 12px; margin-bottom: 18px;">
             ${bulletItems}
           </ul>
 
@@ -2076,7 +2074,6 @@ function generateWhatHappensNextPage(
               <div class="label">Contact</div>
               <div class="name">${consultant.name}</div>
               <div class="contact">${consultant.email}</div>
-              <div class="contact">${consultant.phone}</div>
             </div>
           </div>
         </div>
