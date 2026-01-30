@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "./db";
 import { sendSms } from "./sms";
 import { sendEmail } from "./email";
@@ -6,16 +6,27 @@ import { sendErrorAlert } from "./slack";
 import { quickDelay } from "./human-delay";
 import { getAvailableSlots, getAvailableSlotsForDay, createDirectBooking, getTimezoneForProvince, TimeSlot } from "./calcom";
 import { fetchYouTubeLinkForBriefing } from "./holly-knowledge-base";
+import { buildHollyBriefing } from "./holly-knowledge-base";
+import { getLeadJourneyIntro, getValueProposition } from "./lead-journey-context";
+import { analyzeReply, isImmediateBooking, BEHAVIORAL_INTELLIGENCE } from "./behavioral-intelligence";
+import { getConversationGuidance, SALES_PSYCHOLOGY } from "./sales-psychology";
+import { getRelevantExamples } from "./holly-training-examples";
+import { LEARNED_EXAMPLES } from "./holly-learned-examples";
+import { getLocalTime, getLocalTimeString } from "./timezone-utils";
+import {
+  detectConversationStage,
+  buildStageEnforcementPrompt,
+} from "./conversation-stage";
 
-// Lazy-init to prevent build-time crash on Vercel (OPENAI_API_KEY not available during static collection)
-let _openai: OpenAI | null = null;
-function getOpenAI(): OpenAI {
-  if (!_openai) {
-    _openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY || "placeholder-for-build",
+// Lazy-init to prevent build-time crash on Vercel (ANTHROPIC_API_KEY not available during static collection)
+let _anthropic: Anthropic | null = null;
+function getAnthropic(): Anthropic {
+  if (!_anthropic) {
+    _anthropic = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY || "placeholder-for-build",
     });
   }
-  return _openai;
+  return _anthropic;
 }
 
 interface LeadContext {
@@ -1085,28 +1096,240 @@ export async function handleConversation(
     availabilitySummary,
   });
 
-  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
+  // === BUILD ENHANCED CONTEXT (6-layer training from claude-decision.ts) ===
+  const rawData = context.leadData;
+  const firstName = rawData?.name?.split(' ')[0] || context.lead.firstName || 'there';
+  const province = rawData?.province || rawData?.state || 'British Columbia';
+
+  // Current date/time context
+  const now = new Date();
+  const currentDateFormatted = now.toLocaleDateString('en-US', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+  });
+  const currentTimeFormatted = now.toLocaleTimeString('en-US', {
+    hour: 'numeric', minute: '2-digit', hour12: true, timeZoneName: 'short'
+  });
+
+  // Lead's local time
+  const leadLocalTime = getLocalTime(province);
+  const leadLocalTimeFormatted = leadLocalTime.toLocaleString('en-US', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+    hour: 'numeric', minute: '2-digit', hour12: true, timeZoneName: 'short'
+  });
+
+  // Determine lead type
+  const loanType = (rawData?.loanType || rawData?.lead_type || '').toLowerCase();
+  const leadType = loanType.includes('purchase') ? 'purchase'
+    : loanType.includes('refinance') ? 'refinance'
+    : loanType.includes('renewal') ? 'renewal'
+    : 'purchase';
+
+  // Counts
+  const outboundCount = context.pipelineStatus.outboundCount;
+  const inboundCount = context.pipelineStatus.inboundCount;
+  const daysInPipeline = context.pipelineStatus.daysInStage;
+
+  // Last reply for behavioral analysis
+  const lastReply = context.conversationHistory
+    .filter(c => c.role === 'user')
+    .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())[0]?.content;
+
+  // Build rich briefing (same as claude-decision.ts)
+  const recentMessages = context.conversationHistory.length > 0
+    ? context.conversationHistory.slice(0, 8).map((m) => {
+        const timestamp = m.timestamp.toLocaleString('en-US', {
+          month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true
+        });
+        const sender = m.role === 'assistant' ? 'Holly' : firstName;
+        return `${sender} (${timestamp}): ${m.content}`;
+      }).join('\n\n')
+    : '(No conversation yet - this will be first contact)';
+
+  const lastMessageFrom: 'holly' | 'lead' | 'none' = context.conversationHistory.length === 0
+    ? 'none'
+    : context.conversationHistory[0]?.role === 'assistant' ? 'holly' : 'lead';
+
+  const hollyBriefing = buildHollyBriefing({
+    leadData: rawData,
+    conversationContext: {
+      touchNumber: outboundCount + 1,
+      hasReplied: inboundCount > 0,
+      daysInPipeline,
+      messageHistory: recentMessages,
+      lastMessageFrom,
+    },
+    appointments: context.appointments || [],
+    callOutcome: undefined, // Not available from this context
+    applicationStatus: {
+      started: (context as any).applicationStatus?.started,
+      completed: (context as any).applicationStatus?.completed,
+    },
+  });
+
+  // === CONVERSATION STAGE DETECTION ===
+  const conversationStage = detectConversationStage({
+    lead: {
+      status: context.lead.status,
+      applicationStartedAt: context.lead.applicationStartedAt || null,
+      applicationCompletedAt: context.lead.applicationCompletedAt || null,
+    },
+    appointments: context.appointments || [],
+    callOutcomes: [],
+    communications: await prisma.communication.findMany({
+      where: { leadId },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    }),
+  });
+
+  const appointmentDetails = existingAppointment
+    ? {
+        date: (existingAppointment.scheduledFor || existingAppointment.scheduledAt).toLocaleDateString('en-US', {
+          weekday: 'long', month: 'long', day: 'numeric',
+        }),
+        time: (existingAppointment.scheduledFor || existingAppointment.scheduledAt).toLocaleTimeString('en-US', {
+          hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Vancouver',
+        }),
+      }
+    : undefined;
+
+  const stageEnforcementBlock = buildStageEnforcementPrompt(conversationStage, firstName, appointmentDetails);
+
+  // === LAYER 1: LEAD JOURNEY CONTEXT ===
+  const journeyContext = getLeadJourneyIntro(leadType, rawData?.motivation_level);
+  const valueProp = getValueProposition(rawData);
+
+  // === LAYER 2: BEHAVIORAL INTELLIGENCE ===
+  const replyAnalysis = lastReply ? analyzeReply(lastReply) : null;
+  const urgentBooking = isImmediateBooking(rawData);
+
+  // === LAYER 3: SALES PSYCHOLOGY ===
+  const conversationGuidance = getConversationGuidance(outboundCount + 1);
+
+  // === LAYER 4: TRAINING EXAMPLES ===
+  const hasUpcomingAppointment = context.appointments?.some(
+    (a: any) => (a.scheduledFor || a.scheduledAt) > now && a.status === 'scheduled'
+  );
+  const hasPastNoShow = context.appointments?.some((a: any) => {
+    const scheduledDate = a.scheduledFor || a.scheduledAt;
+    return scheduledDate < now && a.status === 'scheduled';
+  });
+  const hasRepliedAfterBooking = inboundCount > 0 && context.appointments && context.appointments.length > 0;
+
+  const relevantExamples = getRelevantExamples(leadType, rawData?.motivation_level, lastReply, outboundCount + 1, {
+    hasUpcomingAppointment, hasPastNoShow, hasRepliedAfterBooking,
+  });
+
+  // Build training examples section
+  const examplesSection = relevantExamples.length > 0
+    ? `\n## 📚 TRAINING EXAMPLES\n${relevantExamples.map((ex, i) => `
+### Example ${i + 1}: ${ex.scenario}
+**Similar lead context:** Type: ${ex.leadContext.type}${ex.leadContext.urgency ? `, Urgency: ${ex.leadContext.urgency}` : ''}${ex.leadContext.objection ? `, Objection: ${ex.leadContext.objection}` : ''}
+
+**✅ GOOD APPROACH:**
+\`${ex.goodApproach.message}\`
+Why: ${ex.goodApproach.whyItWorks.join('; ')}
+
+**❌ BAD APPROACH:**
+\`${ex.badApproach.message}\`
+Why bad: ${ex.badApproach.whyItFails.join('; ')}
+`).join('\n')}\n---\n` : '';
+
+  // Build behavioral intelligence section
+  const behavioralSection = replyAnalysis
+    ? `\n## 🧠 BEHAVIORAL ANALYSIS\nThey said: "${lastReply}"\nPattern: ${replyAnalysis.pattern}\nMeaning: ${replyAnalysis.meaning}\nRecommended: ${replyAnalysis.recommendedAction}\n${replyAnalysis.exampleResponse ? `Example: "${replyAnalysis.exampleResponse}"` : ''}\n---\n` : '';
+
+  // Build sales psychology section
+  const psychologySection = `
+## 🎯 SALES PSYCHOLOGY (Touch #${outboundCount + 1})
+Goal: ${conversationGuidance.goal}
+Approach: ${conversationGuidance.approach}
+Avoid: ${conversationGuidance.avoid.join('; ')}
+Trust principles: ${SALES_PSYCHOLOGY.trustBuilding.principles.slice(0, 3).join('; ')}
+---`;
+
+  // === LAYER 5: LEARNED EXAMPLES ===
+  const learnedSection = LEARNED_EXAMPLES.length > 0 ? `
+## 📊 REAL CONVERSATION LEARNINGS
+${LEARNED_EXAMPLES.map(ex => `
+### ${ex.scenario} (${ex.sampleSize} conversations)
+✅ WORKED (${ex.whatWorked.bookingRate}% booking, ${ex.whatWorked.engagementRate}% engagement): "${ex.whatWorked.message}"
+Why: ${ex.whatWorked.whyItWorked.join('; ')}
+❌ DIDN'T WORK (${ex.whatDidntWork.bookingRate}% booking, ${ex.whatDidntWork.engagementRate}% engagement): "${ex.whatDidntWork.message}"
+Why: ${ex.whatDidntWork.whyItFailed.join('; ')}
+`).join('\n')}
+---` : '';
+
+  // Days since last contact
+  const daysSinceLastContact = lastMessageFrom === 'holly' && context.pipelineStatus.lastActivity
+    ? Math.floor((now.getTime() - context.pipelineStatus.lastActivity.getTime()) / (1000 * 60 * 60 * 24))
+    : 0;
+
+  // === BUILD ENHANCED SYSTEM PROMPT with 6-layer training ===
+  const enhancedSystemPrompt = `${stageEnforcementBlock}
+
+# ⏰ CURRENT DATE & TIME
+**System Time:** ${currentDateFormatted} at ${currentTimeFormatted}
+**Lead's Local Time (${province}):** ${leadLocalTimeFormatted}
+
+🚨 **TEMPORAL REASONING RULES** 🚨
+When the lead uses "tonight", "tomorrow", etc., interpret relative to WHEN THEY SENT THE MESSAGE (check timestamps), NOT the current time.
+Before interpreting any time word: find their message timestamp → calculate what it meant then → translate to now.
+${daysSinceLastContact >= 2 && outboundCount > 0 ? `
+
+## 🚨 RE-ENGAGEMENT ALERT: ${daysSinceLastContact}-DAY GAP
+It's been ${daysSinceLastContact} days since your last message. Acknowledge the gap explicitly. Don't act like no time passed.
+` : ''}
+
+${hollyBriefing}
+
+---
+
+${journeyContext}
+
+${learnedSection}
+
+${examplesSection}
+
+${behavioralSection}
+
+${psychologySection}
+
+## 🎯 CONTEXT FOR THIS DECISION
+Lead Temperature: ${urgentBooking ? 'URGENT BOOKING SIGNAL' : 'Standard'}
+Value Proposition: ${valueProp}
+
+---
+
+${systemPrompt}
+
+## 🚦 STAGE MOVEMENT RULES
+You have the power to move leads between stages using the move_stage tool.
+
+STAGE FLOW: NEW → CONTACTED → ENGAGED → CALL_SCHEDULED → WAITING_FOR_APPLICATION → [FINMO TAKES OVER]
+                                    ↓           ↓
+                               NURTURING → NURTURING
+                                    ↓           ↓
+                                 LOST ←────────
+
+**Move to ENGAGED:** Lead replies positively, asks questions
+**Move to NURTURING:** No response after 3-5 touches; "maybe later"; timeline 6+ months
+**Move to LOST:** Explicit decline, hostile, "stop texting", already closed elsewhere
+
+Use one of the available tools to respond.`;
+
+  // Build user message
+  let userMessage = "";
 
   if (incomingMessage) {
-    // Detect channel from incoming message if not explicitly provided
     const incomingChannel = incomingMessage.includes('@') ? 'EMAIL' : 'SMS';
     const channelNote = `\n\n⚠️ IMPORTANT: The lead sent this via ${incomingChannel}. If you respond via a different channel, ACKNOWLEDGE the original channel (e.g., "Thanks for your ${incomingChannel === 'EMAIL' ? 'email' : 'text'}!")`;
 
-    messages.push({
-      role: "user",
-      content: `The lead just sent this message: "${incomingMessage}"${channelNote}\n\nAnalyze this message and decide what action to take. Consider:\n- Their intent and sentiment\n- Where they are in the pipeline\n- What information you still need\n- Whether they're ready to book or need more nurturing\n- Which of the 3 programs would resonate most\n${existingAppointment ? `\n⚠️ CRITICAL: This lead ALREADY HAS A CALL SCHEDULED for ${(existingAppointment.scheduledFor || existingAppointment.scheduledAt).toLocaleString()}. DO NOT try to book them again. Focus on confirming, preparing, and ensuring they show up.` : ''}\n\nUse one of the available tools to respond.`,
-    });
+    userMessage = `The lead just sent this message: "${incomingMessage}"${channelNote}\n\nAnalyze this message and decide what action to take. Consider:\n- Their intent and sentiment\n- Where they are in the pipeline\n- What information you still need\n- Whether they're ready to book or need more nurturing\n- Which of the 3 programs would resonate most\n${existingAppointment ? `\n⚠️ CRITICAL: This lead ALREADY HAS A CALL SCHEDULED for ${(existingAppointment.scheduledFor || existingAppointment.scheduledAt).toLocaleString()}. DO NOT try to book them again. Focus on confirming, preparing, and ensuring they show up.` : ''}\n\nUse one of the available tools to respond.`;
   } else if (specialContext) {
-    // Special context provided (e.g., after call outcome, cancellation)
-    messages.push({
-      role: "user",
-      content: specialContext,
-    });
+    userMessage = specialContext;
   } else {
-    // Initial contact
-    messages.push({
-      role: "user",
-      content: `This is a brand new lead who just submitted a form. ${existingAppointment ? `\n\n⚠️ CRITICAL: This lead ALREADY BOOKED A CALL when they submitted the form! Scheduled for ${(existingAppointment.scheduledFor || existingAppointment.scheduledAt).toLocaleString()}.\n\nYour message should:\n- Confirm their call is booked\n- Welcome them and introduce yourself\n- Let them know what to expect on the call\n- Build excitement and prepare them\n- Ensure they show up\n\nDO NOT try to book them - they're already booked!` : `\n\n🚨 CRITICAL FIRST MESSAGE STRATEGY (Sterling Wong's Guidance):
+    userMessage = `This is a brand new lead who just submitted a form. ${existingAppointment ? `\n\n⚠️ CRITICAL: This lead ALREADY BOOKED A CALL when they submitted the form! Scheduled for ${(existingAppointment.scheduledFor || existingAppointment.scheduledAt).toLocaleString()}.\n\nYour message should:\n- Confirm their call is booked\n- Welcome them and introduce yourself\n- Let them know what to expect on the call\n- Build excitement and prepare them\n- Ensure they show up\n\nDO NOT try to book them - they're already booked!` : `\n\n🚨 CRITICAL FIRST MESSAGE STRATEGY (Sterling Wong's Guidance):
 
 **What the lead was just promised:**
 - "Your rate is on its way!"
@@ -1134,8 +1357,6 @@ Craft a warm, personalized initial SMS that:
    - For purchase: "Quick question - when do you need financing confirmed by?" (if made offer) OR "Have you been pre-approved anywhere yet?" (if planning/exploring)
    - For renewal: "Quick question - when does your term end?"
 
-**🚨 CRITICAL: USE THEIR FORM DATA TO BUILD TRUST**
-
 **🚨 CRITICAL FIRST MESSAGE RULES:**
 1. **USE their form data** (property value, location, lender, etc.) - shows you read their info
 2. **ASK diagnostic questions** (info NOT on form) - starts real conversation
@@ -1144,321 +1365,262 @@ Craft a warm, personalized initial SMS that:
 5. **NO urgency** - Don't mention "filling up" or scarcity
 6. **Casual and conversational** - Like a real person texting, not a sales pitch
 
-**Example for refinance lead (GOOD - uses their data):**
-"Hi Sarah! It's Holly from Inspired Mortgage. Saw you're looking to refinance your $650K Vancouver condo with RBC${context.leadData.withdraw_amount && parseInt(context.leadData.withdraw_amount) > 0 ? ` and pull out $${parseInt(context.leadData.withdraw_amount).toLocaleString()}` : ''}. Quick question - what's prompting this right now?"
-
-**Why this works:**
-- Uses specific form data ($650K, Vancouver, RBC)
-- Asks open-ended question (not info you have)
-- Casual tone (not aggressive or salesy)
-- No rate claims or comparisons
-
-**Example for purchase lead (GOOD - uses their data):**
-${context.leadData.motivation_level === "I have made an offer to purchase" ?
-`"Hi John! It's Holly from Inspired Mortgage. Saw you made an offer on a $${parseInt(context.leadData.purchasePrice || context.leadData.home_value).toLocaleString()} property in ${context.leadData.city} with $${parseInt(context.leadData.downPayment || context.leadData.down_payment).toLocaleString()} down. Quick question - when do you need financing confirmed by?"` :
-context.leadData.motivation_level === "I plan on making an offer soon" ?
-`"Hi John! It's Holly from Inspired Mortgage. Saw you're planning to offer on a property in ${context.leadData.city} around $${parseInt(context.leadData.purchasePrice || context.leadData.home_value).toLocaleString()}. Quick question - have you been pre-approved anywhere yet?"` :
-`"Hi John! It's Holly from Inspired Mortgage. Saw you're looking to get pre-qualified for a ${context.leadData.city} property around $${parseInt(context.leadData.purchasePrice || context.leadData.home_value).toLocaleString()}. Quick question - what's prompting you to start looking now?"`}
-
-**❌ BAD Examples (don't do this):**
-"Hi Sarah! Saw you're interested in refinancing. What type of property is it?" (YOU ALREADY KNOW!)
-"Hi John! Looking to buy? Where are you looking?" (YOU ALREADY KNOW!)
-
-**Why the GOOD approach works:**
-- Shows you're a real person who READ their details (not a bot)
-- References specific numbers and details (builds instant credibility)
-- Asks smart follow-up questions (NOT info you have)
-- Starts a real conversation (not a generic sales pitch)
-
-**Next Steps:**
-After they reply, you'll ask 1-2 more follow-up questions. THEN you pitch the call as the way to get their rate.
-
-Remember: The goal of message #1 is NOT to book them. It's to demonstrate you read their form, start a conversation, and identify their problem.`}\n\nUse the send_sms tool.`,
-    });
+Remember: The goal of message #1 is NOT to book them. It's to demonstrate you read their form, start a conversation, and identify their problem.`}\n\nUse the send_sms tool.`;
   }
 
-  const response = await getOpenAI().chat.completions.create({
-    model: "gpt-4o",
-    messages: [
-      { role: "system", content: systemPrompt },
-      ...messages,
-    ],
-    tools: [
-      {
-        type: "function",
-        function: {
-          name: "send_sms",
-          description: "Send an immediate SMS response to the lead",
-          parameters: {
-            type: "object",
-            properties: {
-              message: {
-                type: "string",
-                description: "The SMS message to send (keep under 160 chars when possible)",
-              },
-              reasoning: {
-                type: "string",
-                description: "Why you're sending this message and what you hope to achieve",
-              },
-            },
-            required: ["message", "reasoning"],
+  // === CLAUDE API CALL (replacing OpenAI GPT-4o) ===
+  const claudeTools: Anthropic.Tool[] = [
+    {
+      name: "send_sms",
+      description: "Send an immediate SMS response to the lead",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          message: {
+            type: "string",
+            description: "The SMS message to send (keep under 160 chars when possible)",
+          },
+          reasoning: {
+            type: "string",
+            description: "Why you're sending this message and what you hope to achieve",
           },
         },
+        required: ["message", "reasoning"],
       },
-      {
-        type: "function",
-        function: {
-          name: "schedule_followup",
-          description: "Schedule a follow-up message for later",
-          parameters: {
-            type: "object",
-            properties: {
-              hours: {
-                type: "number",
-                description: "How many hours to wait before sending",
-              },
-              message: {
-                type: "string",
-                description: "The follow-up message to send",
-              },
-              reasoning: {
-                type: "string",
-                description: "Why schedule this follow-up",
-              },
-            },
-            required: ["hours", "message", "reasoning"],
+    },
+    {
+      name: "schedule_followup",
+      description: "Schedule a follow-up message for later",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          hours: {
+            type: "number",
+            description: "How many hours to wait before sending",
+          },
+          message: {
+            type: "string",
+            description: "The follow-up message to send",
+          },
+          reasoning: {
+            type: "string",
+            description: "Why schedule this follow-up",
           },
         },
+        required: ["hours", "message", "reasoning"],
       },
-      {
-        type: "function",
-        function: {
-          name: "check_availability",
-          description: "Check Greg's available time slots for a specific day BEYOND the pre-loaded 7-day window. For dates within the next 7 days, use the availability already in your briefing. Only call this for dates further out.",
-          parameters: {
-            type: "object",
-            properties: {
-              date: {
-                type: "string",
-                description: "Date to check availability for, in YYYY-MM-DD format (e.g. '2025-01-15'). Use 'today' or 'tomorrow' and the system will resolve it.",
-              },
-              reasoning: {
-                type: "string",
-                description: "Why you're checking availability",
-              },
-            },
-            required: ["date", "reasoning"],
+    },
+    {
+      name: "check_availability",
+      description: "Check Greg's available time slots for a specific day BEYOND the pre-loaded 7-day window. For dates within the next 7 days, use the availability already in your briefing. Only call this for dates further out.",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          date: {
+            type: "string",
+            description: "Date to check availability for, in YYYY-MM-DD format (e.g. '2025-01-15'). Use 'today' or 'tomorrow' and the system will resolve it.",
+          },
+          reasoning: {
+            type: "string",
+            description: "Why you're checking availability",
           },
         },
+        required: ["date", "reasoning"],
       },
-      {
-        type: "function",
-        function: {
-          name: "book_appointment_directly",
-          description: "Book a specific appointment slot for the lead directly — no booking link needed. Use this AFTER the lead picks a time from check_availability results.",
-          parameters: {
-            type: "object",
-            properties: {
-              startTime: {
-                type: "string",
-                description: "The exact ISO 8601 UTC start time for the booking (from check_availability results)",
-              },
-              leadName: {
-                type: "string",
-                description: "Lead's full name for the booking",
-              },
-              leadEmail: {
-                type: "string",
-                description: "Lead's email address for the booking confirmation",
-              },
-              leadTimezone: {
-                type: "string",
-                description: "Lead's IANA timezone (e.g. 'America/Vancouver')",
-              },
-              message: {
-                type: "string",
-                description: "Confirmation message to send to the lead via SMS after booking",
-              },
-              reasoning: {
-                type: "string",
-                description: "Why you're booking this specific slot",
-              },
-            },
-            required: ["startTime", "leadName", "leadEmail", "message", "reasoning"],
+    },
+    {
+      name: "book_appointment_directly",
+      description: "Book a specific appointment slot for the lead directly — no booking link needed. Use this AFTER the lead picks a time from check_availability results.",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          startTime: {
+            type: "string",
+            description: "The exact ISO 8601 UTC start time for the booking (from check_availability results)",
+          },
+          leadName: {
+            type: "string",
+            description: "Lead's full name for the booking",
+          },
+          leadEmail: {
+            type: "string",
+            description: "Lead's email address for the booking confirmation",
+          },
+          leadTimezone: {
+            type: "string",
+            description: "Lead's IANA timezone (e.g. 'America/Vancouver')",
+          },
+          message: {
+            type: "string",
+            description: "Confirmation message to send to the lead via SMS after booking",
+          },
+          reasoning: {
+            type: "string",
+            description: "Why you're booking this specific slot",
           },
         },
+        required: ["startTime", "leadName", "leadEmail", "message", "reasoning"],
       },
-      {
-        type: "function",
-        function: {
-          name: "send_booking_link",
-          description: "FALLBACK: Send the Cal.com booking link when direct booking isn't possible. Prefer check_availability + book_appointment_directly first.",
-          parameters: {
-            type: "object",
-            properties: {
-              message: {
-                type: "string",
-                description: "Message to accompany the booking link. Write naturally - the Cal.com URL will be automatically appended after your message. Example: 'Greg can walk you through your options in 10 mins. When works better for you?'",
-              },
-              reasoning: {
-                type: "string",
-                description: "Why they're ready to book now",
-              },
-            },
-            required: ["message", "reasoning"],
+    },
+    {
+      name: "send_booking_link",
+      description: "FALLBACK: Send the Cal.com booking link when direct booking isn't possible. Prefer check_availability + book_appointment_directly first.",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          message: {
+            type: "string",
+            description: "Message to accompany the booking link. Write naturally - the Cal.com URL will be automatically appended after your message.",
+          },
+          reasoning: {
+            type: "string",
+            description: "Why they're ready to book now",
           },
         },
+        required: ["message", "reasoning"],
       },
-      {
-        type: "function",
-        function: {
-          name: "send_application_link",
-          description: "Send the mortgage application link when lead is ready to start their application (typically after discovery call)",
-          parameters: {
-            type: "object",
-            properties: {
-              message: {
-                type: "string",
-                description: "Message to accompany the application link. Write naturally - the application URL will be automatically appended after your message. Example: 'Great! Here's your application link. Takes about 10-15 mins to complete.'",
-              },
-              reasoning: {
-                type: "string",
-                description: "Why they're ready to start the application now",
-              },
-            },
-            required: ["message", "reasoning"],
+    },
+    {
+      name: "send_application_link",
+      description: "Send the mortgage application link when lead is ready to start their application (typically after discovery call)",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          message: {
+            type: "string",
+            description: "Message to accompany the application link. Write naturally - the application URL will be automatically appended after your message.",
+          },
+          reasoning: {
+            type: "string",
+            description: "Why they're ready to start the application now",
           },
         },
+        required: ["message", "reasoning"],
       },
-      {
-        type: "function",
-        function: {
-          name: "move_stage",
-          description: "Move the lead to a different pipeline stage",
-          parameters: {
-            type: "object",
-            properties: {
-              stage: {
-                type: "string",
-                enum: ["NEW", "CONTACTED", "ENGAGED", "QUALIFIED", "NURTURING", "CALL_SCHEDULED", "LOST"],
-                description: "The new stage",
-              },
-              reasoning: {
-                type: "string",
-                description: "Why move to this stage",
-              },
-            },
-            required: ["stage", "reasoning"],
+    },
+    {
+      name: "move_stage",
+      description: "Move the lead to a different pipeline stage",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          stage: {
+            type: "string",
+            enum: ["NEW", "CONTACTED", "ENGAGED", "QUALIFIED", "NURTURING", "CALL_SCHEDULED", "LOST"],
+            description: "The new stage",
+          },
+          reasoning: {
+            type: "string",
+            description: "Why move to this stage",
           },
         },
+        required: ["stage", "reasoning"],
       },
-      {
-        type: "function",
-        function: {
-          name: "escalate",
-          description: "Flag this lead for human intervention",
-          parameters: {
-            type: "object",
-            properties: {
-              reason: {
-                type: "string",
-                description: "Why this needs human attention",
-              },
-            },
-            required: ["reason"],
+    },
+    {
+      name: "escalate",
+      description: "Flag this lead for human intervention",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          reason: {
+            type: "string",
+            description: "Why this needs human attention",
           },
         },
+        required: ["reason"],
       },
-      {
-        type: "function",
-        function: {
-          name: "send_email",
-          description: "Send a professional email with detailed information - use when lead needs more context than SMS can provide",
-          parameters: {
-            type: "object",
-            properties: {
-              subject: {
-                type: "string",
-                description: "Email subject - personal, benefit-driven, under 50 chars (e.g. 'Hey Sarah! Your $600K purchase - programs available')",
-              },
-              body: {
-                type: "string",
-                description: "Email body in HTML format. Can be longer than SMS. Use <h2>, <p>, <ul>, <li>, <strong> tags. IMPORTANT: When including booking link, use actual HTML anchor tag with Cal.com URL: <a href=\"https://cal.com/team/inpired-mortgage/mortgage-discovery-call\" class=\"cta-button\">Book Your Discovery Call</a>. Sign as 'Holly from Inspired Mortgage'.",
-              },
-              reasoning: {
-                type: "string",
-                description: "Why email is the right channel for this message",
-              },
-            },
-            required: ["subject", "body", "reasoning"],
+    },
+    {
+      name: "send_email",
+      description: "Send a professional email with detailed information - use when lead needs more context than SMS can provide",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          subject: {
+            type: "string",
+            description: "Email subject - personal, benefit-driven, under 50 chars",
+          },
+          body: {
+            type: "string",
+            description: "Email body in HTML format. Use <h2>, <p>, <ul>, <li>, <strong> tags. Sign as 'Holly from Inspired Mortgage'.",
+          },
+          reasoning: {
+            type: "string",
+            description: "Why email is the right channel for this message",
           },
         },
+        required: ["subject", "body", "reasoning"],
       },
-      {
-        type: "function",
-        function: {
-          name: "send_both",
-          description: "Send coordinated SMS + Email together for maximum impact - use for high-value moments (initial contact with booking link, post-call follow-up)",
-          parameters: {
-            type: "object",
-            properties: {
-              smsMessage: {
-                type: "string",
-                description: "Short, attention-grabbing SMS under 160 chars (e.g. 'Hey Sarah! Just sent you an email with your mortgage programs. Check it out')",
-              },
-              emailSubject: {
-                type: "string",
-                description: "Email subject line - personal and compelling",
-              },
-              emailBody: {
-                type: "string",
-                description: "Detailed email in HTML with full context, programs, next steps. IMPORTANT: Include actual clickable Cal.com link with HTML anchor tag: <a href=\"https://cal.com/team/inpired-mortgage/mortgage-discovery-call\" class=\"cta-button\">Book Your Discovery Call</a>.",
-              },
-              reasoning: {
-                type: "string",
-                description: "Why both channels are needed for maximum impact",
-              },
-            },
-            required: ["smsMessage", "emailSubject", "emailBody", "reasoning"],
+    },
+    {
+      name: "send_both",
+      description: "Send coordinated SMS + Email together for maximum impact - use for high-value moments",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          smsMessage: {
+            type: "string",
+            description: "Short, attention-grabbing SMS under 160 chars",
+          },
+          emailSubject: {
+            type: "string",
+            description: "Email subject line - personal and compelling",
+          },
+          emailBody: {
+            type: "string",
+            description: "Detailed email in HTML with full context, programs, next steps.",
+          },
+          reasoning: {
+            type: "string",
+            description: "Why both channels are needed for maximum impact",
           },
         },
+        required: ["smsMessage", "emailSubject", "emailBody", "reasoning"],
       },
-      {
-        type: "function",
-        function: {
-          name: "do_nothing",
-          description: "No action needed right now",
-          parameters: {
-            type: "object",
-            properties: {
-              reasoning: {
-                type: "string",
-                description: "Why no action is needed",
-              },
-            },
-            required: ["reasoning"],
+    },
+    {
+      name: "do_nothing",
+      description: "No action needed right now",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          reasoning: {
+            type: "string",
+            description: "Why no action is needed",
           },
         },
+        required: ["reasoning"],
       },
-    ],
-    tool_choice: "required",
+    },
+  ];
+
+  const response = await getAnthropic().messages.create({
+    model: "claude-sonnet-4-5-20250929",
+    max_tokens: 4096,
+    system: enhancedSystemPrompt,
+    messages: [{ role: "user", content: userMessage }],
+    tools: claudeTools,
+    tool_choice: { type: "any" },
   });
 
-  // Parse AI response
-  const toolCall = response.choices[0]?.message?.tool_calls?.[0];
+  // Parse Claude's response — find the tool_use content block
+  const toolUseBlock = response.content.find(
+    (block): block is Anthropic.ToolUseBlock => block.type === "tool_use"
+  );
 
-  if (!toolCall) {
-    throw new Error("AI did not use a tool");
+  if (!toolUseBlock) {
+    throw new Error("Claude did not use a tool");
   }
 
-  const functionArgs = JSON.parse(toolCall.function.arguments);
+  const functionArgs = toolUseBlock.input as Record<string, any>;
 
   const decision: AIDecision = {
-    action: toolCall.function.name as any,
-    reasoning: functionArgs.reasoning || "",
+    action: toolUseBlock.name as any,
+    reasoning: functionArgs.reasoning || functionArgs.reason || "",
   };
 
-  switch (toolCall.function.name) {
+  switch (toolUseBlock.name) {
     case "send_sms":
       decision.message = functionArgs.message;
       break;
@@ -1493,6 +1655,9 @@ Remember: The goal of message #1 is NOT to book them. It's to demonstrate you re
       break;
     case "move_stage":
       decision.newStage = functionArgs.stage;
+      break;
+    case "escalate":
+      decision.reasoning = functionArgs.reason || functionArgs.reasoning || "";
       break;
   }
 
