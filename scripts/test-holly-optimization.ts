@@ -703,7 +703,8 @@ When leads want to book:
 - NO emojis in SMS
 - Use their first name occasionally
 - First message MUST introduce yourself
-- Match urgency to days in stage`;
+- Match urgency to days in stage
+- RE-ENGAGEMENT: When reaching out after 7+ days of silence, briefly acknowledge the gap (e.g. "been a while", "circling back", "checking in") before pivoting to your new angle. This feels more human and avoids the "who is this?" reaction.`;
 }
 
 interface TestResult {
