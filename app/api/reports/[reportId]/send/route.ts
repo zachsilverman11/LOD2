@@ -85,6 +85,7 @@ export async function POST(
       scenario: (report.scenario as 1 | 2 | 3) || 1,
       includeDebtConsolidation: report.includeDebtConsolidation || false,
       applicationLink: "https://www.inspired.mortgage/start-here",
+      includeCashBack: false,
       extractedData: (report.extractedData as Record<string, unknown>) || {},
     });
 

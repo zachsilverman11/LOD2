@@ -55,14 +55,14 @@ The problem isn't what happened. The problem is what's about to happen.`,
 
       amortizationContext: `You started with a {{ORIGINAL_AMORTIZATION}}-year amortization. After five years of payments, you're now at {{CURRENT_AMORTIZATION}} years remaining. You made real progress.
 
-But at today's rates, keeping the same amortization would push your payment from approximately ${{OLD_PAYMENT}} to ${{NEW_PAYMENT}}—a difference of ${{PAYMENT_DIFFERENCE}} per month.`,
+But at today's rates, keeping the same amortization would push your payment from approximately ${"$"}{{OLD_PAYMENT}} to ${"$"}{{NEW_PAYMENT}}—a difference of ${"$"}{{PAYMENT_DIFFERENCE}} per month.`,
 
       bankSolution: `For most people, that's not manageable. So the bank offers a simple solution: add 5 years back onto your amortization. Payment problem solved.
 
 Except here's what that actually means:`,
 
       impactHeading: "Five years of payments. Zero progress.",
-      impactDetail: `You'll make another 60 payments—roughly ${{FIVE_YEARS_OF_PAYMENTS}} out of your pocket—and at the end of it, you'll still have {{CURRENT_AMORTIZATION}} years remaining. Exactly where you are today.
+      impactDetail: `You'll make another 60 payments—roughly ${"$"}{{FIVE_YEARS_OF_PAYMENTS}} out of your pocket—and at the end of it, you'll still have {{CURRENT_AMORTIZATION}} years remaining. Exactly where you are today.
 
 All that ground you gained with your sub-2% rate? Given back. The years of principal reduction you earned? Erased on paper.
 
@@ -195,7 +195,7 @@ The pattern only breaks if someone is actually paying attention. That's what we 
       description: "Client had variable with fixed payments, didn't realize balance was growing",
       heading: "What Happened on Your Last Term",
 
-      intro: `In 2021 or 2022, you had a variable rate mortgage with a fixed payment—probably around ${{THEIR_PAYMENT}} per month. Your rate was somewhere in the {{THEIR_ORIGINAL_RATE}}% range. Life was good.
+      intro: `In 2021 or 2022, you had a variable rate mortgage with a fixed payment—probably around ${"$"}{{THEIR_PAYMENT}} per month. Your rate was somewhere in the {{THEIR_ORIGINAL_RATE}}% range. Life was good.
 
 Then rates exploded. From 2% to 6% in less than two years.
 

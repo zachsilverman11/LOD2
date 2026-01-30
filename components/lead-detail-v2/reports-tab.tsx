@@ -448,7 +448,7 @@ export function ReportsTab({ lead }: ReportsTabProps) {
           },
           bullets: report.bullets,
           mortgageAmount: formatCurrency(report.mortgageAmount),
-          scenario: report.scenario ? (report.scenario as 1 | 2 | 3) : null,
+          scenario: report.scenario ? (report.scenario as 0 | 1 | 2 | 3) : null,
           includeDebtConsolidation: report.includeDebtConsolidation || false,
           applicationLink: "https://stressfree.mtg-app.com/signup",
           extractedData: report.extractedData || {},
@@ -543,7 +543,7 @@ export function ReportsTab({ lead }: ReportsTabProps) {
 
   // Check for missing required data based on scenario
   const getMissingFields = (): string[] => {
-    if (!extractedData || !scenario || scenario === 0) return [];
+    if (!extractedData || !scenario) return [];
 
     const missing: string[] = [];
 
