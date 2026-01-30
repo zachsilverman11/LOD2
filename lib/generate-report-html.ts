@@ -1049,13 +1049,20 @@ function pageFooter(pageNumber: number): string {
 }
 
 /**
- * Generate Cover Page
+ * Generate Cover Page — Uses REPORT_COPY.cover for all text
  */
 function generateCoverPage(
   clientName: string,
   date: string,
   consultant: { name: string; email: string; phone: string }
 ): string {
+  const copy = REPORT_COPY.cover;
+  const benefitsList = copy.benefits.map(b => `
+            <li>
+              <span class="checkmark">✓</span>
+              <span>${b}</span>
+            </li>`).join("");
+
   return `
     <div class="page cover-page">
       <div class="cover-header">
@@ -1064,36 +1071,25 @@ function generateCoverPage(
       </div>
       <div class="cover-body">
         <div class="cover-tagline">
-          <h1>See Lenders Compete<br>For Your Business</h1>
+          <h1>${copy.tagline}</h1>
         </div>
         <div class="cover-divider"></div>
         <div class="cover-client-info">
-          <div class="prepared-for">Prepared for</div>
+          <div class="prepared-for">${copy.preparedForLabel}</div>
           <div class="client-name">${clientName}</div>
           <div class="date">${date}</div>
         </div>
         <div class="cover-callout">
           <p class="callout-text">
-            The application isn't a commitment—it's how we get lenders to compete for your business. Here's what it unlocks:
+            ${copy.applicationNotice}
           </p>
           <ul class="callout-list">
-            <li>
-              <span class="checkmark">✓</span>
-              <span>Access to 30+ lenders, not just one</span>
-            </li>
-            <li>
-              <span class="checkmark">✓</span>
-              <span>Real numbers customized for your goals</span>
-            </li>
-            <li>
-              <span class="checkmark">✓</span>
-              <span>Side-by-side comparison to your current offer</span>
-            </li>
+            ${benefitsList}
           </ul>
         </div>
         <div class="cover-advisor">
           <div class="advisor-card">
-            <div class="label">Your Advisor</div>
+            <div class="label">${copy.advisorLabel}</div>
             <div class="name">${consultant.name}</div>
             <div class="contact">${consultant.email}</div>
             <div class="contact">${consultant.phone}</div>
@@ -1101,7 +1097,11 @@ function generateCoverPage(
         </div>
       </div>
       <div class="cover-footer-note">
-        This report takes about 10 minutes to read.
+        <p>${copy.readingTime}</p>
+        <p style="font-size: 12px; color: rgba(255,255,255,0.7); margin-top: 8px; line-height: 1.5;">${copy.readingEncouragement.split('\n\n')[0]}</p>
+      </div>
+      <div class="cover-closing" style="text-align: center; margin-top: 12px; font-style: italic; color: rgba(255,255,255,0.8); font-size: 14px;">
+        ${copy.closingLine}
       </div>
     </div>
   `;
@@ -1560,7 +1560,7 @@ function generateScenario3Pages(
 }
 
 /**
- * Generate Debt Consolidation Page
+ * Generate Debt Consolidation Page — Uses REPORT_COPY.debtConsolidation for all text
  */
 function generateDebtConsolidationPage(
   clientName: string,
@@ -1568,6 +1568,7 @@ function generateDebtConsolidationPage(
   otherDebts: Array<{ type: string; balance: number; payment: number }>,
   pageNumber: number
 ): string {
+  const copy = REPORT_COPY.debtConsolidation;
   const totalDebt =
     mortgageAmount + otherDebts.reduce((sum, d) => sum + d.balance, 0);
   const totalPayments = otherDebts.reduce((sum, d) => sum + d.payment, 0);
@@ -1584,53 +1585,56 @@ function generateDebtConsolidationPage(
     )
     .join("");
 
+  // Build example debts from approved copy
+  const exampleDebtRows = copy.example.debts.map(d => `
+      <tr><td>${d.type}</td><td class="text-right">${formatCurrency(d.balance)}</td><td class="text-right">${formatCurrency(d.payment)}/mo</td></tr>
+  `).join("");
+
   return `
     <div class="page">
       <div class="page-inner">
         ${pageHeader(clientName)}
         <div class="page-content">
           <div class="section-header">
-            <h2>The Opportunity You Might Not See</h2>
+            <h2>${copy.heading}</h2>
             <div class="underline"></div>
           </div>
 
-          <p class="mb-4">You mentioned other debts during our conversation. Here's what consolidating them into your mortgage could look like:</p>
+          ${copy.intro.split('\n\n').map(p => `<p class="mb-4">${p}</p>`).join('')}
+
+          <h3 class="mt-6">${copy.example.heading}</h3>
+          <p class="mb-4">${copy.example.setup}</p>
 
           <table class="data-table">
             <thead>
               <tr>
-                <th>Current Debts</th>
+                <th>Debt</th>
                 <th class="text-right">Balance</th>
                 <th class="text-right">Payment</th>
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td>Mortgage</td>
-                <td class="text-right">${formatCurrency(mortgageAmount)}</td>
-                <td class="text-right">—</td>
-              </tr>
-              ${debtRows}
-              <tr>
-                <td>Total</td>
-                <td class="text-right">${formatCurrency(totalDebt)}</td>
-                <td class="text-right">${formatCurrency(totalPayments)}/mo (other debts)</td>
-              </tr>
+              ${exampleDebtRows}
             </tbody>
           </table>
 
+          <p class="mb-4">${copy.example.totalOutflow}</p>
+          <p class="mb-4">${copy.example.bankPath}</p>
+
+          <h3 class="mt-6">${copy.solution.heading}</h3>
+          <p class="mb-4">${copy.solution.body}</p>
+
           <div class="cta-box">
-            <h3>After Consolidation</h3>
-            <p>Same ${formatCurrency(totalPayments)}/month toward debt → Debt-free in 10 years, not 20</p>
+            <p style="font-size: 18px; font-weight: 700;">${copy.solution.impactLine}</p>
           </div>
 
-          <div class="pullquote">
-            <p>Consolidating doesn't add debt. It repositions it—often at a fraction of the interest rate you're currently paying.</p>
-          </div>
+          <p class="mb-4" style="font-style: italic;">${copy.solution.clientReaction}</p>
 
-          <p class="mt-4">Your car loan might be at 7%. Your line of credit at 9%. Your mortgage rate? Likely under 5%. By consolidating, you pay the same amount each month—but more goes toward principal instead of interest.</p>
+          <h3 class="mt-6">${copy.noteOnIncreasingMortgage.heading}</h3>
+          ${copy.noteOnIncreasingMortgage.body.split('\n\n').map(p => `<p class="mb-4">${p}</p>`).join('')}
 
-          <p class="mt-4">We'll run the exact numbers for your situation. For many clients, consolidation shaves years off their total debt payoff timeline.</p>
+          <h3 class="mt-6">${copy.relevance.heading}</h3>
+          ${copy.relevance.body.split('\n\n').map(p => `<p class="mb-4">${p}</p>`).join('')}
         </div>
         ${pageFooter(pageNumber)}
       </div>
