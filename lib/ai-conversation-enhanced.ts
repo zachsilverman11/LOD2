@@ -4,6 +4,8 @@ import { sendSms } from "./sms";
 import { sendEmail } from "./email";
 import { sendErrorAlert } from "./slack";
 import { quickDelay } from "./human-delay";
+import { getAvailableSlotsForDay, createDirectBooking, getTimezoneForProvince } from "./calcom";
+import { fetchYouTubeLinkForBriefing } from "./holly-knowledge-base";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -37,6 +39,8 @@ interface AIDecision {
     | "schedule_followup"
     | "send_booking_link"
     | "send_application_link"
+    | "check_availability"
+    | "book_appointment_directly"
     | "escalate"
     | "do_nothing"
     | "move_stage";
@@ -46,6 +50,12 @@ interface AIDecision {
   followupHours?: number;
   newStage?: string;
   reasoning: string;
+  // Cal.com direct booking fields
+  checkDate?: string;
+  bookingStartTime?: string;
+  bookingLeadName?: string;
+  bookingLeadEmail?: string;
+  bookingLeadTimezone?: string;
 }
 
 /**
@@ -120,7 +130,7 @@ export async function buildLeadContext(leadId: string): Promise<LeadContext> {
 /**
  * Generate enhanced system prompt with Inspired Mortgage training
  */
-function generateSystemPrompt(context: LeadContext, existingAppointment?: any): string {
+function generateSystemPrompt(context: LeadContext, existingAppointment?: any, options?: { youtubeLink?: string | null; youtubeAlreadyShared?: boolean }): string {
   const data = context.leadData;
   const daysInStage = context.pipelineStatus.daysInStage;
 
@@ -769,16 +779,46 @@ Otherwise, I'll leave you be. Good luck with everything! 👍"
 
 **After sending:** Use move_stage action to move lead to LOST status. No further follow-ups unless they reply again.
 
+${options?.youtubeLink ? `
+# 🎬 GREG'S YOUTUBE SHOW (Trust Builder)
+
+${options.youtubeAlreadyShared ? `⚠️ You've ALREADY shared the YouTube show link in this conversation. Do NOT mention it again.` : `📺 Greg Williamson has a weekly YouTube show breaking down what's actually happening in the mortgage market.
+
+**Link:** ${options.youtubeLink}
+
+**When to share (ONCE per conversation):**
+- Messages 2-4 (after rapport is building, NOT in your first message)
+- Drop it naturally as a value-add, NOT as a booking pitch
+- Example: "By the way — our co-founder Greg Williamson has a weekly show where he breaks down what's actually happening in the mortgage market and gives you the straight goods on your best options. No fluff, no sales pitch — just a few minutes of real talk. Since you're looking at a mortgage, this week's episode is worth a watch: ${options.youtubeLink}"
+
+**Rules:**
+- Use it ONCE, then move on
+- It's a credibility/trust builder, not a conversion tool
+- Don't ask if they watched it later`}
+` : ''}
+
+# 🗓️ DIRECT BOOKING (Preferred over booking link)
+
+When a lead says they want to book or shows high intent:
+1. **FIRST:** Use \`check_availability\` to check Greg's available slots for a specific day
+2. **THEN:** Offer specific times: "Greg has openings at 2pm, 3:30pm, and 4:30pm today — which works for you?"
+3. **WHEN THEY PICK:** Use \`book_appointment_directly\` to book the slot immediately
+4. **FALLBACK ONLY:** If direct booking fails or they prefer self-service, use \`send_booking_link\`
+
+This is a BETTER experience for leads — they don't have to navigate a booking page. You handle it for them.
+
 # 🛠️ TOOLS AVAILABLE
 1. **send_sms**: Send immediate SMS response
 2. **send_email**: Send professional email with detailed information
 3. **send_both**: Send coordinated SMS + Email together for maximum impact
 4. **schedule_followup**: Schedule follow-up (specify hours to wait)
-5. **send_booking_link**: Send Cal.com link when ready to book discovery call
-6. **send_application_link**: Send mortgage application link when ready to start app
-7. **move_stage**: Progress lead through pipeline
-8. **escalate**: Flag for human intervention
-9. **do_nothing**: No action needed
+5. **check_availability**: Check Greg's available time slots for a specific day (use BEFORE offering times)
+6. **book_appointment_directly**: Book a specific time slot for the lead (use AFTER they pick a time)
+7. **send_booking_link**: Send Cal.com link as FALLBACK when direct booking doesn't work
+8. **send_application_link**: Send mortgage application link when ready to start app
+9. **move_stage**: Progress lead through pipeline
+10. **escalate**: Flag for human intervention
+11. **do_nothing**: No action needed
 
 🚨 **CRITICAL LINK SENDING RULES - READ THIS CAREFULLY:**
 
@@ -965,7 +1005,27 @@ export async function handleConversation(
     orderBy: { scheduledAt: "asc" },
   });
 
-  const systemPrompt = generateSystemPrompt(context, existingAppointment);
+  // Fetch YouTube link for trust-building hook (gracefully degrades if not configured)
+  let youtubeLink: string | null = null;
+  try {
+    youtubeLink = await fetchYouTubeLinkForBriefing();
+  } catch {
+    // Silently fail — YouTube hook is optional
+  }
+
+  // Check if YouTube link was already shared in this conversation
+  const youtubeAlreadyShared = context.conversationHistory.some(
+    (msg) =>
+      msg.role === "assistant" &&
+      (msg.content.includes("youtube.com/watch") ||
+       msg.content.includes("youtube.com/@") ||
+       msg.content.includes("Greg Williamson has a weekly show"))
+  );
+
+  const systemPrompt = generateSystemPrompt(context, existingAppointment, {
+    youtubeLink,
+    youtubeAlreadyShared,
+  });
 
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
 
@@ -1115,8 +1175,66 @@ Remember: The goal of message #1 is NOT to book them. It's to demonstrate you re
       {
         type: "function",
         function: {
+          name: "check_availability",
+          description: "Check Greg's available time slots for a specific day. Use this BEFORE offering times to a lead. Returns available slots formatted for the lead's timezone.",
+          parameters: {
+            type: "object",
+            properties: {
+              date: {
+                type: "string",
+                description: "Date to check availability for, in YYYY-MM-DD format (e.g. '2025-01-15'). Use 'today' or 'tomorrow' and the system will resolve it.",
+              },
+              reasoning: {
+                type: "string",
+                description: "Why you're checking availability",
+              },
+            },
+            required: ["date", "reasoning"],
+          },
+        },
+      },
+      {
+        type: "function",
+        function: {
+          name: "book_appointment_directly",
+          description: "Book a specific appointment slot for the lead directly — no booking link needed. Use this AFTER the lead picks a time from check_availability results.",
+          parameters: {
+            type: "object",
+            properties: {
+              startTime: {
+                type: "string",
+                description: "The exact ISO 8601 UTC start time for the booking (from check_availability results)",
+              },
+              leadName: {
+                type: "string",
+                description: "Lead's full name for the booking",
+              },
+              leadEmail: {
+                type: "string",
+                description: "Lead's email address for the booking confirmation",
+              },
+              leadTimezone: {
+                type: "string",
+                description: "Lead's IANA timezone (e.g. 'America/Vancouver')",
+              },
+              message: {
+                type: "string",
+                description: "Confirmation message to send to the lead via SMS after booking",
+              },
+              reasoning: {
+                type: "string",
+                description: "Why you're booking this specific slot",
+              },
+            },
+            required: ["startTime", "leadName", "leadEmail", "message", "reasoning"],
+          },
+        },
+      },
+      {
+        type: "function",
+        function: {
           name: "send_booking_link",
-          description: "Send the Cal.com booking link when lead is ready to schedule a discovery call",
+          description: "FALLBACK: Send the Cal.com booking link when direct booking isn't possible. Prefer check_availability + book_appointment_directly first.",
           parameters: {
             type: "object",
             properties: {
@@ -1298,6 +1416,16 @@ Remember: The goal of message #1 is NOT to book them. It's to demonstrate you re
     case "schedule_followup":
       decision.message = functionArgs.message;
       decision.followupHours = functionArgs.hours;
+      break;
+    case "check_availability":
+      decision.checkDate = functionArgs.date;
+      break;
+    case "book_appointment_directly":
+      decision.message = functionArgs.message;
+      decision.bookingStartTime = functionArgs.startTime;
+      decision.bookingLeadName = functionArgs.leadName;
+      decision.bookingLeadEmail = functionArgs.leadEmail;
+      decision.bookingLeadTimezone = functionArgs.leadTimezone;
       break;
     case "send_booking_link":
       decision.message = functionArgs.message;
@@ -1601,6 +1729,156 @@ export async function executeDecision(
             },
           });
           throw error;
+        }
+      }
+      break;
+
+    case "check_availability":
+      if (decision.checkDate) {
+        try {
+          const province = lead.rawData?.province || lead.rawData?.state;
+          const tz = getTimezoneForProvince(province);
+
+          // Resolve "today" / "tomorrow" to actual dates
+          let resolvedDate = decision.checkDate;
+          if (resolvedDate.toLowerCase() === "today") {
+            resolvedDate = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD
+          } else if (resolvedDate.toLowerCase() === "tomorrow") {
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            resolvedDate = tomorrow.toLocaleDateString("en-CA");
+          }
+
+          const { slots, summary } = await getAvailableSlotsForDay(resolvedDate, tz);
+
+          console.log(`[Cal.com] Checked availability for ${resolvedDate} (${tz}): ${slots.length} slots`);
+
+          // Log the availability check
+          await prisma.leadActivity.create({
+            data: {
+              leadId,
+              type: "NOTE_ADDED",
+              channel: "SYSTEM",
+              subject: "🗓️ Availability Checked",
+              content: `Holly checked Greg's availability for ${resolvedDate}: ${slots.length} slots found.\n${summary}`,
+              metadata: { date: resolvedDate, slotCount: slots.length, timezone: tz },
+            },
+          });
+
+          // NOTE: check_availability is an info-gathering step — no SMS is sent.
+          // The AI should call again with a send_sms or book_appointment_directly action.
+        } catch (error) {
+          console.error("[Cal.com] Error checking availability:", error);
+          await prisma.leadActivity.create({
+            data: {
+              leadId,
+              type: "NOTE_ADDED",
+              channel: "SYSTEM",
+              subject: "⚠️ Availability Check Failed",
+              content: `Failed to check availability for ${decision.checkDate}: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          });
+        }
+      }
+      break;
+
+    case "book_appointment_directly":
+      if (decision.bookingStartTime && decision.message) {
+        try {
+          const province = lead.rawData?.province || lead.rawData?.state;
+          const tz = decision.bookingLeadTimezone || getTimezoneForProvince(province);
+          const eventTypeId = parseInt(process.env.CALCOM_EVENT_TYPE_ID || "0", 10);
+
+          const confirmation = await createDirectBooking({
+            eventTypeId,
+            start: decision.bookingStartTime,
+            attendee: {
+              name: decision.bookingLeadName || `${lead.firstName || ""} ${lead.lastName || ""}`.trim() || "Lead",
+              email: decision.bookingLeadEmail || lead.email || "",
+              timeZone: tz,
+            },
+            metadata: {
+              leadId,
+              source: "holly_direct_booking",
+            },
+          });
+
+          console.log(`[Cal.com] Direct booking created: ${confirmation.uid}`);
+
+          // Send confirmation SMS
+          await sendSms({
+            to: lead.phone,
+            body: decision.message,
+          });
+
+          await prisma.communication.create({
+            data: {
+              leadId,
+              channel: "SMS",
+              direction: "OUTBOUND",
+              content: decision.message,
+              intent: "direct_booking_confirmation",
+              metadata: {
+                aiReasoning: decision.reasoning,
+                bookingUid: confirmation.uid,
+                bookingTime: confirmation.startTime,
+              },
+            },
+          });
+
+          // Create appointment record
+          await prisma.appointment.create({
+            data: {
+              leadId,
+              calComBookingUid: confirmation.uid,
+              scheduledAt: new Date(confirmation.startTime),
+              scheduledFor: new Date(confirmation.startTime),
+              duration: 15,
+              status: "SCHEDULED",
+              bookingSource: "HOLLY",
+              advisorName: "Greg Williamson",
+            },
+          });
+
+          // Move to CALL_SCHEDULED
+          await prisma.lead.update({
+            where: { id: leadId },
+            data: {
+              status: "CALL_SCHEDULED",
+              lastContactedAt: new Date(),
+            },
+          });
+
+          await prisma.leadActivity.create({
+            data: {
+              leadId,
+              type: "STATUS_CHANGE",
+              content: `Holly directly booked appointment for ${new Date(confirmation.startTime).toLocaleString()}. Booking UID: ${confirmation.uid}`,
+              metadata: { bookingUid: confirmation.uid },
+            },
+          });
+        } catch (error) {
+          console.error("[Cal.com] Direct booking failed:", error);
+
+          // Log failure and fall back — the AI may need to retry with send_booking_link
+          await prisma.leadActivity.create({
+            data: {
+              leadId,
+              type: "NOTE_ADDED",
+              channel: "SYSTEM",
+              subject: "⚠️ Direct Booking Failed",
+              content: `Holly's direct booking attempt failed: ${error instanceof Error ? error.message : String(error)}. May need to fall back to booking link.`,
+            },
+          });
+
+          await sendErrorAlert({
+            error: error instanceof Error ? error : new Error(String(error)),
+            context: {
+              location: "ai-conversation-enhanced - book_appointment_directly",
+              leadId,
+              details: { startTime: decision.bookingStartTime },
+            },
+          });
         }
       }
       break;
