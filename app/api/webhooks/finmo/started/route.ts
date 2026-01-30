@@ -350,7 +350,7 @@ export async function POST(request: NextRequest) {
           : matchedViaPhone
             ? "📱 APPLICATION STARTED (Phone Match)"
             : "🚦 APPLICATION STARTED - Finmo Handoff Complete",
-        content: `Lead started mortgage application via Finmo.${reEngagementNote}${phoneMatchNote}\n\n🛑 HOLLY PERMANENTLY DISABLED 🛑\n\nAll communication from this point forward is handled by the Finmo automated system.\n\nHolly will NOT:\n- Send any messages\n- Follow up or nurture\n- Move stages\n- Take any automated actions\n\nFinmo owns this relationship until application is completed or abandoned.`,
+        content: `Lead started mortgage application via Finmo.${reEngagementNote}${phoneMatchNote}\n\n🛑 HOLLY PERMANENTLY DISABLED 🛑\n\nAll communication from this point forward is handled by the Finmo automated system.\n\nHolly will NOT:\n- Send any messages\n- Follow up or nurture\n- Move stages\n- Take any automated actions\n\n📧 Post-call email/SMS sequences will auto-cancel (applicationStartedAt is set).\n\nFinmo owns this relationship until application is completed or abandoned.`,
         metadata: {
           finmoDealId: payload.finmoDealId || payload.dealId,
           finmoId: payload.id,

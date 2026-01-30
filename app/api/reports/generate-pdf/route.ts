@@ -67,8 +67,9 @@ export async function POST(request: NextRequest) {
       },
       bullets: bullets as string[],
       mortgageAmount: String(mortgageAmount),
-      scenario: validatedScenario as 1 | 2 | 3,
+      scenario: validatedScenario as 0 | 1 | 2 | 3,
       includeDebtConsolidation: includeDebtConsolidation || false,
+      includeCashBack: false,
       applicationLink: applicationLink || "https://www.inspired.mortgage/start-here",
       extractedData: extractedData || {},
     };

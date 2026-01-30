@@ -126,11 +126,11 @@ export function generateReportHTML(props: ReportHTMLProps): string {
 
   // 3. Scenario (if selected, skip if "None"/0/null)
   if (activeScenario === 1) {
-    pages.push(...generateScenario1Pages(clientName, extractedData, vars));
+    pages.push(...generateScenario1Pages(clientName, extractedData));
   } else if (activeScenario === 2) {
-    pages.push(...generateScenario2Pages(clientName, extractedData, vars));
+    pages.push(...generateScenario2Pages(clientName, extractedData));
   } else if (activeScenario === 3) {
-    pages.push(...generateScenario3Pages(clientName, extractedData, vars));
+    pages.push(...generateScenario3Pages(clientName, extractedData));
   }
 
   // APP LINK #1: After scenario (or after What You Told Us if no scenario)
@@ -490,7 +490,7 @@ function getBaseStyles(): string {
        SECTION STYLES
        ================================================ */
     .section-header {
-      margin-bottom: 16px;
+      margin-bottom: 24px;
     }
 
     .section-header h2 {
@@ -537,9 +537,9 @@ function getBaseStyles(): string {
     .impact-statement {
       background: ${colors.navy};
       color: ${colors.white};
-      padding: 24px 40px;
+      padding: 32px 40px;
       text-align: center;
-      margin: 12px -56px;
+      margin: 16px -56px;
     }
 
     .impact-statement h2 {
@@ -562,14 +562,14 @@ function getBaseStyles(): string {
       display: flex;
       align-items: center;
       gap: 16px;
-      margin: 18px 0;
+      margin: 24px 0;
     }
 
     .comparison-card {
       flex: 1;
       background: ${colors.lightGray};
       border-radius: 12px;
-      padding: 20px;
+      padding: 24px;
       text-align: center;
     }
 
@@ -817,6 +817,7 @@ function getBaseStyles(): string {
 
     .data-table tr:last-child td {
       border-bottom: 2px solid ${colors.charcoal};
+      font-weight: 600;
     }
 
     .data-table .text-right {
@@ -980,12 +981,12 @@ function getBaseStyles(): string {
       font-size: 17px;
       color: ${colors.charcoal};
       line-height: 1.7;
-      margin-bottom: 18px;
+      margin-bottom: 24px;
     }
 
     .signature-block {
-      margin-top: 24px;
-      padding-top: 18px;
+      margin-top: 32px;
+      padding-top: 24px;
       border-top: 1px solid ${colors.border};
     }
 
@@ -1007,10 +1008,10 @@ function getBaseStyles(): string {
     .text-left { text-align: left; }
     .mt-2 { margin-top: 8px; }
     .mt-4 { margin-top: 16px; }
-    .mt-6 { margin-top: 18px; }
+    .mt-6 { margin-top: 24px; }
     .mb-2 { margin-bottom: 8px; }
     .mb-4 { margin-bottom: 16px; }
-    .mb-6 { margin-bottom: 18px; }
+    .mb-6 { margin-bottom: 24px; }
     .font-bold { font-weight: 700; }
 
     .avoid-break {
@@ -1091,12 +1092,13 @@ function generateCoverPage(
             <div class="label">${copy.advisorLabel}</div>
             <div class="name">${consultant.name}</div>
             <div class="contact">${consultant.email}</div>
+            <div class="contact">${consultant.phone}</div>
           </div>
         </div>
       </div>
       <div class="cover-footer-note">
         <p>${copy.readingTime}</p>
-        ${copy.readingEncouragement.split('\n\n').map(p => `<p style="font-size: 12px; color: rgba(255,255,255,0.7); margin-top: 8px; line-height: 1.5;">${p}</p>`).join('\n        ')}
+        <p style="font-size: 12px; color: rgba(255,255,255,0.7); margin-top: 8px; line-height: 1.5;">${copy.readingEncouragement.split('\n\n')[0]}</p>
       </div>
       <div class="cover-closing" style="text-align: center; margin-top: 12px; font-style: italic; color: rgba(255,255,255,0.8); font-size: 14px;">
         ${copy.closingLine}
@@ -1149,7 +1151,7 @@ function generateWhatYouToldUsPage(
 
           ${introParagraphs}
 
-          <ul class="bullet-list" style="background: ${colors.cream}; padding: 20px 20px 20px 36px; border-radius: 12px; margin-bottom: 18px;">
+          <ul class="bullet-list" style="background: ${colors.cream}; padding: 24px 24px 24px 40px; border-radius: 12px; margin-bottom: 24px;">
             ${bulletItems}
           </ul>
 
@@ -1162,30 +1164,22 @@ function generateWhatYouToldUsPage(
 }
 
 /**
- * Generate Scenario 1 Pages - Sub-2% Fixed → Renewal Trap (Uses REPORT_COPY)
+ * Generate Scenario 1 Pages - Sub-2% Fixed → Renewal Trap
  */
 function generateScenario1Pages(
   clientName: string,
-  data: ReportHTMLProps["extractedData"],
-  vars: Record<string, string> = {}
+  data: ReportHTMLProps["extractedData"]
 ): string[] {
-  const copy = REPORT_COPY.scenarios.scenario1;
   const oldPayment = formatCurrency(data.oldPayment || 2045);
   const newPayment = formatCurrency(data.newPayment || 2689);
   const paymentDiff = formatCurrency(data.paymentDifference || 644);
+  const fiveYearTotal = formatCurrency(data.fiveYearsOfPayments || 161340);
+  const previousRate = formatPercent(data.previousRate || 0.0189);
+  // Use the actual currentMarketRate if provided, otherwise check for null/undefined explicitly
+  const currentRate = data.currentMarketRate != null ? formatPercent(data.currentMarketRate) : formatPercent(0.045);
+  const mortgageAmount = formatCurrency(data.mortgageAmount || 485000);
+  const originalAm = data.originalAmortization || 25;
   const currentAm = data.currentAmortization || 20;
-
-  const introParagraphs = replaceVariables(copy.intro, vars).split(/\n\n+/).filter(p => p.trim()).map((p, i) =>
-    i === 0 ? `<p class="mb-4">${p}</p>` : `<p class="mb-4"><strong>${p}</strong></p>`
-  ).join("");
-
-  const amortParagraphs = replaceVariables(copy.amortizationContext, vars).split(/\n\n+/).filter(p => p.trim()).map(p =>
-    `<p class="mb-4">${p}</p>`
-  ).join("");
-
-  const bankParagraphs = replaceVariables(copy.bankSolution, vars).split(/\n\n+/).filter(p => p.trim()).map((p, i) =>
-    i === 1 ? `<p class="mt-4"><strong>${p}</strong></p>` : `<p class="mt-4">${p}</p>`
-  ).join("");
 
   const page1 = `
     <div class="page">
@@ -1193,12 +1187,19 @@ function generateScenario1Pages(
         ${pageHeader(clientName)}
         <div class="page-content">
           <div class="section-header">
-            <h2>${copy.heading}</h2>
+            <h2>What Happened on Your Last Term</h2>
             <div class="underline"></div>
           </div>
 
-          ${introParagraphs}
-          ${amortParagraphs}
+          <p class="mb-4"><strong>Here's the thing: your last term was actually great.</strong></p>
+
+          <p class="mb-4">You locked in at ${previousRate}—one of the lowest fixed rates in Canadian history. Your payments were predictable. Your principal was dropping steadily. You did everything right.</p>
+
+          <p class="mb-4"><strong>The problem isn't what happened. The problem is what's about to happen.</strong></p>
+
+          <p class="mb-4">You started with a ${originalAm}-year amortization. After five years of payments, you're now at ${currentAm} years remaining. You made real progress.</p>
+
+          <p class="mb-4">But at today's rates, keeping the same amortization would push your payment from approximately ${oldPayment} to ${newPayment}—a difference of ${paymentDiff} per month.</p>
 
           <div class="comparison-container">
             <div class="comparison-card old">
@@ -1219,35 +1220,14 @@ function generateScenario1Pages(
             </div>
           </div>
 
-          ${bankParagraphs}
+          <p class="mt-4">For most people, that's not manageable. So the bank offers a simple solution: add 5 years back onto your amortization. Payment problem solved.</p>
+
+          <p class="mt-4"><strong>Except here's what that actually means:</strong></p>
         </div>
         ${pageFooter(3)}
       </div>
     </div>
   `;
-
-  const impactParagraphs = replaceVariables(copy.impactDetail, vars).split(/\n\n+/).filter(p => p.trim()).map(p =>
-    `<p class="mt-4">${p}</p>`
-  ).join("");
-
-  const transitionParagraphs = replaceVariables(copy.transitionToSolution, vars).split(/\n\n+/).filter(p => p.trim()).map(p =>
-    `<p class="mt-4">${p}</p>`
-  ).join("");
-
-  const summaryParagraphs = replaceVariables(copy.activeManagement.summary, vars).split(/\n\n+/).filter(p => p.trim()).map(p =>
-    `<p class="mt-4">${p}</p>`
-  ).join("");
-
-  const empathyParagraphs = replaceVariables(copy.activeManagement.empathy, vars).split(/\n\n+/).filter(p => p.trim()).map((p, i, arr) =>
-    i === arr.length - 1 ? `<p class="mt-4"><strong>${p}</strong></p>` : `<p class="mt-4">${p}</p>`
-  ).join("");
-
-  const timelineItems = copy.activeManagement.timeline.map(item => `
-              <div class="timeline-item">
-                <div class="timeline-year">${item.year.split(' (')[0]}</div>
-                <div class="timeline-rate">${item.year.includes('(') ? item.year.match(/\(([^)]+)\)/)?.[1] || '' : ''}</div>
-                <div class="timeline-text">${item.action.replace(/"/g, '&quot;').substring(0, 80)}</div>
-              </div>`).join("");
 
   const page2 = `
     <div class="page">
@@ -1255,75 +1235,89 @@ function generateScenario1Pages(
         ${pageHeader(clientName)}
         <div class="page-content">
           <div class="impact-statement" style="margin-top: 0;">
-            <h2>${copy.impactHeading.replace('. ', '.<br>')}</h2>
+            <h2>Five years of payments.<br>Zero progress.</h2>
           </div>
 
-          ${impactParagraphs}
-          ${transitionParagraphs}
+          <p class="mt-6">You'll make another 60 payments—roughly ${fiveYearTotal} out of your pocket—and at the end of it, you'll still have ${currentAm} years remaining. Exactly where you are today.</p>
+
+          <p class="mt-4">All that ground you gained with your sub-2% rate? Given back. The years of principal reduction you earned? Erased on paper.</p>
+
+          <p class="mt-4">And the bank won't explain this. They'll send you a renewal letter with a checkbox. You'll sign it because the payment looks affordable. And you won't realize what you gave up until years later—if ever.</p>
 
           <div class="section-header mt-6">
-            <h2>${copy.activeManagement.heading}</h2>
+            <h2>The Difference Active Management Makes</h2>
             <div class="underline"></div>
           </div>
 
-          <p class="mb-4">${replaceVariables(copy.activeManagement.intro, vars)}</p>
+          <p class="mb-4">Here's what would have happened if you'd had someone watching your mortgage the whole time:</p>
 
           <div class="timeline">
             <h3>What Active Management Looks Like</h3>
             <div class="timeline-items">
-              ${timelineItems}
+              <div class="timeline-item">
+                <div class="timeline-year">Year 1</div>
+                <div class="timeline-rate">2.9%</div>
+                <div class="timeline-text">We call you.<br>"Bump payment slightly now."</div>
+              </div>
+              <div class="timeline-item">
+                <div class="timeline-year">Year 2</div>
+                <div class="timeline-rate">3.8%</div>
+                <div class="timeline-text">We call you.<br>"Another small increase."</div>
+              </div>
+              <div class="timeline-item">
+                <div class="timeline-year">Year 3</div>
+                <div class="timeline-rate">4.2%</div>
+                <div class="timeline-text">We call you.<br>"Consider locking in."</div>
+              </div>
+              <div class="timeline-item">
+                <div class="timeline-year">Now</div>
+                <div class="timeline-rate">Prepared</div>
+                <div class="timeline-text">No payment shock.<br>No surprises.</div>
+              </div>
             </div>
           </div>
 
-          ${summaryParagraphs}
-          ${empathyParagraphs}
+          <p class="mt-4">By the time you reached renewal, your payments would have already adjusted gradually. No shock. No scramble. And instead of needing to extend your amortization, you'd have accelerated it—years ahead of where you are now.</p>
         </div>
         ${pageFooter(4)}
       </div>
     </div>
   `;
 
-  const whatWeLookForItems = copy.whatWeLookFor.items.map(item =>
-    `<p class="mb-2"><strong>${item.title}:</strong> ${replaceVariables(item.body, vars).split(/\n\n/)[0]}</p>`
-  ).join("");
-
-  const outcomeParagraphs = replaceVariables(copy.outcome.body, vars).split(/\n\n+/).filter(p => p.trim()).map(p =>
-    `<p class="mb-4">${p}</p>`
-  ).join("");
-
   const page3 = `
     <div class="page">
       <div class="page-inner">
         ${pageHeader(clientName)}
         <div class="page-content">
+          <p class="mb-4"><strong>This wasn't your fault.</strong> Nobody explained the options. Nobody showed you what was coming. Nobody called you before that renewal letter arrived.</p>
+
+          <p class="mb-6"><strong>Nobody did that for you last time. We will this time.</strong></p>
+
           <div class="section-header">
-            <h2>${copy.whatWeLookFor.heading}</h2>
+            <h2>What We Look For Instead</h2>
             <div class="underline"></div>
           </div>
 
-          <p class="mb-4">${replaceVariables(copy.whatWeLookFor.intro, vars)}</p>
+          <p class="mb-4">There may be ways to reduce your overall interest cost across this next term that let you hold your amortization—or at least minimize the damage:</p>
 
-          ${whatWeLookForItems}
+          <p class="mb-2"><strong>Rate optimization:</strong> Not just today's rate, but actively managing through the term as rates move. If we can save you 0.5% through a strategic relock in year two or three, that savings doesn't just reduce your payment—it accelerates your amortization. Every dollar that would have gone to interest now goes to principal.</p>
+
+          <p class="mb-2"><strong>Debt restructuring:</strong> If you're carrying other debts—car loans, lines of credit, credit cards—there may be a consolidation play that reduces your total monthly outflow while keeping your mortgage amortization intact.</p>
+
+          <p class="mb-4"><strong>Cash flow reallocation:</strong> With regular check-ins throughout your next term, we look for moments when you can increase your payments—even slightly—to claw back amortization. A small raise at work. A car loan that gets paid off. These are opportunities to move forward, but only if someone asks the question.</p>
 
           <div class="pullquote">
-            <p>${replaceVariables(copy.whatWeLookFor.closing, vars)}</p>
+            <p>Our goal isn't just to set up your mortgage and disappear. It's to keep optimizing, keep asking, and keep you moving toward debt-free faster than you thought possible.</p>
           </div>
-
-          <div class="section-header mt-6">
-            <h2>${copy.outcome.heading}</h2>
-            <div class="underline"></div>
-          </div>
-
-          ${outcomeParagraphs}
 
           <div class="verification-box">
             <div class="verification-header">
-              <span class="title">${copy.verificationBox.heading}</span>
+              <span class="title">Verify This Yourself</span>
               <span class="copy-hint">Copy prompt below</span>
             </div>
             <div class="verification-body">
-              <p class="instruction">${copy.verificationBox.instruction}</p>
-              <div class="verification-prompt">${replaceVariables(copy.verificationBox.prompt, vars)}</div>
+              <p class="instruction">Ask any AI (ChatGPT, Claude, Google):</p>
+              <div class="verification-prompt">I have a ${mortgageAmount} mortgage. I was paying ${previousRate} and now I'm renewing at ${currentRate}. What's the payment difference and how much will I pay over 5 years?</div>
             </div>
           </div>
         </div>
@@ -1336,23 +1330,16 @@ function generateScenario1Pages(
 }
 
 /**
- * Generate Scenario 2 Pages - Variable → Panic Lock (Uses REPORT_COPY)
+ * Generate Scenario 2 Pages - Variable → Panic Lock
  */
 function generateScenario2Pages(
   clientName: string,
-  data: ReportHTMLProps["extractedData"],
-  vars: Record<string, string> = {}
+  data: ReportHTMLProps["extractedData"]
 ): string[] {
-  const copy = REPORT_COPY.scenarios.scenario2;
+  const originalRate = formatPercent(data.originalRate || 0.0145);
+  const lockInRate = formatPercent(data.lockInRate || 0.0579);
   const extraInterest = formatCurrency(data.estimatedExtraInterest || 38675);
-
-  const introParagraphs = replaceVariables(copy.intro, vars).split(/\n\n+/).filter(p => p.trim()).map((p, i, arr) =>
-    i === arr.length - 1 ? `<p class="mb-4"><strong>${p}</strong></p>` : `<p class="mb-4">${p}</p>`
-  ).join("");
-
-  const costParagraphs = replaceVariables(copy.costExplanation, vars).split(/\n\n+/).filter(p => p.trim()).map(p =>
-    `<p class="mt-4">${p}</p>`
-  ).join("");
+  const mortgageAmount = formatCurrency(data.mortgageAmount || 520000);
 
   const page1 = `
     <div class="page">
@@ -1360,55 +1347,89 @@ function generateScenario2Pages(
         ${pageHeader(clientName)}
         <div class="page-content">
           <div class="section-header">
-            <h2>${copy.heading}</h2>
+            <h2>What Happened on Your Last Term</h2>
             <div class="underline"></div>
           </div>
 
-          ${introParagraphs}
+          <p class="mb-4">You started with a variable rate at ${originalRate}—a great rate at the time. Then rates started climbing. The headlines got scary. Your bank called and offered to "lock you in for protection."</p>
+
+          <p class="mb-4">It felt responsible. It felt safe. But here's what actually happened:</p>
 
           <div class="cost-highlight">
-            <div class="label">${copy.costHighlight.label}</div>
+            <div class="label">Estimated Extra Interest Paid</div>
             <div class="value">${extraInterest}</div>
-            <div class="subtitle">${copy.costHighlight.subtext}</div>
+            <div class="subtitle">Over the remaining term vs. staying variable</div>
           </div>
 
-          ${costParagraphs}
+          <p class="mt-4">You locked in at ${lockInRate} when rates were at their peak. Since then, rates have dropped—but you're stuck paying the higher rate until your term ends.</p>
+
+          <div class="pullquote">
+            <p>The bank wasn't protecting you. They were protecting their revenue.</p>
+          </div>
+
+          <p class="mt-4">Variable rate mortgages are designed to fluctuate. That's the trade-off for historically lower rates. But when the fluctuation happened, your bank positioned a lock-in as a safety measure—when it was actually a revenue opportunity for them.</p>
         </div>
         ${pageFooter(3)}
       </div>
     </div>
   `;
 
-  const empathyParagraphs = replaceVariables(copy.empathy, vars).split(/\n\n+/).filter(p => p.trim()).map((p, i) =>
-    i === 0 ? `<p class="mb-4"><strong>${p}</strong></p>` : `<p class="mb-4">${p}</p>`
-  ).join("");
-
-  const futureParagraphs = replaceVariables(copy.futureRisk.body, vars).split(/\n\n+/).filter(p => p.trim()).map(p =>
-    `<p class="mb-4">${p}</p>`
-  ).join("");
-
   const page2 = `
     <div class="page">
       <div class="page-inner">
         ${pageHeader(clientName)}
         <div class="page-content">
-          ${empathyParagraphs}
-
-          <div class="section-header mt-6">
-            <h2>${copy.futureRisk.heading}</h2>
+          <div class="section-header">
+            <h2>This Wasn't Your Fault</h2>
             <div class="underline"></div>
           </div>
 
-          ${futureParagraphs}
+          <p class="mb-4">When rates are rising and the news is alarming, locking in feels like the responsible choice. But nobody told you:</p>
+
+          <ul class="bullet-list">
+            <li>
+              <span class="bullet"></span>
+              <span>Variable rates historically outperform fixed rates over time</span>
+            </li>
+            <li>
+              <span class="bullet"></span>
+              <span>Banks make more money when you lock in at peak rates</span>
+            </li>
+            <li>
+              <span class="bullet"></span>
+              <span>The "protection" they offered came with a significant cost</span>
+            </li>
+            <li>
+              <span class="bullet"></span>
+              <span>There were other strategies—like trigger rate management—that could have helped</span>
+            </li>
+          </ul>
+
+          <div class="section-header mt-6">
+            <h2>Here's What Would Have Happened</h2>
+            <div class="underline"></div>
+          </div>
+
+          <p class="mb-4">If someone had been watching your mortgage:</p>
+
+          <p class="mb-2"><strong>When your rate crossed 3.5%:</strong> We would have called. "Rates are climbing. Let's discuss whether locking in now makes sense before it gets worse."</p>
+
+          <p class="mb-2"><strong>When you were considering locking in at ${lockInRate}:</strong> We would have run the numbers. "Here's what locking in costs you vs. riding it out. Here's the break-even point."</p>
+
+          <p class="mb-4"><strong>When rates started falling after you locked in:</strong> We would have called again. "Rates have dropped significantly. Let's calculate whether breaking your mortgage and relocking makes financial sense."</p>
+
+          <p class="mt-4">Instead, you were left to react alone, under stress, with incomplete information. The pattern only breaks if someone is actually paying attention.</p>
+
+          <p class="mt-4"><strong>Nobody did that for you last time. We will this time.</strong></p>
 
           <div class="verification-box">
             <div class="verification-header">
-              <span class="title">${copy.verificationBox.heading}</span>
+              <span class="title">Verify This Yourself</span>
               <span class="copy-hint">Copy prompt below</span>
             </div>
             <div class="verification-body">
-              <p class="instruction">${copy.verificationBox.instruction}</p>
-              <div class="verification-prompt">${copy.verificationBox.prompt}</div>
+              <p class="instruction">Ask any AI (ChatGPT, Claude, Google):</p>
+              <div class="verification-prompt">I have a ${mortgageAmount} mortgage. I started at ${originalRate} variable and locked in at ${lockInRate} with 3 years remaining. If rates dropped 1.5% since then, how much extra interest am I paying?</div>
             </div>
           </div>
         </div>
@@ -1421,24 +1442,16 @@ function generateScenario2Pages(
 }
 
 /**
- * Generate Scenario 3 Pages - Fixed Payment Variable → Negative Amortization (Uses REPORT_COPY)
+ * Generate Scenario 3 Pages - Fixed Payment Variable → Negative Amortization
  */
 function generateScenario3Pages(
   clientName: string,
-  data: ReportHTMLProps["extractedData"],
-  vars: Record<string, string> = {}
+  data: ReportHTMLProps["extractedData"]
 ): string[] {
-  const copy = REPORT_COPY.scenarios.scenario3;
+  const mortgageAmount = formatCurrency(data.mortgageAmount || 415000);
+  const fixedPayment = formatCurrency(data.fixedPayment || 1850);
   const originalAm = data.originalAmortization || 25;
   const currentAm = data.currentAmortization || 26;
-
-  const introParagraphs = replaceVariables(copy.intro, vars).split(/\n\n+/).filter(p => p.trim()).map(p =>
-    `<p class="mb-4">${p}</p>`
-  ).join("");
-
-  const explanationParagraphs = replaceVariables(copy.explanation.body, vars).split(/\n\n+/).filter(p => p.trim()).map(p =>
-    `<p class="mb-4">${p}</p>`
-  ).join("");
 
   const page1 = `
     <div class="page">
@@ -1446,15 +1459,13 @@ function generateScenario3Pages(
         ${pageHeader(clientName)}
         <div class="page-content">
           <div class="section-header">
-            <h2>${copy.heading}</h2>
+            <h2>What Happened on Your Last Term</h2>
             <div class="underline"></div>
           </div>
 
-          ${introParagraphs}
+          <p class="mb-4">You chose a variable rate mortgage with fixed payments of ${fixedPayment}/month. It seemed like the best of both worlds—variable rate savings with predictable payments.</p>
 
-          <h3 class="mt-6">${copy.explanation.heading}</h3>
-
-          ${explanationParagraphs}
+          <p class="mb-4">But when rates rose, something happened that your bank never warned you about:</p>
 
           <div class="impact-statement">
             <h2>You made every payment.<br>You now owe more than before.</h2>
@@ -1471,19 +1482,15 @@ function generateScenario3Pages(
               <div class="value">${currentAm} years</div>
             </div>
           </div>
+
+          <p class="mt-4">This is called <strong>negative amortization</strong>. Your fixed payment no longer covered the interest, so the unpaid interest got added to your balance. You were going backwards without knowing it.</p>
+
+          <p class="mt-4">Every month, you thought you were paying down your mortgage. Every month, your balance was actually growing. And your bank knew—they just didn't tell you.</p>
         </div>
         ${pageFooter(3)}
       </div>
     </div>
   `;
-
-  const empathyParagraphs = replaceVariables(copy.empathy.body, vars).split(/\n\n+/).filter(p => p.trim()).map(p =>
-    `<p class="mb-4">${p}</p>`
-  ).join("");
-
-  const futureParagraphs = replaceVariables(copy.futureRisk.body, vars).split(/\n\n+/).filter(p => p.trim()).map((p, i, arr) =>
-    i === arr.length - 1 ? `<p class="mb-4"><strong>${p}</strong></p>` : `<p class="mb-4">${p}</p>`
-  ).join("");
 
   const page2 = `
     <div class="page">
@@ -1491,27 +1498,56 @@ function generateScenario3Pages(
         ${pageHeader(clientName)}
         <div class="page-content">
           <div class="section-header">
-            <h2>${copy.empathy.heading}</h2>
+            <h2>This Wasn't Your Fault</h2>
             <div class="underline"></div>
           </div>
 
-          ${empathyParagraphs}
+          <p class="mb-4">Your bank had a responsibility to tell you this was happening. They didn't. No phone call. No letter. No warning until you looked at your statement and saw your balance had increased.</p>
+
+          <ul class="bullet-list">
+            <li>
+              <span class="bullet"></span>
+              <span>You weren't told about trigger rates or trigger points</span>
+            </li>
+            <li>
+              <span class="bullet"></span>
+              <span>You weren't offered the option to increase your payment</span>
+            </li>
+            <li>
+              <span class="bullet"></span>
+              <span>You weren't warned that your amortization was extending</span>
+            </li>
+            <li>
+              <span class="bullet"></span>
+              <span>You weren't given a strategy to get back on track</span>
+            </li>
+          </ul>
 
           <div class="section-header mt-6">
-            <h2>${copy.futureRisk.heading}</h2>
+            <h2>Here's What Would Have Happened</h2>
             <div class="underline"></div>
           </div>
 
-          ${futureParagraphs}
+          <p class="mb-4">If someone had been watching your mortgage:</p>
+
+          <p class="mb-2"><strong>When rates started rising:</strong> We would have called. "Your fixed payment may not cover the interest soon. Let's increase it slightly now to stay on track."</p>
+
+          <p class="mb-2"><strong>When you hit your trigger rate:</strong> We would have called. "Your payment no longer covers the interest. Here are your options: increase payment, lock in, or switch to adjustable payments."</p>
+
+          <p class="mb-4"><strong>When your amortization started extending:</strong> We would have called. "Your mortgage is going backwards. Here's exactly what's happening and how to fix it."</p>
+
+          <p class="mt-4">Your bank had all this information. They chose not to share it. We don't operate that way.</p>
+
+          <p class="mt-4"><strong>Nobody did that for you last time. We will this time.</strong></p>
 
           <div class="verification-box">
             <div class="verification-header">
-              <span class="title">${copy.verificationBox.heading}</span>
+              <span class="title">Verify This Yourself</span>
               <span class="copy-hint">Copy prompt below</span>
             </div>
             <div class="verification-body">
-              <p class="instruction">${copy.verificationBox.instruction}</p>
-              <div class="verification-prompt">${copy.verificationBox.prompt}</div>
+              <p class="instruction">Ask any AI (ChatGPT, Claude, Google):</p>
+              <div class="verification-prompt">I have a ${mortgageAmount} mortgage with fixed payments of ${fixedPayment}. If rates rose from 1.65% to 5.5%, would my payment still cover the interest? What happens if it doesn't?</div>
             </div>
           </div>
         </div>
@@ -1738,6 +1774,116 @@ function generateGuaranteePage(
       </div>
     </div>
   `;
+}
+
+/**
+ * OLD: Generate Our Approach Pages — REPLACED by generateOurApproachPage + generateGuaranteePage
+ * Keeping for reference during migration, will be removed
+ */
+function _deprecated_generateOurApproachPages(
+  clientName: string,
+  consultant: { name: string; email: string; phone: string },
+  startPageNumber: number
+): string[] {
+  // Page 1: Our Approach
+  const approachPage = `
+    <div class="page">
+      <div class="page-inner">
+        ${pageHeader(clientName)}
+        <div class="page-content">
+          <div class="section-header">
+            <h2>Our Approach</h2>
+            <div class="underline"></div>
+          </div>
+
+          <p class="approach-intro">The Inspired Team has over 90 years combined experience in the Canadian mortgage space. We've seen every rate cycle, every market panic, every "this time is different" moment.</p>
+
+          <p class="mb-4">And here's what we've learned: the mortgage industry is designed to benefit banks, not borrowers. We built Inspired Mortgage to change that.</p>
+
+          <p class="mb-4">Here's what makes us different:</p>
+
+          <ul class="bullet-list">
+            <li>
+              <span class="bullet"></span>
+              <span><strong>We work for you, not the banks.</strong> We're paid the same regardless of which lender you choose. Our only job is finding you the best deal.</span>
+            </li>
+            <li>
+              <span class="bullet"></span>
+              <span><strong>We watch your mortgage.</strong> Not just at renewal—throughout your entire term. If something changes, we call you.</span>
+            </li>
+            <li>
+              <span class="bullet"></span>
+              <span><strong>We explain the math.</strong> Every recommendation comes with numbers you can verify yourself.</span>
+            </li>
+            <li>
+              <span class="bullet"></span>
+              <span><strong>We make lenders compete.</strong> 30+ lenders. One application. You see every offer.</span>
+            </li>
+          </ul>
+
+          <p class="mt-4">After decades in this industry, we could have done anything. Instead, we built this.</p>
+
+          <div class="callout-box">
+            <h4>The Inspired Mortgage Promise</h4>
+            <p>You'll never sign a renewal letter without knowing your options. You'll never be surprised by rate changes. You'll never wonder if you got the best deal.</p>
+          </div>
+
+          <div class="signature-block">
+            <div class="name">${consultant.name}</div>
+            <div class="title">${consultant.name.toLowerCase().includes("greg") ? "Founder" : "Mortgage Advisor"}, Inspired Mortgage</div>
+          </div>
+        </div>
+        ${pageFooter(startPageNumber)}
+      </div>
+    </div>
+  `;
+
+  // Page 2: $5,000 Penalty Guarantee
+  const guaranteePage = `
+    <div class="page">
+      <div class="page-inner">
+        ${pageHeader(clientName)}
+        <div class="page-content">
+          <div class="section-header">
+            <h2>The $5,000 Penalty Guarantee</h2>
+            <div class="underline"></div>
+          </div>
+
+          <div class="guarantee-certificate">
+            <div class="amount">$5,000</div>
+            <div class="title">Penalty Guarantee</div>
+            <p>If your penalty exceeds $5,000 when refinancing with us, we cover the difference. Guaranteed.</p>
+          </div>
+
+          <h3 class="mb-2">How It Works</h3>
+          <ul class="bullet-list mb-4">
+            <li>
+              <span class="bullet"></span>
+              <span>Your penalty is $8,000? You pay $5,000, we cover $3,000.</span>
+            </li>
+            <li>
+              <span class="bullet"></span>
+              <span>Your penalty is $12,000? You pay $5,000, we cover $7,000.</span>
+            </li>
+            <li>
+              <span class="bullet"></span>
+              <span>Your penalty is $4,500? You pay $4,500, no coverage needed.</span>
+            </li>
+          </ul>
+
+          <p class="mb-4">This guarantee exists because we believe in our ability to find you a better deal. If the savings from your new rate don't justify the penalty, we make up the difference.</p>
+
+          <div class="callout-box">
+            <h4>Ask Your Bank</h4>
+            <p>Call your current lender and ask: "What would my penalty be if I broke my mortgage today?" They're required to tell you. That number helps us calculate whether refinancing makes sense—and whether the guarantee applies.</p>
+          </div>
+        </div>
+        ${pageFooter(startPageNumber + 1)}
+      </div>
+    </div>
+  `;
+
+  return [approachPage, guaranteePage];
 }
 
 /**
@@ -2074,6 +2220,7 @@ function generateWhatHappensNextPage(
               <div class="label">Contact</div>
               <div class="name">${consultant.name}</div>
               <div class="contact">${consultant.email}</div>
+              <div class="contact">${consultant.phone}</div>
             </div>
           </div>
         </div>

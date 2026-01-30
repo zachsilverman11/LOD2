@@ -89,7 +89,6 @@ export function buildVariableMap(vars: ReportVariables): Record<string, string> 
     map["CURRENT_AMORTIZATION"] = String(vars.currentAmortization);
     map["CURRENT_AMORTIZATION_MINUS_5"] = String(vars.currentAmortization - 5);
     map["CURRENT_AMORTIZATION_MINUS_10"] = String(vars.currentAmortization - 10);
-    map["EXTENDED_AMORTIZATION"] = String(vars.currentAmortization + 5);
   }
   if (vars.oldPayment != null) map["OLD_PAYMENT"] = formatCurrency(vars.oldPayment).replace("$", "");
   if (vars.newPayment != null) map["NEW_PAYMENT"] = formatCurrency(vars.newPayment).replace("$", "");
