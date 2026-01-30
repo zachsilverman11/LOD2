@@ -154,11 +154,11 @@ export function generateReportHTML(props: ReportHTMLProps): string {
 
   // 3. Scenario pages
   if (activeScenario === 1) {
-    pages.push(...generateScenario1Pages(clientName, extractedData, vars));
+    pages.push(...generateScenario1Pages(clientName, extractedData, pages.length + 1, vars));
   } else if (activeScenario === 2) {
-    pages.push(...generateScenario2Pages(clientName, extractedData, vars));
+    pages.push(...generateScenario2Pages(clientName, extractedData, pages.length + 1, vars));
   } else if (activeScenario === 3) {
-    pages.push(...generateScenario3Pages(clientName, extractedData, vars));
+    pages.push(...generateScenario3Pages(clientName, extractedData, pages.length + 1, vars));
   }
 
   // APP LINK #1: After scenario
@@ -173,7 +173,7 @@ export function generateReportHTML(props: ReportHTMLProps): string {
   // 4. Debt Consolidation
   if (includeDebtConsolidation && extractedData.otherDebts?.length) {
     pages.push(
-      generateDebtConsolidationPage(
+      ...generateDebtConsolidationPage(
         clientName,
         extractedData.mortgageAmount || 0,
         extractedData.otherDebts,
@@ -247,8 +247,8 @@ function getBaseStyles(): string {
 
     body {
       font-family: 'Georgia', 'Times New Roman', 'Palatino', serif;
-      font-size: 15px;
-      line-height: 1.7;
+      font-size: 14px;
+      line-height: 1.65;
       color: ${colors.textPrimary};
       background: ${colors.white};
       -webkit-font-smoothing: antialiased;
@@ -281,7 +281,7 @@ function getBaseStyles(): string {
 
     .page-content {
       flex: 1;
-      padding: 36px 64px 40px 64px;
+      padding: 32px 56px 32px 56px;
     }
 
     /* ================================================
@@ -463,7 +463,7 @@ function getBaseStyles(): string {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 18px 64px;
+      padding: 16px 48px;
       border-bottom: 1px solid ${colors.border};
       flex-shrink: 0;
     }
@@ -484,7 +484,7 @@ function getBaseStyles(): string {
     }
 
     .page-footer {
-      padding: 14px 64px;
+      padding: 12px 48px;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -641,7 +641,7 @@ function getBaseStyles(): string {
       color: ${colors.white};
       padding: 28px 48px;
       text-align: center;
-      margin: 24px -64px;
+      margin: 24px -48px;
     }
 
     .impact-banner h2 {
@@ -1275,6 +1275,7 @@ function generateWhatYouToldUsPage(
 function generateScenario1Pages(
   clientName: string,
   data: ReportHTMLProps["extractedData"],
+  startPageNumber: number,
   vars: Record<string, string> = {}
 ): string[] {
   const copy = REPORT_COPY.scenarios.scenario1;
@@ -1331,7 +1332,7 @@ function generateScenario1Pages(
 
           ${bankParagraphs}
         </div>
-        ${pageFooter(3)}
+        ${pageFooter(startPageNumber)}
       </div>
     </div>
   `;
@@ -1371,8 +1372,18 @@ function generateScenario1Pages(
 
           ${impactParagraphs}
           ${transitionParagraphs}
+        </div>
+        ${pageFooter(startPageNumber + 1)}
+      </div>
+    </div>
+  `;
 
-          <div class="section-header mt-6">
+  const page2b = `
+    <div class="page">
+      <div class="page-inner">
+        ${pageHeader(clientName)}
+        <div class="page-content">
+          <div class="section-header" style="margin-top: 0;">
             <h2>${copy.activeManagement.heading}</h2>
           </div>
 
@@ -1388,7 +1399,7 @@ function generateScenario1Pages(
           ${summaryParagraphs}
           ${empathyParagraphs}
         </div>
-        ${pageFooter(4)}
+        ${pageFooter(startPageNumber + 2)}
       </div>
     </div>
   `;
@@ -1418,8 +1429,18 @@ function generateScenario1Pages(
           <div class="pullquote">
             <p>${replaceVariables(copy.whatWeLookFor.closing, vars)}</p>
           </div>
+        </div>
+        ${pageFooter(startPageNumber + 3)}
+      </div>
+    </div>
+  `;
 
-          <div class="section-header mt-6">
+  const page4 = `
+    <div class="page">
+      <div class="page-inner">
+        ${pageHeader(clientName)}
+        <div class="page-content">
+          <div class="section-header">
             <h2>${copy.outcome.heading}</h2>
           </div>
 
@@ -1436,12 +1457,12 @@ function generateScenario1Pages(
             </div>
           </div>
         </div>
-        ${pageFooter(5)}
+        ${pageFooter(startPageNumber + 4)}
       </div>
     </div>
   `;
 
-  return [page1, page2, page3];
+  return [page1, page2, page2b, page3, page4];
 }
 
 // ============================================================
@@ -1450,6 +1471,7 @@ function generateScenario1Pages(
 function generateScenario2Pages(
   clientName: string,
   data: ReportHTMLProps["extractedData"],
+  startPageNumber: number,
   vars: Record<string, string> = {}
 ): string[] {
   const copy = REPORT_COPY.scenarios.scenario2;
@@ -1483,7 +1505,7 @@ function generateScenario2Pages(
 
           ${costParagraphs}
         </div>
-        ${pageFooter(3)}
+        ${pageFooter(startPageNumber)}
       </div>
     </div>
   `;
@@ -1520,7 +1542,7 @@ function generateScenario2Pages(
             </div>
           </div>
         </div>
-        ${pageFooter(4)}
+        ${pageFooter(startPageNumber + 1)}
       </div>
     </div>
   `;
@@ -1534,6 +1556,7 @@ function generateScenario2Pages(
 function generateScenario3Pages(
   clientName: string,
   data: ReportHTMLProps["extractedData"],
+  startPageNumber: number,
   vars: Record<string, string> = {}
 ): string[] {
   const copy = REPORT_COPY.scenarios.scenario3;
@@ -1582,7 +1605,7 @@ function generateScenario3Pages(
             </div>
           </div>
         </div>
-        ${pageFooter(3)}
+        ${pageFooter(startPageNumber)}
       </div>
     </div>
   `;
@@ -1623,7 +1646,7 @@ function generateScenario3Pages(
             </div>
           </div>
         </div>
-        ${pageFooter(4)}
+        ${pageFooter(startPageNumber + 1)}
       </div>
     </div>
   `;
@@ -1639,7 +1662,7 @@ function generateDebtConsolidationPage(
   mortgageAmount: number,
   otherDebts: Array<{ type: string; balance: number; payment: number }>,
   pageNumber: number
-): string {
+): string[] {
   const copy = REPORT_COPY.debtConsolidation;
   const totalPayments = otherDebts.reduce((sum, d) => sum + d.payment, 0);
 
@@ -1651,7 +1674,7 @@ function generateDebtConsolidationPage(
     </tr>
   `).join("");
 
-  return `
+  const page1 = `
     <div class="page">
       <div class="page-inner">
         ${pageHeader(clientName)}
@@ -1690,17 +1713,29 @@ function generateDebtConsolidationPage(
           </div>
 
           <p style="margin-bottom: 14px; font-style: italic;">${copy.solution.clientReaction}</p>
-
-          <h3 class="mt-6" style="margin-bottom: 10px;">${copy.noteOnIncreasingMortgage.heading}</h3>
-          ${copy.noteOnIncreasingMortgage.body.split('\n\n').map(p => `<p style="margin-bottom: 10px;">${p}</p>`).join('')}
-
-          <h3 class="mt-6" style="margin-bottom: 10px;">${copy.relevance.heading}</h3>
-          ${copy.relevance.body.split('\n\n').map(p => `<p style="margin-bottom: 10px;">${p}</p>`).join('')}
         </div>
         ${pageFooter(pageNumber)}
       </div>
     </div>
   `;
+
+  const page2 = `
+    <div class="page">
+      <div class="page-inner">
+        ${pageHeader(clientName)}
+        <div class="page-content">
+          <h3 style="margin-bottom: 10px;">${copy.noteOnIncreasingMortgage.heading}</h3>
+          ${copy.noteOnIncreasingMortgage.body.split('\n\n').map(p => `<p style="margin-bottom: 14px;">${p}</p>`).join('')}
+
+          <h3 class="mt-6" style="margin-bottom: 10px;">${copy.relevance.heading}</h3>
+          ${copy.relevance.body.split('\n\n').map(p => `<p style="margin-bottom: 14px;">${p}</p>`).join('')}
+        </div>
+        ${pageFooter(pageNumber + 1)}
+      </div>
+    </div>
+  `;
+
+  return [page1, page2];
 }
 
 // ============================================================
