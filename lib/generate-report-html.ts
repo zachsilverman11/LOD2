@@ -1323,7 +1323,7 @@ function generateScenario1Pages(
             </div>
             <div class="verification-body">
               <p class="instruction">${copy.verificationBox.instruction}</p>
-              <div class="verification-prompt">${copy.verificationBox.prompt}</div>
+              <div class="verification-prompt">${replaceVariables(copy.verificationBox.prompt, vars)}</div>
             </div>
           </div>
         </div>

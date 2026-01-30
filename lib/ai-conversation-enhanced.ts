@@ -6,7 +6,7 @@ import { sendErrorAlert } from "./slack";
 import { quickDelay } from "./human-delay";
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY || "placeholder-for-build",
 });
 
 interface LeadContext {
