@@ -14,8 +14,14 @@
 const CALCOM_API_V2_URL = "https://api.cal.com/v2";
 const CALCOM_API_VERSION = process.env.CALCOM_API_VERSION || "2024-09-04";
 
+// ─── Public booking endpoint (same as cal.com booking page — no auth needed) ───
+const CALCOM_PUBLIC_BOOKING_URL = "https://app.cal.com/api/book/event";
+
 // ─── V1 base URL kept for backward-compatible cancel/reschedule if needed ───
 const CALCOM_API_V1_URL = "https://api.cal.com/v1";
+
+// ─── Known event type ID (discovered from public booking page) ───
+const DEFAULT_EVENT_TYPE_ID = 3298267;
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -161,18 +167,28 @@ export async function getAvailableSlots(
   timeZone: string = "America/Vancouver",
   eventTypeId?: number
 ): Promise<TimeSlot[]> {
-  const apiKey = getApiKey();
-  const etId = eventTypeId || getEventTypeId();
-
+  // Use slug-based approach (no auth required) as primary, fall back to eventTypeId
   const params = new URLSearchParams({
-    eventTypeId: etId.toString(),
     start: startDate,
     end: endDate,
     timeZone,
   });
 
+  // Prefer slug-based lookup (no API key needed — works like the public booking page)
+  const teamSlug = process.env.CALCOM_TEAM_SLUG || "inspired-mortgage";
+  const eventSlug = process.env.CALCOM_EVENT_SLUG || "mortgage-discovery-call";
+
+  if (!eventTypeId) {
+    params.set("teamSlug", teamSlug);
+    params.set("eventTypeSlug", eventSlug);
+  } else {
+    params.set("eventTypeId", eventTypeId.toString());
+  }
+
   const response = await fetch(`${CALCOM_API_V2_URL}/slots?${params}`, {
-    headers: v2Headers(apiKey),
+    headers: {
+      "cal-api-version": CALCOM_API_VERSION,
+    },
   });
 
   if (!response.ok) {
@@ -183,14 +199,18 @@ export async function getAvailableSlots(
 
   const data = await response.json();
 
-  // v2 slots response: { status: "success", data: { slots: { "YYYY-MM-DD": [{ time: "..." }] } } }
-  const slotsMap: Record<string, Array<{ time: string }>> = data?.data?.slots || {};
+  // v2 slots response: { status: "success", data: { "YYYY-MM-DD": [{ start: "..." }] } }
+  // Note: response shape is data.data (outer = fetch json, inner = cal response)
+  const slotsMap: Record<string, Array<{ start?: string; time?: string }>> = data?.data || {};
 
   const slots: TimeSlot[] = [];
 
   for (const [, daySlots] of Object.entries(slotsMap)) {
+    if (!Array.isArray(daySlots)) continue;
     for (const slot of daySlots) {
-      const slotDate = new Date(slot.time);
+      const slotTime = slot.start || slot.time;
+      if (!slotTime) continue;
+      const slotDate = new Date(slotTime);
       const displayTime = slotDate.toLocaleString("en-US", {
         timeZone,
         weekday: "short",
@@ -202,7 +222,7 @@ export async function getAvailableSlots(
       });
 
       slots.push({
-        time: slot.time,
+        time: slotTime,
         displayTime,
       });
     }
@@ -252,37 +272,44 @@ export async function getAvailableSlotsForDay(
 export async function createDirectBooking(
   params: DirectBookingParams
 ): Promise<BookingConfirmation> {
-  const apiKey = getApiKey();
+  // Use the public booking endpoint (same as cal.com booking page — no API key needed)
+  const eventTypeId = params.eventTypeId || parseInt(process.env.CALCOM_EVENT_TYPE_ID || "") || DEFAULT_EVENT_TYPE_ID;
 
   const body = {
-    eventTypeId: params.eventTypeId || getEventTypeId(),
+    eventTypeId,
     start: params.start,
-    attendee: {
+    responses: {
       name: params.attendee.name,
       email: params.attendee.email,
-      timeZone: params.attendee.timeZone,
+      notes: params.metadata?.notes as string || "",
     },
-    metadata: params.metadata || {},
+    timeZone: params.attendee.timeZone,
+    language: "en",
+    metadata: {
+      source: "holly-direct-booking",
+      ...(params.metadata || {}),
+    },
   };
 
-  const response = await fetch(`${CALCOM_API_V2_URL}/bookings`, {
+  const response = await fetch(CALCOM_PUBLIC_BOOKING_URL, {
     method: "POST",
-    headers: v2Headers(apiKey),
+    headers: {
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify(body),
   });
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error(`[Cal.com v2] createDirectBooking error ${response.status}:`, errorText);
+    console.error(`[Cal.com] createDirectBooking error ${response.status}:`, errorText);
     throw new Error(`Cal.com booking error (${response.status}): ${errorText}`);
   }
 
-  const data = await response.json();
-  const booking = data?.data;
+  const booking = await response.json();
 
   return {
     uid: booking?.uid || booking?.id?.toString() || "unknown",
-    title: booking?.title || "Discovery Call",
+    title: booking?.title || "Mortgage Discovery Call",
     startTime: booking?.startTime || booking?.start || params.start,
     endTime: booking?.endTime || booking?.end || "",
     attendeeName: params.attendee.name,
