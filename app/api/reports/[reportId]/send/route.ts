@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { inngest } from "@/lib/inngest";
 import { generateReportHTML } from "@/lib/generate-report-html";
 import { generatePDFFromHTML } from "@/lib/generate-report-puppeteer";
+import { buildReportDeliveryEmail } from "@/lib/email-templates/post-call-sequence";
+import { buildReportNotificationSms } from "@/lib/sms-templates/post-call-sequence";
+import { sendSms } from "@/lib/sms";
 
 export async function POST(
   request: NextRequest,
@@ -98,8 +102,8 @@ export async function POST(
     // Convert buffer to base64 for email attachment
     const pdfBase64 = pdfBuffer.toString("base64");
 
-    // Build the email HTML
-    const emailHtml = buildReportEmailHtml({
+    // Build the branded report delivery email (Implementation Guide Email 1)
+    const reportEmail = buildReportDeliveryEmail({
       clientFirstName: report.lead.firstName || "there",
       advisorName: report.consultantName,
       advisorEmail: report.generatedBy.email,
@@ -135,7 +139,7 @@ export async function POST(
         personalizations: [
           {
             to: [{ email: report.lead.email }],
-            subject: "Your Mortgage Strategy Report from Inspired Mortgage",
+            subject: reportEmail.subject,
           },
         ],
         from: { email: fromEmail, name: "Inspired Mortgage" },
@@ -143,7 +147,7 @@ export async function POST(
         content: [
           {
             type: "text/html",
-            value: emailHtml,
+            value: reportEmail.html,
           },
         ],
         attachments: [
@@ -166,6 +170,30 @@ export async function POST(
       );
     }
 
+    // Send immediate SMS notification (SMS 1 of the post-call sequence)
+    if (report.lead.id) {
+      try {
+        const lead = await prisma.lead.findUnique({
+          where: { id: report.lead.id },
+          select: { phone: true, consentSms: true },
+        });
+
+        if (lead?.phone && lead?.consentSms) {
+          const smsBody = buildReportNotificationSms({
+            clientFirstName: report.lead.firstName || "there",
+            advisorName: report.consultantName,
+          });
+
+          await sendSms({ to: lead.phone, body: smsBody });
+
+          console.log(`[Report Send] Sent immediate SMS notification to lead ${report.lead.id}`);
+        }
+      } catch (smsError) {
+        // Don't fail the whole request if SMS fails
+        console.error("[Report Send] Failed to send immediate SMS:", smsError);
+      }
+    }
+
     // Update the report with sent info
     const updatedReport = await prisma.report.update({
       where: { id: reportId },
@@ -185,6 +213,22 @@ export async function POST(
         },
       },
     });
+
+    // Fire Inngest events to start both email and SMS drip sequences
+    // These fire-and-forget events trigger scheduled follow-ups at Day 2/3/5/7/10
+    try {
+      await inngest.send({
+        name: "report/sent",
+        data: {
+          leadId: report.lead.id,
+          reportId: reportId,
+        },
+      });
+      console.log(`[Report Send] Inngest report/sent event fired for lead ${report.lead.id}`);
+    } catch (inngestError) {
+      // Don't fail the request if Inngest event fails
+      console.error("[Report Send] Failed to fire Inngest event:", inngestError);
+    }
 
     return NextResponse.json({
       success: true,
