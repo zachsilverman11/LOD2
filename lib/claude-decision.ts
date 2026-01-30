@@ -16,7 +16,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { Lead } from '@prisma/client';
 import { DealSignals } from './deal-intelligence';
 import { HollyDecision } from './safety-guardrails';
-import { buildHollyBriefing } from './holly-knowledge-base';
+import { buildHollyBriefing, selectBookingHook } from './holly-knowledge-base';
 import { getLeadJourneyIntro, getValueProposition, LEAD_JOURNEY } from './lead-journey-context';
 import { analyzeReply, isImmediateBooking, BEHAVIORAL_INTELLIGENCE } from './behavioral-intelligence';
 import { getConversationGuidance, SALES_PSYCHOLOGY } from './sales-psychology';
@@ -194,6 +194,9 @@ export async function askHollyToDecide(
   // === LAYER 1: LEAD JOURNEY CONTEXT ===
   const journeyContext = getLeadJourneyIntro(leadType, rawData?.motivation_level);
   const valueProp = getValueProposition(rawData);
+
+  // === BOOKING HOOK SELECTION ===
+  const selectedHook = selectBookingHook(recentMessages);
 
   // === LAYER 2: BEHAVIORAL INTELLIGENCE ===
   const replyAnalysis = lastReply ? analyzeReply(lastReply) : null;
@@ -570,6 +573,9 @@ ${signals.reasoningContext}
 
 **Relevant value proposition for this lead:**
 ${valueProp}
+
+**Booking hook selected for this lead:** "${selectedHook.name}"
+Use this angle when pushing for a booking: ${selectedHook.angle}
 
 ---
 

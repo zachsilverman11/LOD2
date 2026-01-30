@@ -13,6 +13,108 @@ export interface ProgramInfo {
 }
 
 /**
+ * Booking Hooks
+ * These are Holly's persuasion angles for getting leads to book a call.
+ * Each hook reframes the call around the REPORT (the deliverable), not "a consultation."
+ * Hook selection is based on lead signals detected during conversation.
+ */
+export interface BookingHook {
+  id: string;
+  name: string;
+  targetLeadType: string;
+  angle: string;
+  hookMessage: string;
+  followUpNudge: string;
+}
+
+export const BOOKING_HOOKS: BookingHook[] = [
+  {
+    id: 'hidden-cost',
+    name: 'The Hidden Cost',
+    targetLeadType: 'default',
+    angle: 'Sell the REPORT, not the call. The call is just the delivery mechanism.',
+    hookMessage:
+      'Most people don\'t realize their mortgage has hidden costs buried in the fine print — penalties, restrictions, rate traps. We put together a free Mortgage Strategy Report that breaks it all down in plain English. Takes 15 minutes on a call and you walk away with a document you can actually use. Want me to set that up?',
+    followUpNudge:
+      'Still thinking about that report? No pressure — but I\'d hate for you to miss something in your mortgage that could cost you thousands. The call is quick and the report is yours to keep either way.',
+  },
+  {
+    id: 'before-your-bank',
+    name: 'Before You Talk to Your Bank',
+    targetLeadType: 'renewal',
+    angle: 'Preempt the bank conversation. Arm them with leverage BEFORE the bank calls.',
+    hookMessage:
+      'Before you sign that renewal letter from the bank, there\'s something you should see. We build a Mortgage Strategy Report that shows you exactly what the bank ISN\'T offering — and what you should be asking for. Most people save thousands just by knowing the right questions. Quick 15-minute call and the report is yours. Want me to book that?',
+    followUpNudge:
+      'Just checking — have you signed that renewal yet? If not, it\'s worth 15 minutes to see what your bank isn\'t telling you. The report alone could save you the call.',
+  },
+  {
+    id: 'what-they-dont-tell-you',
+    name: 'What They Don\'t Tell You',
+    targetLeadType: 'rate-shopping',
+    angle: 'Rate is the least important part. Reframe around total cost and flexibility.',
+    hookMessage:
+      'Here\'s what most rate comparison sites won\'t tell you — the rate is actually the LEAST important part of your mortgage. Penalties, portability, prepayment options — that\'s where the real money is. Our Mortgage Strategy Report breaks down the full picture so you can compare apples to apples. 15-minute call, and you\'ll never look at rates the same way. Interested?',
+    followUpNudge:
+      'Still comparing rates? The report I mentioned covers the stuff that actually moves the needle — not just the rate. Worth a quick look before you decide.',
+  },
+  {
+    id: 'spouse-needs-to-see',
+    name: 'Your Spouse Needs to See This',
+    targetLeadType: 'partner',
+    angle: 'The report is a shareability tool. Make it easy to loop in the partner.',
+    hookMessage:
+      'Totally get it — this is a decision you make together. That\'s actually why the Mortgage Strategy Report works so well. It\'s a clear, shareable document you can both review at home. No pressure, no jargon — just the numbers and options laid out. Quick 15-minute call to put it together, and you\'ll both have everything you need to decide. Sound good?',
+    followUpNudge:
+      'Have you had a chance to chat with your partner? The report is designed to make that conversation easy — everything in one place, no jargon. Happy to get it ready whenever you\'re both ready to look.',
+  },
+  {
+    id: 'too-good-to-be-true',
+    name: 'Too Good to Be True',
+    targetLeadType: 'skeptical',
+    angle: 'Lean into the skepticism. The report is the PROOF, not a sales pitch.',
+    hookMessage:
+      'I get it — sounds too good to be true, right? That\'s exactly why we put everything in writing. The Mortgage Strategy Report shows you the actual numbers — no fluff, no sales pitch. If it checks out, great. If not, you\'ve lost 15 minutes and gained peace of mind. Fair enough?',
+    followUpNudge:
+      'Still on the fence? Totally fair. The offer stands — 15 minutes for a report that either confirms your suspicions or shows you something worth exploring. Either way, you win.',
+  },
+];
+
+/**
+ * Select the best booking hook based on conversation signals
+ */
+export function selectBookingHook(conversationText: string): BookingHook {
+  const text = conversationText.toLowerCase();
+
+  // Renewal signals
+  const renewalKeywords = ['renewal', 'renew', 'bank letter', 'term ending', 'term is up', 'maturity', 'renewal offer'];
+  if (renewalKeywords.some(kw => text.includes(kw))) {
+    return BOOKING_HOOKS.find(h => h.id === 'before-your-bank')!;
+  }
+
+  // Rate shopping signals
+  const rateKeywords = ['best rate', 'rate shopping', 'comparing rates', 'lowest rate', 'rate compare', 'shop around', 'better rate'];
+  if (rateKeywords.some(kw => text.includes(kw))) {
+    return BOOKING_HOOKS.find(h => h.id === 'what-they-dont-tell-you')!;
+  }
+
+  // Partner signals
+  const partnerKeywords = ['spouse', 'partner', 'wife', 'husband', 'we need to discuss', 'talk to my', 'check with my', 'other half'];
+  if (partnerKeywords.some(kw => text.includes(kw))) {
+    return BOOKING_HOOKS.find(h => h.id === 'spouse-needs-to-see')!;
+  }
+
+  // Skeptical signals
+  const skepticalKeywords = ['sounds too good', "what's the catch", 'sales pitch', 'yeah right', 'too good to be true', 'scam', 'is this legit', 'hard to believe'];
+  if (skepticalKeywords.some(kw => text.includes(kw))) {
+    return BOOKING_HOOKS.find(h => h.id === 'too-good-to-be-true')!;
+  }
+
+  // Default
+  return BOOKING_HOOKS.find(h => h.id === 'hidden-cost')!;
+}
+
+/**
  * Inspired Mortgage Programs
  * Holly knows about these but decides WHEN and HOW to use them
  */
@@ -545,6 +647,24 @@ ${suggestedPrograms
   .join('\n\n')}
 
 **Note:** Only mention if RELEVANT to their situation. Don't force it.
+`;
+
+  // Add booking hook based on conversation signals
+  const selectedHook = selectBookingHook(conversationContext.messageHistory);
+  briefing += `
+---
+
+## 🪝 BOOKING HOOK: "${selectedHook.name}"
+
+**Why this hook:** ${selectedHook.angle}
+
+**When you're ready to push for a booking, use this angle:**
+${selectedHook.hookMessage}
+
+**If they need a nudge later:**
+${selectedHook.followUpNudge}
+
+**Remember:** Adapt this to the conversation — don't copy-paste. The hook is the ANGLE, not a script.
 `;
 
   return briefing;
