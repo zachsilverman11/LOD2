@@ -261,11 +261,12 @@ function getBaseStyles(): string {
     .page {
       width: 8.5in;
       min-height: 11in;
+      height: 11in;
       padding: 0;
       position: relative;
       page-break-after: always;
       background: ${colors.white};
-      overflow: visible;
+      overflow: hidden;
     }
 
     .page:last-child {
@@ -1812,9 +1813,9 @@ function generateOurApproachPage(
             ${differentiatorItems}
           </ul>
 
-          <p style="margin-top: 16px; margin-bottom: 16px;">${copy.closing}</p>
+          <p style="margin-top: 16px; margin-bottom: 24px;">${copy.closing}</p>
 
-          <div class="callout-box accent">
+          <div class="callout-box accent" style="border: 2px solid ${colors.accent}; margin-bottom: 24px;">
             <h4>${copy.promise.heading}</h4>
             <p>${copy.promise.body}</p>
           </div>
@@ -1983,17 +1984,17 @@ function generateFixedRateStrategyPages(
     <div class="page">
       <div class="page-inner">
         ${pageHeader(clientName)}
-        <div class="page-content">
+        <div class="page-content" style="display: flex; flex-direction: column; justify-content: center;">
           <div class="impact-banner" style="margin-top: 0;">
             <h2>${copy.borrowerComparison.result.heading}</h2>
           </div>
 
           ${resultParagraphs}
 
-          <h3 style="margin-top: 24px; margin-bottom: 10px;">Ask Your Bank</h3>
-          <div style="background: ${colors.navy}; border-radius: 10px; padding: 24px 28px;">
-            <p style="font-style: italic; color: rgba(255,255,255,0.85); font-size: 14px; line-height: 1.6;">${askYourBankParagraphs[0] || ""}</p>
-            ${askYourBankParagraphs.length > 1 ? `<p style="font-weight: 700; margin-top: 12px; color: ${colors.goldBorder}; font-size: 14px;">${askYourBankParagraphs[1]}</p>` : ""}
+          <h3 style="margin-top: 32px; margin-bottom: 14px;">Ask Your Bank</h3>
+          <div style="background: ${colors.navy}; border-radius: 10px; padding: 28px 32px;">
+            <p style="font-style: italic; color: rgba(255,255,255,0.85); font-size: 15px; line-height: 1.7;">${askYourBankParagraphs[0] || ""}</p>
+            ${askYourBankParagraphs.length > 1 ? `<p style="font-weight: 700; margin-top: 14px; color: ${colors.goldBorder}; font-size: 15px;">${askYourBankParagraphs[1]}</p>` : ""}
           </div>
         </div>
         ${pageFooter(startPageNumber + 2)}
@@ -2195,7 +2196,7 @@ function generateWhatHappensNextPage(
     <div class="page">
       <div class="page-inner">
         ${pageHeader(clientName)}
-        <div class="page-content">
+        <div class="page-content" style="display: flex; flex-direction: column; justify-content: center;">
           <div class="section-header">
             
             <h2>${copy.heading}</h2>
@@ -2205,7 +2206,7 @@ function generateWhatHappensNextPage(
             ${stepsHtml}
           </div>
 
-          <div class="cta-box">
+          <div class="cta-box" style="margin-top: 32px;">
             <h3>${copy.ctaBox.heading}</h3>
             <a href="${applicationLink}" class="cta-button">Start Your Application →</a>
           </div>
