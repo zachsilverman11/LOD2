@@ -53,6 +53,7 @@ type ReportsTabProps = {
 };
 
 const SCENARIO_OPTIONS = [
+  { value: 0, label: "None (skip scenario section)", description: "No scenario section will be included in the report" },
   { value: 1, label: "Scenario 1: Sub-2% Fixed → Renewal Trap", description: "Client locked in at sub-2% in 2020-2021, now facing payment shock" },
   { value: 2, label: "Scenario 2: Variable → Panic Lock", description: "Client was in variable, rode rates up, then panic-locked at peak" },
   { value: 3, label: "Scenario 3: Fixed Payment Variable → Negative Am", description: "Client had variable with fixed payments, didn't realize balance was growing" },
@@ -71,8 +72,11 @@ export function ReportsTab({ lead }: ReportsTabProps) {
   const [isLoadingAdvisors, setIsLoadingAdvisors] = useState(false);
 
   // New state for scenario and debt consolidation
-  const [scenario, setScenario] = useState<1 | 2 | 3 | null>(null);
+  const [scenario, setScenario] = useState<0 | 1 | 2 | 3 | null>(null);
   const [includeDebtConsolidation, setIncludeDebtConsolidation] = useState(false);
+  const [includeCashBack, setIncludeCashBack] = useState(false);
+  const [applicationUrl, setApplicationUrl] = useState("https://stressfree.mtg-app.com/signup");
+  const [partnerName, setPartnerName] = useState("");
   const [extractedData, setExtractedData] = useState<ExtractedData | null>(null);
   const [isExtractingData, setIsExtractingData] = useState(false);
 
@@ -155,50 +159,68 @@ export function ReportsTab({ lead }: ReportsTabProps) {
     : 0;
 
   const handleGeneratePreview = async () => {
-    if (!scenario) {
-      setError("Please select a scenario");
+    if (scenario === null) {
+      setError("Please select a scenario (or 'None' to skip)");
       return;
     }
 
     setIsGenerating(true);
-    setIsExtractingData(true);
+    setIsExtractingData(scenario !== 0);
     setError(null);
     setShowPreview(true);
 
     try {
-      // Generate bullets and extract data in parallel
-      const [bulletsResponse, extractResponse] = await Promise.all([
-        fetch("/api/ai/generate-bullets", {
+      if (scenario === 0) {
+        // "None" scenario — only generate bullets, skip data extraction
+        const bulletsResponse = await fetch("/api/ai/generate-bullets", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ notes }),
-        }),
-        fetch("/api/ai/extract-mortgage-data", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            notes,
-            scenario,
-            leadRawData: lead.rawData,
-          }),
-        }),
-      ]);
+        });
 
-      if (!bulletsResponse.ok) {
-        const data = await bulletsResponse.json();
-        throw new Error(data.error || "Failed to generate bullets");
-      }
+        if (!bulletsResponse.ok) {
+          const data = await bulletsResponse.json();
+          throw new Error(data.error || "Failed to generate bullets");
+        }
 
-      const bulletsData = await bulletsResponse.json();
-      setBullets(bulletsData.bullets);
-
-      if (extractResponse.ok) {
-        const extractData = await extractResponse.json();
-        setExtractedData(extractData.extractedData);
-      } else {
-        // Don't fail entirely if extraction fails, just show warning
-        console.error("Failed to extract mortgage data");
+        const bulletsData = await bulletsResponse.json();
+        setBullets(bulletsData.bullets);
         setExtractedData(null);
+      } else {
+        // Generate bullets and extract data in parallel
+        const [bulletsResponse, extractResponse] = await Promise.all([
+          fetch("/api/ai/generate-bullets", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ notes }),
+          }),
+          fetch("/api/ai/extract-mortgage-data", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              notes,
+              scenario,
+              leadRawData: lead.rawData,
+            }),
+          }),
+        ]);
+
+        if (!bulletsResponse.ok) {
+          const data = await bulletsResponse.json();
+          throw new Error(data.error || "Failed to generate bullets");
+        }
+
+        const bulletsData = await bulletsResponse.json();
+        setBullets(bulletsData.bullets);
+
+        if (extractResponse.ok) {
+          const extractData = await extractResponse.json();
+          setExtractedData(extractData.extractedData);
+        } else {
+          // Don't fail entirely if extraction fails, just show warning
+          console.error("Failed to extract mortgage data");
+          setExtractedData(null);
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
@@ -309,8 +331,8 @@ export function ReportsTab({ lead }: ReportsTabProps) {
       return;
     }
 
-    if (!scenario) {
-      alert("Please select a scenario");
+    if (scenario === null) {
+      alert("Please select a scenario (or 'None' to skip)");
       return;
     }
 
@@ -339,9 +361,11 @@ export function ReportsTab({ lead }: ReportsTabProps) {
           },
           bullets,
           mortgageAmount: formatCurrency(extractedData?.mortgageAmount || mortgageBalance),
-          scenario,
+          scenario: scenario === 0 ? null : scenario,
           includeDebtConsolidation,
-          applicationLink: "https://www.inspired.mortgage/start-here",
+          includeCashBack,
+          applicationLink: applicationUrl,
+          partnerName: partnerName.trim() || null,
           extractedData: extractedData || {},
         }),
       });
@@ -374,8 +398,11 @@ export function ReportsTab({ lead }: ReportsTabProps) {
           consultantName: selectedAdvisor.name,
           bullets,
           mortgageAmount: extractedData?.mortgageAmount || mortgageBalance,
-          scenario,
+          scenario: scenario === 0 ? null : scenario,
           includeDebtConsolidation,
+          includeCashBack,
+          applicationLink: applicationUrl,
+          partnerName: partnerName.trim() || null,
           extractedData,
         }),
       });
@@ -421,9 +448,9 @@ export function ReportsTab({ lead }: ReportsTabProps) {
           },
           bullets: report.bullets,
           mortgageAmount: formatCurrency(report.mortgageAmount),
-          scenario: (report.scenario as 1 | 2 | 3) || 1,
+          scenario: report.scenario ? (report.scenario as 1 | 2 | 3) : null,
           includeDebtConsolidation: report.includeDebtConsolidation || false,
-          applicationLink: "https://www.inspired.mortgage/start-here",
+          applicationLink: "https://stressfree.mtg-app.com/signup",
           extractedData: report.extractedData || {},
         }),
       });
@@ -516,7 +543,7 @@ export function ReportsTab({ lead }: ReportsTabProps) {
 
   // Check for missing required data based on scenario
   const getMissingFields = (): string[] => {
-    if (!extractedData || !scenario) return [];
+    if (!extractedData || !scenario || scenario === 0) return [];
 
     const missing: string[] = [];
 
@@ -591,7 +618,7 @@ export function ReportsTab({ lead }: ReportsTabProps) {
               </label>
               <select
                 value={scenario || ""}
-                onChange={(e) => setScenario(e.target.value ? (parseInt(e.target.value) as 1 | 2 | 3) : null)}
+                onChange={(e) => setScenario(e.target.value !== "" ? (parseInt(e.target.value) as 0 | 1 | 2 | 3) : null)}
                 className="w-full border border-[#E5E0D8] rounded-xl p-3 text-sm text-[#1C1B1A] bg-white focus:outline-none focus:ring-2 focus:ring-[#B1AFFF] focus:border-[#625FFF] transition-all duration-150"
               >
                 <option value="">Select scenario...</option>
@@ -601,7 +628,7 @@ export function ReportsTab({ lead }: ReportsTabProps) {
                   </option>
                 ))}
               </select>
-              {scenario && (
+              {scenario !== null && (
                 <p className="text-xs text-[#8E8983] mt-1">
                   {SCENARIO_OPTIONS.find((o) => o.value === scenario)?.description}
                 </p>
@@ -623,6 +650,58 @@ export function ReportsTab({ lead }: ReportsTabProps) {
               </label>
               <p className="text-xs text-[#8E8983] mt-1 ml-6">
                 Add this when the client has mentioned other debts on the call
+              </p>
+            </div>
+
+            {/* Cash Back Strategy Checkbox */}
+            <div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={includeCashBack}
+                  onChange={(e) => setIncludeCashBack(e.target.checked)}
+                  className="w-4 h-4 rounded border-[#E5E0D8] text-[#625FFF] focus:ring-[#B1AFFF]"
+                />
+                <span className="text-sm text-[#1C1B1A]">
+                  Include Cash Back Strategy
+                </span>
+              </label>
+              <p className="text-xs text-[#8E8983] mt-1 ml-6">
+                Add when cash back mortgage could benefit the client (debt payoff, CMHC avoidance, etc.)
+              </p>
+            </div>
+
+            {/* Application URL Field */}
+            <div>
+              <label className="block text-sm font-medium text-[#1C1B1A] mb-2">
+                Application URL
+              </label>
+              <input
+                type="url"
+                value={applicationUrl}
+                onChange={(e) => setApplicationUrl(e.target.value)}
+                placeholder="https://stressfree.mtg-app.com/signup"
+                className="w-full border border-[#E5E0D8] rounded-xl p-3 text-sm text-[#1C1B1A] bg-white focus:outline-none focus:ring-2 focus:ring-[#B1AFFF] focus:border-[#625FFF] transition-all duration-150"
+              />
+              <p className="text-xs text-[#8E8983] mt-1">
+                This URL appears in 3 locations in the report (cover, steps, CTA)
+              </p>
+            </div>
+
+            {/* Spouse/Partner Name Field */}
+            <div>
+              <label className="block text-sm font-medium text-[#1C1B1A] mb-2">
+                Spouse/Partner Name <span className="text-xs text-[#8E8983] font-normal">(optional)</span>
+              </label>
+              <input
+                type="text"
+                value={partnerName}
+                onChange={(e) => setPartnerName(e.target.value)}
+                placeholder="Leave blank to use &quot;your partner&quot;"
+                className="w-full border border-[#E5E0D8] rounded-xl p-3 text-sm text-[#1C1B1A] bg-white focus:outline-none focus:ring-2 focus:ring-[#B1AFFF] focus:border-[#625FFF] transition-all duration-150"
+              />
+              <p className="text-xs text-[#8E8983] mt-1">
+                Used in email/SMS personalization. Falls back to &quot;your partner&quot; if empty.
               </p>
             </div>
 
@@ -654,8 +733,8 @@ export function ReportsTab({ lead }: ReportsTabProps) {
               {isGenerating ? "Generating..." : "Generate Preview"}
             </Button>
 
-            {!scenario && notes.length >= 50 && selectedAdvisor && (
-              <p className="text-xs text-amber-600">Please select a scenario to continue</p>
+            {scenario === null && notes.length >= 50 && selectedAdvisor && (
+              <p className="text-xs text-amber-600">Please select a scenario to continue (or &quot;None&quot; to skip)</p>
             )}
           </div>
         </CardContent>
@@ -742,7 +821,7 @@ export function ReportsTab({ lead }: ReportsTabProps) {
             </div>
 
             {/* Extracted Data Section */}
-            {scenario && (
+            {scenario !== null && scenario !== 0 && (
               <div className="mt-6">
                 <h4 className="text-sm font-semibold text-[#1C1B1A] mb-3">
                   Extracted Mortgage Data
@@ -920,7 +999,7 @@ export function ReportsTab({ lead }: ReportsTabProps) {
               <Button
                 variant="primary"
                 onClick={handleDownloadPDF}
-                disabled={isGeneratingPDF || bullets.length === 0 || !scenario}
+                disabled={isGeneratingPDF || bullets.length === 0 || scenario === null}
               >
                 {isGeneratingPDF ? "Generating PDF..." : "Download PDF"}
               </Button>
