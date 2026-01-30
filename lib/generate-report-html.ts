@@ -261,12 +261,11 @@ function getBaseStyles(): string {
     .page {
       width: 8.5in;
       min-height: 11in;
-      height: 11in;
       padding: 0;
       position: relative;
       page-break-after: always;
       background: ${colors.white};
-      overflow: hidden;
+      overflow: visible;
     }
 
     .page:last-child {
@@ -1251,7 +1250,7 @@ function generateWhatYouToldUsPage(
           </div>
 
           <div class="section-header">
-            <span class="section-icon">📋</span>
+            
             <h2>${copy.heading}</h2>
           </div>
 
@@ -1301,7 +1300,7 @@ function generateScenario1Pages(
         ${pageHeader(clientName)}
         <div class="page-content">
           <div class="section-header">
-            <span class="section-icon">📊</span>
+            
             <h2>${copy.heading}</h2>
           </div>
 
@@ -1357,7 +1356,7 @@ function generateScenario1Pages(
     <div class="timeline-item">
       <div class="timeline-year">${item.year.split(' (')[0]}</div>
       <div class="timeline-rate">${item.year.includes('(') ? item.year.match(/\(([^)]+)\)/)?.[1] || '' : ''}</div>
-      <div class="timeline-text">${item.action.replace(/"/g, '&quot;').substring(0, 80)}</div>
+      <div class="timeline-text">${item.action.replace(/"/g, '&quot;')}</div>
     </div>`).join("");
 
   const page2 = `
@@ -1469,7 +1468,7 @@ function generateScenario2Pages(
         ${pageHeader(clientName)}
         <div class="page-content">
           <div class="section-header">
-            <span class="section-icon">📊</span>
+            
             <h2>${copy.heading}</h2>
           </div>
 
@@ -1554,7 +1553,7 @@ function generateScenario3Pages(
         ${pageHeader(clientName)}
         <div class="page-content">
           <div class="section-header">
-            <span class="section-icon">📊</span>
+            
             <h2>${copy.heading}</h2>
           </div>
 
@@ -1657,7 +1656,7 @@ function generateDebtConsolidationPage(
         ${pageHeader(clientName)}
         <div class="page-content">
           <div class="section-header">
-            <span class="section-icon">💰</span>
+            
             <h2>${copy.heading}</h2>
           </div>
 
@@ -1736,7 +1735,7 @@ function generateApplicationLinkPage(
         ${pageHeader(clientName)}
         <div class="page-content">
           <div class="section-header">
-            <span class="section-icon">✅</span>
+            
             <h2>${ctaCopy.heading}</h2>
           </div>
 
@@ -1802,7 +1801,7 @@ function generateOurApproachPage(
         ${pageHeader(clientName)}
         <div class="page-content">
           <div class="section-header">
-            <span class="section-icon">🏢</span>
+            
             <h2>${copy.heading}</h2>
           </div>
 
@@ -1853,12 +1852,11 @@ function generateGuaranteePage(
         ${pageHeader(clientName)}
         <div class="page-content">
           <div class="section-header">
-            <span class="section-icon">🛡️</span>
-            <h2>${copy.heading}</h2>
+            <h2>Our Promise to You</h2>
           </div>
 
           <div class="guarantee-certificate">
-            <div class="guarantee-shield">🛡️</div>
+            <div class="guarantee-shield">✦</div>
             <div class="amount">${copy.certificate.amount}</div>
             <div class="g-title">${copy.certificate.title}</div>
             <p>${copy.certificate.body}</p>
@@ -1930,7 +1928,7 @@ function generateFixedRateStrategyPages(
         ${pageHeader(clientName)}
         <div class="page-content">
           <div class="section-header">
-            <span class="section-icon">📈</span>
+            
             <h2>${copy.heading}</h2>
           </div>
 
@@ -1964,7 +1962,7 @@ function generateFixedRateStrategyPages(
           <h3 style="margin-top: 24px; margin-bottom: 10px;">${copy.borrowerComparison.heading}</h3>
           <p style="margin-bottom: 14px;">${copy.borrowerComparison.intro}</p>
 
-          <div style="display: flex; gap: 16px; margin: 20px 0;">
+          <div style="display: flex; gap: 16px; margin: 20px 0; align-items: flex-start;">
             <div style="flex: 1; background: ${colors.bgCard}; border: 1px solid ${colors.border}; border-radius: 10px; padding: 20px;">
               <h4 style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: ${colors.textMuted}; margin-bottom: 12px;">${copy.borrowerComparison.borrowerA.label}</h4>
               <ul class="bullet-list" style="margin: 0;">${borrowerASteps}</ul>
@@ -2039,7 +2037,7 @@ function generateVariableRateStrategyPages(
         ${pageHeader(clientName)}
         <div class="page-content">
           <div class="section-header">
-            <span class="section-icon">📉</span>
+            
             <h2>${copy.heading}</h2>
           </div>
 
@@ -2120,7 +2118,7 @@ function generateCashBackStrategyPages(
         ${pageHeader(clientName)}
         <div class="page-content">
           <div class="section-header">
-            <span class="section-icon">💵</span>
+            
             <h2>${copy.heading}</h2>
           </div>
 
@@ -2199,7 +2197,7 @@ function generateWhatHappensNextPage(
         ${pageHeader(clientName)}
         <div class="page-content">
           <div class="section-header">
-            <span class="section-icon">🚀</span>
+            
             <h2>${copy.heading}</h2>
           </div>
 
