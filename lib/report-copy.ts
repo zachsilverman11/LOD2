@@ -159,7 +159,7 @@ We can't promise we'll find the perfect solution for your situation. But we can 
       verificationBox: {
         heading: "Want to understand why this matters?",
         instruction: "Copy and paste this prompt into Google or any AI tool:",
-        prompt: `If a Canadian homeowner had a mortgage at 1.8% for 5 years and now renews at 4.5%, what happens to their payment? If they extend their amortization to keep payments affordable, how much progress do they lose? Over a 25-year mortgage, what's the real cost of extending amortization by 5 years at renewal?`,
+        prompt: `If a Canadian homeowner had a mortgage at 1.8% for 5 years and now renews at 4.5%, what happens to their payment? If they extend their amortization to keep payments affordable, how much progress do they lose? Over a 25-year mortgage, what's the real cost of extending amortization by 5 years at renewal? Also, what would it cost in total extra payments if I simply increase my amortization from {{CURRENT_AMORTIZATION}} years to {{EXTENDED_AMORTIZATION}} years at today's rates?`,
       },
     },
 
@@ -582,6 +582,53 @@ Her bank never mentioned this was possible. Why would they? They weren't watchin
 If you're carrying high-interest debt, that cash back could eliminate it—and the interest savings often exceed the higher mortgage rate. If you're close to 20% down, it could help you avoid CMHC insurance entirely. If you're a first-time buyer, it could give you breathing room when your accounts are drained.
 
 The key is using it strategically. That's exactly what we'll analyze in your Lender Comparison Report—whether cash back makes sense for your situation, and if so, how much it could save you (or cost you) over the term.`,
+    },
+  },
+
+  // ===========================================================================
+  // CTA / APPLICATION LINK PAGES
+  // ===========================================================================
+  ctaPages: {
+    // CTA Page #1: After scenario section
+    afterScenario: {
+      message: `Ready to see which strategies fit your situation? Complete your application and we'll build your personalized Lender Comparison Report—including real numbers from 30+ lenders competing for your business.`,
+      heading: "Your Next Step",
+      subheading: "What the Application Unlocks",
+      benefits: [
+        "Access to 30+ lenders competing for your business",
+        "A side-by-side Lender Comparison Report with real rates",
+        "Personalized strategy recommendations based on your full financial picture",
+        "Our $5,000 Penalty Guarantee — protection no bank will offer",
+      ],
+      reassurance: {
+        heading: "No Commitment Required",
+        body: `The application is not a commitment to proceed. It's how we gather the information needed to make lenders compete for your business. There's no credit impact, no obligation, and no pressure. You'll receive your personalized Lender Comparison Report within 24-48 hours—and then you decide.`,
+      },
+      urgency: {
+        heading: "Why Timing Matters",
+        body: `Mortgage rates change daily. The rates available today may not be available next week. By completing your application now, we can lock in today's best options while you review your report and make your decision.`,
+      },
+    },
+
+    // CTA Page #2: After $5,000 Guarantee section
+    afterGuarantee: {
+      message: `See what this looks like for your mortgage. Complete your application to unlock your Lender Comparison Report—including which lenders offer fair penalties and how the $5,000 Guarantee applies to your specific situation.`,
+      heading: "See the $5,000 Guarantee in Action",
+      subheading: "What You'll Receive",
+      benefits: [
+        "Your exact penalty amount from each lender",
+        "How the $5,000 Guarantee applies to your situation",
+        "A clear comparison showing which lenders offer fair terms",
+        "The math behind whether breaking your current mortgage makes sense",
+      ],
+      reassurance: {
+        heading: "We Do the Heavy Lifting",
+        body: `Once you complete the application, our team reviews your full financial picture and shops your mortgage to 30+ lenders. You don't need to call anyone, negotiate anything, or fill out multiple applications. One application. Every option. Delivered to you in a clear, easy-to-read report.`,
+      },
+      testimonial: {
+        quote: `"I had no idea I was overpaying until Inspired Mortgage showed me the numbers. The $5,000 Penalty Guarantee made the decision easy—I'm saving over $400 a month now."`,
+        attribution: "— Recent Inspired Mortgage Client",
+      },
     },
   },
 

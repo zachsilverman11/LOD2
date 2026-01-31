@@ -1,6 +1,13 @@
 /**
  * HTML Template Generator for Post-Discovery Reports
  * Premium design using HTML/CSS for Puppeteer PDF generation
+ * 
+ * Design System: Wealth management firm aesthetic
+ * - Navy (#1e293b) for authority/headers
+ * - Brand purple (#625FFF) as sparse accent only
+ * - Gold/amber (#d97706) for savings/positive outcomes
+ * - Warm grays for body text
+ * - Generous whitespace throughout
  */
 
 import { REPORT_COPY, getAdvisorTitle } from "@/lib/report-copy";
@@ -21,43 +28,65 @@ export interface ReportHTMLProps {
   scenario: 0 | 1 | 2 | 3 | null;
   includeDebtConsolidation: boolean;
   includeCashBack: boolean;
-  applicationLink: string; // The actual application URL to include in the report
+  applicationLink: string;
   extractedData: {
     mortgageAmount?: number;
     originalAmortization?: number;
     currentAmortization?: number;
-    // Scenario 1
     previousRate?: number;
     currentMarketRate?: number;
     oldPayment?: number;
     newPayment?: number;
     paymentDifference?: number;
     fiveYearsOfPayments?: number;
-    // Scenario 2
     originalRate?: number;
     lockInRate?: number;
     estimatedExtraInterest?: number;
-    // Scenario 3
     fixedPayment?: number;
-    // Debt consolidation
     otherDebts?: Array<{ type: string; balance: number; payment: number }>;
   };
 }
 
-// Design System Colors
+// ============================================================
+// DESIGN SYSTEM
+// ============================================================
 const colors = {
-  brandPurple: "#625FFF",
-  brandPurpleDark: "#4F4ACC",
-  brandPurpleLight: "#E8E7FF",
-  navy: "#1e3a5f",
-  charcoal: "#1a1a1a",
-  slate: "#374151",
-  lightGray: "#f8fafc",
-  cream: "#FBF3E7",
-  gold: "#D4AF37",
-  goldLight: "#FEF3C7",
+  // Primary
+  navy: "#1e293b",
+  navyLight: "#334155",
+  navyDark: "#0f172a",
+
+  // Accent — used sparingly
+  accent: "#625FFF",
+  accentLight: "#ede9fe",
+  accentMuted: "#8b5cf6",
+
+  // Gold/Amber — savings, positive outcomes
+  gold: "#d97706",
+  goldLight: "#fef3c7",
+  goldDark: "#b45309",
+  goldBorder: "#f59e0b",
+
+  // Text
+  textPrimary: "#1e293b",
+  textSecondary: "#475569",
+  textMuted: "#94a3b8",
+  textLight: "#cbd5e1",
+
+  // Backgrounds
   white: "#ffffff",
-  border: "#e5e7eb",
+  bgLight: "#f8fafc",
+  bgWarm: "#faf8f5",
+  bgCard: "#f1f5f9",
+
+  // Borders
+  border: "#e2e8f0",
+  borderLight: "#f1f5f9",
+
+  // Functional
+  success: "#059669",
+  successLight: "#ecfdf5",
+  successBorder: "#10b981",
 };
 
 // Helper functions
@@ -90,7 +119,6 @@ export function generateReportHTML(props: ReportHTMLProps): string {
     extractedData,
   } = props;
 
-  // Build variable map for template replacement
   const vars = buildVariableMap({
     clientName,
     clientFirstName: clientName.split(" ")[0],
@@ -115,7 +143,7 @@ export function generateReportHTML(props: ReportHTMLProps): string {
 
   const activeScenario: 1 | 2 | 3 | null = (scenario === 1 || scenario === 2 || scenario === 3) ? scenario : null;
 
-  // Build pages array — APPROVED PAGE ORDER
+  // Build pages — APPROVED PAGE ORDER
   const pages: string[] = [];
 
   // 1. Cover Page
@@ -124,27 +152,28 @@ export function generateReportHTML(props: ReportHTMLProps): string {
   // 2. What You Told Us
   pages.push(generateWhatYouToldUsPage(clientName, bullets, pages.length + 1, vars));
 
-  // 3. Scenario (if selected, skip if "None"/0/null)
+  // 3. Scenario pages
   if (activeScenario === 1) {
-    pages.push(...generateScenario1Pages(clientName, extractedData));
+    pages.push(...generateScenario1Pages(clientName, extractedData, pages.length + 1, vars));
   } else if (activeScenario === 2) {
-    pages.push(...generateScenario2Pages(clientName, extractedData));
+    pages.push(...generateScenario2Pages(clientName, extractedData, pages.length + 1, vars));
   } else if (activeScenario === 3) {
-    pages.push(...generateScenario3Pages(clientName, extractedData));
+    pages.push(...generateScenario3Pages(clientName, extractedData, pages.length + 1, vars));
   }
 
-  // APP LINK #1: After scenario (or after What You Told Us if no scenario)
+  // APP LINK #1: After scenario
   pages.push(generateApplicationLinkPage(
     clientName,
     applicationLink,
-    "Ready to see which strategies fit your situation? Complete your application and we'll build your personalized Lender Comparison Report—including real numbers from 30+ lenders competing for your business.",
-    pages.length + 1
+    REPORT_COPY.ctaPages.afterScenario.message,
+    pages.length + 1,
+    "afterScenario"
   ));
 
-  // 4. Debt Consolidation (if checkbox selected)
+  // 4. Debt Consolidation
   if (includeDebtConsolidation && extractedData.otherDebts?.length) {
     pages.push(
-      generateDebtConsolidationPage(
+      ...generateDebtConsolidationPage(
         clientName,
         extractedData.mortgageAmount || 0,
         extractedData.otherDebts,
@@ -159,26 +188,27 @@ export function generateReportHTML(props: ReportHTMLProps): string {
   // 6. $5,000 Penalty Guarantee
   pages.push(generateGuaranteePage(clientName, pages.length + 1));
 
-  // APP LINK #2: After $5,000 Guarantee
+  // APP LINK #2: After Guarantee
   pages.push(generateApplicationLinkPage(
     clientName,
     applicationLink,
-    "See what this looks like for your mortgage. Complete your application to unlock your Lender Comparison Report—including which lenders offer fair penalties and how the $5,000 Guarantee applies to your specific situation.",
-    pages.length + 1
+    REPORT_COPY.ctaPages.afterGuarantee.message,
+    pages.length + 1,
+    "afterGuarantee"
   ));
 
-  // 7. Strategy: Fixed Rate Mortgage
+  // 7. Strategy: Fixed Rate
   pages.push(...generateFixedRateStrategyPages(clientName, pages.length + 1));
 
-  // 8. Strategy: Variable Rate Mortgage
+  // 8. Strategy: Variable Rate
   pages.push(...generateVariableRateStrategyPages(clientName, pages.length + 1, vars));
 
-  // 9. Strategy: Cash Back Mortgage (if checkbox selected)
+  // 9. Strategy: Cash Back (optional)
   if (includeCashBack) {
     pages.push(...generateCashBackStrategyPages(clientName, pages.length + 1, vars));
   }
 
-  // 10. What Happens Next (CTA) — APP LINK #3
+  // 10. What Happens Next — APP LINK #3
   pages.push(
     generateWhatHappensNextPage(clientName, consultant, applicationLink, pages.length + 1)
   );
@@ -199,9 +229,9 @@ export function generateReportHTML(props: ReportHTMLProps): string {
 </html>`;
 }
 
-/**
- * Base CSS styles
- */
+// ============================================================
+// BASE CSS
+// ============================================================
 function getBaseStyles(): string {
   return `
     @page {
@@ -216,15 +246,18 @@ function getBaseStyles(): string {
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      font-size: 16px;
-      line-height: 1.6;
-      color: ${colors.charcoal};
+      font-family: 'Georgia', 'Times New Roman', 'Palatino', serif;
+      font-size: 14px;
+      line-height: 1.65;
+      color: ${colors.textPrimary};
       background: ${colors.white};
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
     }
 
+    /* ================================================
+       PAGE FOUNDATION
+       ================================================ */
     .page {
       width: 8.5in;
       min-height: 11in;
@@ -248,198 +281,179 @@ function getBaseStyles(): string {
 
     .page-content {
       flex: 1;
-      padding: 32px 56px 48px 56px;
+      padding: 32px 56px 32px 56px;
     }
 
-    /* Typography */
+    /* ================================================
+       TYPOGRAPHY
+       ================================================ */
     h1 {
-      font-size: 42px;
-      font-weight: 700;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 40px;
+      font-weight: 300;
       line-height: 1.2;
       letter-spacing: -0.02em;
+      color: ${colors.navy};
     }
 
     h2 {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
       font-size: 28px;
       font-weight: 700;
       line-height: 1.3;
       letter-spacing: -0.01em;
-      color: ${colors.charcoal};
+      color: ${colors.navy};
     }
 
     h3 {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
       font-size: 20px;
       font-weight: 600;
       line-height: 1.4;
+      color: ${colors.navy};
+    }
+
+    h4 {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      line-height: 1.4;
+      color: ${colors.navy};
     }
 
     p {
-      font-size: 16px;
-      line-height: 1.7;
-      color: ${colors.slate};
+      font-size: 15px;
+      line-height: 1.75;
+      color: ${colors.textSecondary};
     }
 
     /* ================================================
-       COVER PAGE STYLES
+       COVER PAGE
        ================================================ */
     .cover-page {
       display: flex;
       flex-direction: column;
       height: 11in;
       position: relative;
+      overflow: hidden;
     }
 
-    .cover-header {
-      background: ${colors.brandPurple};
-      height: 120px;
+    .cover-top {
+      background: linear-gradient(135deg, ${colors.navyDark} 0%, ${colors.navy} 60%, ${colors.navyLight} 100%);
+      height: 320px;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
+      position: relative;
       flex-shrink: 0;
     }
 
-    .cover-header .logo-text {
+    .cover-top::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, ${colors.accent}, ${colors.gold});
+    }
+
+    .cover-logo {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
       color: ${colors.white};
-      font-size: 32px;
-      font-weight: 700;
-      letter-spacing: 3px;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 4px;
       text-transform: uppercase;
+      margin-bottom: 24px;
+      opacity: 0.9;
+    }
+
+    .cover-tagline {
+      color: ${colors.white};
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 32px;
+      font-weight: 300;
+      letter-spacing: 1px;
+      text-align: center;
+      line-height: 1.3;
+      max-width: 500px;
+      padding: 0 40px;
     }
 
     .cover-body {
       flex: 1;
       display: flex;
       flex-direction: column;
-      padding: 48px 56px 100px 56px;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 64px 40px 64px;
     }
 
-    .cover-tagline {
-      text-align: center;
-      margin-top: 40px;
-      margin-bottom: 32px;
+    .cover-label {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 11px;
+      color: ${colors.textMuted};
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      margin-bottom: 16px;
     }
 
-    .cover-tagline h1 {
-      font-size: 38px;
+    .cover-client-name {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 36px;
       font-weight: 300;
       color: ${colors.navy};
-      line-height: 1.3;
       letter-spacing: -0.5px;
+      margin-bottom: 8px;
+    }
+
+    .cover-date {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 14px;
+      color: ${colors.textMuted};
+      margin-bottom: 48px;
     }
 
     .cover-divider {
-      width: 60px;
-      height: 2px;
-      background: ${colors.brandPurple};
-      margin: 0 auto 32px auto;
+      width: 48px;
+      height: 1px;
+      background: ${colors.border};
+      margin-bottom: 48px;
     }
 
-    .cover-client-info {
+    .cover-advisor-card {
+      background: ${colors.bgLight};
+      border: 1px solid ${colors.border};
+      border-radius: 8px;
+      padding: 20px 28px;
       text-align: center;
-      margin-bottom: 40px;
+      min-width: 280px;
     }
 
-    .cover-client-info .prepared-for {
-      font-size: 13px;
-      color: #6b7280;
+    .cover-advisor-label {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 10px;
+      color: ${colors.textMuted};
       text-transform: uppercase;
       letter-spacing: 2px;
       margin-bottom: 8px;
     }
 
-    .cover-client-info .client-name {
-      font-size: 32px;
+    .cover-advisor-name {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 17px;
       font-weight: 600;
-      color: ${colors.charcoal};
+      color: ${colors.navy};
       margin-bottom: 4px;
     }
 
-    .cover-client-info .date {
-      font-size: 14px;
-      color: #9ca3af;
-    }
-
-    .cover-callout {
-      background: ${colors.brandPurpleLight};
-      border-radius: 12px;
-      padding: 28px 32px;
-      max-width: 520px;
-      margin: 0 auto;
-    }
-
-    .cover-callout .callout-text {
-      font-size: 16px;
-      color: ${colors.charcoal};
-      margin-bottom: 20px;
-      line-height: 1.6;
-    }
-
-    .cover-callout .callout-list {
-      list-style: none;
-    }
-
-    .cover-callout .callout-list li {
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-      margin-bottom: 10px;
-      font-size: 15px;
-      color: ${colors.charcoal};
-      line-height: 1.5;
-    }
-
-    .cover-callout .callout-list li:last-child {
-      margin-bottom: 0;
-    }
-
-    .cover-callout .checkmark {
-      color: ${colors.brandPurple};
-      font-weight: 700;
-      font-size: 16px;
-      flex-shrink: 0;
-      margin-top: 1px;
-    }
-
-    .cover-advisor {
-      margin-top: auto;
-    }
-
-    .advisor-card {
-      background: ${colors.lightGray};
-      border-radius: 8px;
-      padding: 18px 22px;
-      display: inline-block;
-    }
-
-    .advisor-card .label {
-      font-size: 10px;
-      color: #6b7280;
-      text-transform: uppercase;
-      letter-spacing: 1.5px;
-      margin-bottom: 6px;
-    }
-
-    .advisor-card .name {
-      font-size: 17px;
-      font-weight: 600;
-      color: ${colors.charcoal};
-      margin-bottom: 2px;
-    }
-
-    .advisor-card .contact {
-      font-size: 14px;
-      color: ${colors.brandPurple};
-    }
-
-    .cover-footer-note {
-      position: absolute;
-      bottom: 40px;
-      left: 0;
-      right: 0;
-      text-align: center;
+    .cover-advisor-detail {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
       font-size: 13px;
-      color: #9ca3af;
-      font-style: italic;
+      color: ${colors.textSecondary};
+      line-height: 1.5;
     }
 
     /* ================================================
@@ -449,26 +463,28 @@ function getBaseStyles(): string {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 20px 56px;
+      padding: 16px 48px;
       border-bottom: 1px solid ${colors.border};
       flex-shrink: 0;
     }
 
     .page-header .logo {
-      font-size: 12px;
-      font-weight: 700;
-      color: ${colors.brandPurple};
-      letter-spacing: 1.5px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      color: ${colors.navy};
+      letter-spacing: 2px;
       text-transform: uppercase;
     }
 
     .page-header .client {
-      font-size: 12px;
-      color: ${colors.slate};
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 11px;
+      color: ${colors.textMuted};
     }
 
     .page-footer {
-      padding: 16px 56px;
+      padding: 12px 48px;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -477,32 +493,39 @@ function getBaseStyles(): string {
     }
 
     .page-footer .website {
-      font-size: 11px;
-      color: ${colors.slate};
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 10px;
+      color: ${colors.textMuted};
+      letter-spacing: 0.5px;
     }
 
     .page-footer .page-number {
-      font-size: 11px;
-      color: ${colors.slate};
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 10px;
+      color: ${colors.textMuted};
     }
 
     /* ================================================
-       SECTION STYLES
+       SECTION HEADER
        ================================================ */
     .section-header {
       margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid ${colors.navy};
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
     }
 
     .section-header h2 {
-      color: ${colors.charcoal};
-      margin-bottom: 8px;
+      color: ${colors.navy};
       font-size: 26px;
+      margin: 0;
     }
 
-    .section-header .underline {
-      width: 60px;
-      height: 3px;
-      background: ${colors.brandPurple};
+    .section-icon {
+      font-size: 22px;
+      flex-shrink: 0;
     }
 
     /* ================================================
@@ -510,168 +533,204 @@ function getBaseStyles(): string {
        ================================================ */
     .bullet-list {
       list-style: none;
+      padding: 0;
     }
 
     .bullet-list li {
       display: flex;
       align-items: flex-start;
       gap: 14px;
-      margin-bottom: 14px;
-      font-size: 15px;
-      line-height: 1.6;
-      color: ${colors.charcoal};
+      margin-bottom: 12px;
+      font-size: 14px;
+      line-height: 1.65;
+      color: ${colors.textPrimary};
     }
 
     .bullet-list .bullet {
       flex-shrink: 0;
-      width: 8px;
-      height: 8px;
-      background: ${colors.brandPurple};
+      width: 6px;
+      height: 6px;
+      background: ${colors.accent};
       border-radius: 50%;
-      margin-top: 7px;
+      margin-top: 8px;
     }
 
     /* ================================================
-       IMPACT STATEMENT
+       METRIC CARDS — Dashboard Style
        ================================================ */
-    .impact-statement {
-      background: ${colors.navy};
-      color: ${colors.white};
-      padding: 32px 40px;
-      text-align: center;
-      margin: 16px -56px;
+    .metrics-row {
+      display: flex;
+      gap: 16px;
+      margin: 24px 0;
     }
 
-    .impact-statement h2 {
-      font-size: 32px;
+    .metric-card {
+      flex: 1;
+      border-radius: 10px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .metric-card.neutral {
+      background: ${colors.bgCard};
+      border: 1px solid ${colors.border};
+    }
+
+    .metric-card.highlight {
+      background: ${colors.accentLight};
+      border: 2px solid ${colors.accent};
+    }
+
+    .metric-card.gold {
+      background: ${colors.goldLight};
+      border: 2px solid ${colors.goldBorder};
+    }
+
+    .metric-label {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: ${colors.textMuted};
+      margin-bottom: 8px;
+    }
+
+    .metric-value {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 36px;
+      font-weight: 700;
+      color: ${colors.navy};
+      line-height: 1.1;
+    }
+
+    .metric-value.accent {
+      color: ${colors.accent};
+    }
+
+    .metric-value.gold {
+      color: ${colors.gold};
+    }
+
+    .metric-value.negative {
+      color: #dc2626;
+    }
+
+    .metric-subtitle {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 12px;
+      color: ${colors.textMuted};
+      margin-top: 4px;
+    }
+
+    .comparison-arrow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      color: ${colors.textMuted};
+      padding: 0 4px;
+      flex-shrink: 0;
+    }
+
+    /* ================================================
+       IMPACT BANNER — Full Width Navy
+       ================================================ */
+    .impact-banner {
+      background: ${colors.navy};
+      color: ${colors.white};
+      padding: 28px 48px;
+      text-align: center;
+      margin: 24px -48px;
+    }
+
+    .impact-banner h2 {
+      font-size: 26px;
       font-weight: 700;
       color: ${colors.white};
       line-height: 1.3;
     }
 
-    .impact-statement p {
-      color: rgba(255, 255, 255, 0.85);
-      font-size: 16px;
-      margin-top: 12px;
+    .impact-banner p {
+      color: rgba(255, 255, 255, 0.75);
+      font-size: 14px;
+      margin-top: 8px;
     }
 
     /* ================================================
-       COMPARISON CARDS
+       PULLQUOTE — Key Insight Callout
        ================================================ */
-    .comparison-container {
-      display: flex;
-      align-items: center;
-      gap: 16px;
+    .pullquote {
+      border-left: 4px solid ${colors.accent};
+      padding: 20px 28px;
+      margin: 28px 0;
+      background: ${colors.bgLight};
+      border-radius: 0 8px 8px 0;
+    }
+
+    .pullquote p {
+      font-size: 16px;
+      font-style: italic;
+      color: ${colors.textPrimary};
+      line-height: 1.65;
+    }
+
+    .pullquote .attribution {
+      font-size: 12px;
+      font-style: normal;
+      color: ${colors.textMuted};
+      margin-top: 8px;
+    }
+
+    /* ================================================
+       CALLOUT BOX
+       ================================================ */
+    .callout-box {
+      background: ${colors.bgLight};
+      border: 1px solid ${colors.border};
+      border-radius: 10px;
+      padding: 24px 28px;
       margin: 24px 0;
     }
 
-    .comparison-card {
-      flex: 1;
-      background: ${colors.lightGray};
-      border-radius: 12px;
-      padding: 24px;
-      text-align: center;
+    .callout-box h4 {
+      font-size: 15px;
+      font-weight: 600;
+      color: ${colors.navy};
+      margin-bottom: 10px;
     }
 
-    .comparison-card.old {
-      background: ${colors.lightGray};
-    }
-
-    .comparison-card.new {
-      background: ${colors.brandPurpleLight};
-      border: 2px solid ${colors.brandPurple};
-    }
-
-    .comparison-card .label {
-      font-size: 11px;
-      color: ${colors.slate};
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 8px;
-    }
-
-    .comparison-card .value {
-      font-size: 36px;
-      font-weight: 700;
-      color: ${colors.charcoal};
-    }
-
-    .comparison-card.new .value {
-      color: ${colors.brandPurple};
-    }
-
-    .comparison-arrow {
-      font-size: 24px;
-      color: ${colors.brandPurple};
-      font-weight: bold;
-    }
-
-    .difference-box {
-      background: ${colors.brandPurple};
-      color: ${colors.white};
-      border-radius: 12px;
-      padding: 16px 32px;
-      text-align: center;
-      display: inline-block;
-      margin: 16px 0;
-    }
-
-    .difference-box .label {
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      opacity: 0.9;
-      margin-bottom: 4px;
-    }
-
-    .difference-box .value {
-      font-size: 28px;
-      font-weight: 700;
-    }
-
-    /* Large cost highlight for Scenario 2 */
-    .cost-highlight {
-      background: ${colors.navy};
-      color: ${colors.white};
-      border-radius: 16px;
-      padding: 28px 40px;
-      text-align: center;
-      margin: 16px 0;
-    }
-
-    .cost-highlight .label {
+    .callout-box p {
       font-size: 14px;
-      text-transform: uppercase;
-      letter-spacing: 2px;
-      opacity: 0.85;
-      margin-bottom: 8px;
+      color: ${colors.textSecondary};
+      line-height: 1.65;
     }
 
-    .cost-highlight .value {
-      font-size: 48px;
-      font-weight: 700;
+    .callout-box.warm {
+      background: ${colors.bgWarm};
+      border-color: #e8ddd0;
     }
 
-    .cost-highlight .subtitle {
-      font-size: 14px;
-      opacity: 0.85;
-      margin-top: 8px;
+    .callout-box.accent {
+      background: ${colors.accentLight};
+      border-color: #c4b5fd;
     }
 
     /* ================================================
        TIMELINE
        ================================================ */
     .timeline {
-      background: ${colors.brandPurpleLight};
-      border-radius: 12px;
+      background: ${colors.bgLight};
+      border: 1px solid ${colors.border};
+      border-radius: 10px;
       padding: 28px;
       margin: 24px 0;
     }
 
     .timeline h3 {
-      color: ${colors.charcoal};
+      color: ${colors.navy};
       margin-bottom: 20px;
-      font-size: 18px;
+      font-size: 17px;
     }
 
     .timeline-items {
@@ -693,7 +752,7 @@ function getBaseStyles(): string {
       right: 0;
       width: 50%;
       height: 2px;
-      background: ${colors.brandPurple};
+      background: ${colors.accent};
     }
 
     .timeline-item:not(:first-child)::before {
@@ -703,16 +762,17 @@ function getBaseStyles(): string {
       left: 0;
       width: 50%;
       height: 2px;
-      background: ${colors.brandPurple};
+      background: ${colors.accent};
     }
 
     .timeline-year {
       display: inline-block;
-      background: ${colors.brandPurple};
+      background: ${colors.navy};
       color: ${colors.white};
       padding: 4px 12px;
       border-radius: 20px;
-      font-size: 12px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 11px;
       font-weight: 600;
       margin-bottom: 10px;
       position: relative;
@@ -720,15 +780,16 @@ function getBaseStyles(): string {
     }
 
     .timeline-rate {
-      font-size: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 15px;
       font-weight: 700;
-      color: ${colors.charcoal};
+      color: ${colors.navy};
       margin-bottom: 6px;
     }
 
     .timeline-text {
-      font-size: 12px;
-      color: ${colors.slate};
+      font-size: 11px;
+      color: ${colors.textSecondary};
       line-height: 1.4;
     }
 
@@ -737,7 +798,7 @@ function getBaseStyles(): string {
        ================================================ */
     .verification-box {
       border: 1px solid ${colors.border};
-      border-radius: 8px;
+      border-radius: 10px;
       overflow: hidden;
       margin: 24px 0;
     }
@@ -745,13 +806,14 @@ function getBaseStyles(): string {
     .verification-header {
       background: ${colors.navy};
       color: ${colors.white};
-      padding: 10px 16px;
+      padding: 10px 20px;
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
 
     .verification-header .title {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
       font-size: 11px;
       font-weight: 600;
       text-transform: uppercase;
@@ -759,18 +821,19 @@ function getBaseStyles(): string {
     }
 
     .verification-header .copy-hint {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
       font-size: 10px;
-      opacity: 0.8;
+      opacity: 0.7;
     }
 
     .verification-body {
-      padding: 16px;
-      background: ${colors.lightGray};
+      padding: 20px;
+      background: ${colors.bgLight};
     }
 
     .verification-body .instruction {
       font-size: 13px;
-      color: ${colors.slate};
+      color: ${colors.textSecondary};
       margin-bottom: 12px;
     }
 
@@ -778,49 +841,59 @@ function getBaseStyles(): string {
       background: ${colors.white};
       border: 1px solid ${colors.border};
       border-radius: 6px;
-      padding: 14px;
+      padding: 16px;
       font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
       font-size: 12px;
-      color: ${colors.charcoal};
-      line-height: 1.5;
+      color: ${colors.textPrimary};
+      line-height: 1.6;
     }
 
     /* ================================================
-       DATA TABLE
+       DATA TABLE — Modern
        ================================================ */
     .data-table {
       width: 100%;
-      border-collapse: collapse;
+      border-collapse: separate;
+      border-spacing: 0;
       margin: 20px 0;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid ${colors.border};
     }
 
     .data-table th,
     .data-table td {
-      padding: 14px 16px;
+      padding: 14px 18px;
       text-align: left;
-      border-bottom: 1px solid ${colors.border};
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     }
 
     .data-table th {
-      background: ${colors.lightGray};
-      font-size: 11px;
+      background: ${colors.navy};
+      color: ${colors.white};
+      font-size: 10px;
       font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 1px;
-      color: ${colors.slate};
+      letter-spacing: 1.5px;
     }
 
     .data-table td {
       font-size: 14px;
-      color: ${colors.charcoal};
+      color: ${colors.textPrimary};
+      border-bottom: 1px solid ${colors.borderLight};
     }
 
-    .data-table tr:last-child td {
-      border-bottom: 2px solid ${colors.charcoal};
+    .data-table tbody tr:nth-child(even) {
+      background: ${colors.bgLight};
     }
 
-    .data-table tr.total-row td {
-      font-weight: 600;
+    .data-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    .data-table tbody tr.total-row td {
+      font-weight: 700;
+      background: ${colors.bgCard};
     }
 
     .data-table .text-right {
@@ -831,34 +904,56 @@ function getBaseStyles(): string {
        GUARANTEE CERTIFICATE
        ================================================ */
     .guarantee-certificate {
-      border: 3px solid ${colors.gold};
-      border-radius: 16px;
-      background: ${colors.goldLight};
+      border: 2px solid ${colors.navy};
+      border-radius: 12px;
+      background: linear-gradient(135deg, ${colors.bgLight} 0%, ${colors.white} 100%);
       padding: 40px;
       text-align: center;
-      margin: 24px 0;
+      margin: 28px 0;
+      position: relative;
+    }
+
+    .guarantee-certificate::before {
+      content: '';
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      right: 8px;
+      bottom: 8px;
+      border: 1px solid ${colors.border};
+      border-radius: 8px;
+      pointer-events: none;
+    }
+
+    .guarantee-shield {
+      font-size: 48px;
+      margin-bottom: 12px;
     }
 
     .guarantee-certificate .amount {
-      font-size: 64px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 56px;
       font-weight: 700;
-      color: ${colors.charcoal};
+      color: ${colors.navy};
       margin-bottom: 4px;
     }
 
-    .guarantee-certificate .title {
-      font-size: 22px;
+    .guarantee-certificate .g-title {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 20px;
       font-weight: 600;
-      color: ${colors.charcoal};
-      margin-bottom: 20px;
+      color: ${colors.navy};
+      margin-bottom: 16px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
     }
 
     .guarantee-certificate p {
-      font-size: 15px;
-      color: ${colors.slate};
-      max-width: 480px;
+      font-size: 14px;
+      color: ${colors.textSecondary};
+      max-width: 440px;
       margin: 0 auto;
-      line-height: 1.6;
+      line-height: 1.65;
     }
 
     /* ================================================
@@ -868,140 +963,176 @@ function getBaseStyles(): string {
       display: flex;
       justify-content: center;
       align-items: flex-start;
-      gap: 16px;
+      gap: 12px;
       margin: 32px 0;
     }
 
     .step {
       flex: 1;
       text-align: center;
-      max-width: 180px;
+      max-width: 170px;
     }
 
     .step-number {
-      width: 52px;
-      height: 52px;
-      background: ${colors.brandPurple};
+      width: 48px;
+      height: 48px;
+      background: ${colors.navy};
       color: ${colors.white};
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 22px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 20px;
       font-weight: 700;
       margin: 0 auto 14px auto;
     }
 
     .step h4 {
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 600;
-      color: ${colors.charcoal};
+      color: ${colors.navy};
       margin-bottom: 6px;
     }
 
     .step p {
-      font-size: 13px;
-      color: ${colors.slate};
+      font-size: 12px;
+      color: ${colors.textSecondary};
       line-height: 1.5;
     }
 
     .step-arrow {
       display: flex;
       align-items: center;
-      padding-top: 16px;
-      color: ${colors.brandPurple};
-      font-size: 24px;
+      padding-top: 12px;
+      color: ${colors.textMuted};
+      font-size: 20px;
     }
 
     /* ================================================
        CTA BOX
        ================================================ */
     .cta-box {
-      background: ${colors.brandPurple};
+      background: ${colors.navy};
       color: ${colors.white};
       border-radius: 12px;
-      padding: 28px 32px;
+      padding: 32px 36px;
       text-align: center;
-      margin: 24px 0;
+      margin: 28px 0;
     }
 
     .cta-box h3 {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
       color: ${colors.white};
       font-size: 22px;
       margin-bottom: 12px;
     }
 
     .cta-box p {
-      color: rgba(255, 255, 255, 0.9);
-      font-size: 15px;
-    }
-
-    /* ================================================
-       PULLQUOTE
-       ================================================ */
-    .pullquote {
-      border-left: 4px solid ${colors.brandPurple};
-      padding: 16px 24px;
-      margin: 24px 0;
-      background: ${colors.lightGray};
-      border-radius: 0 8px 8px 0;
-    }
-
-    .pullquote p {
-      font-size: 17px;
-      font-style: italic;
-      color: ${colors.charcoal};
-      line-height: 1.6;
-    }
-
-    /* ================================================
-       CALLOUT BOX
-       ================================================ */
-    .callout-box {
-      background: ${colors.brandPurpleLight};
-      border-radius: 12px;
-      padding: 24px;
-      margin: 20px 0;
-    }
-
-    .callout-box h4 {
-      font-size: 16px;
-      font-weight: 600;
-      color: ${colors.charcoal};
-      margin-bottom: 12px;
-    }
-
-    .callout-box p {
+      color: rgba(255, 255, 255, 0.8);
       font-size: 14px;
-      color: ${colors.slate};
-      line-height: 1.6;
+    }
+
+    .cta-button {
+      display: inline-block;
+      background: ${colors.white};
+      color: ${colors.navy};
+      padding: 14px 36px;
+      border-radius: 8px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-weight: 700;
+      font-size: 16px;
+      text-decoration: none;
+      margin-top: 16px;
     }
 
     /* ================================================
-       APPROACH PAGE
+       COST HIGHLIGHT — Scenario 2
        ================================================ */
-    .approach-intro {
-      font-size: 17px;
-      color: ${colors.charcoal};
-      line-height: 1.7;
-      margin-bottom: 24px;
+    .cost-highlight {
+      background: linear-gradient(135deg, ${colors.navyDark} 0%, ${colors.navy} 100%);
+      color: ${colors.white};
+      border-radius: 12px;
+      padding: 32px 40px;
+      text-align: center;
+      margin: 24px 0;
     }
 
+    .cost-highlight .label {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      opacity: 0.7;
+      margin-bottom: 8px;
+    }
+
+    .cost-highlight .value {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 48px;
+      font-weight: 700;
+    }
+
+    .cost-highlight .subtitle {
+      font-size: 13px;
+      opacity: 0.7;
+      margin-top: 8px;
+    }
+
+    /* ================================================
+       SIGNATURE BLOCK
+       ================================================ */
     .signature-block {
-      margin-top: 32px;
-      padding-top: 24px;
+      margin-top: 28px;
+      padding-top: 20px;
       border-top: 1px solid ${colors.border};
     }
 
     .signature-block .name {
-      font-size: 18px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 17px;
       font-weight: 600;
-      color: ${colors.charcoal};
+      color: ${colors.navy};
     }
 
     .signature-block .title {
-      font-size: 14px;
-      color: ${colors.slate};
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 13px;
+      color: ${colors.textMuted};
+    }
+
+    /* ================================================
+       ADVISOR CARD — Inline
+       ================================================ */
+    .advisor-card-inline {
+      background: ${colors.bgLight};
+      border: 1px solid ${colors.border};
+      border-radius: 8px;
+      padding: 18px 24px;
+      display: inline-block;
+    }
+
+    .advisor-card-inline .label {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 10px;
+      color: ${colors.textMuted};
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 6px;
+    }
+
+    .advisor-card-inline .name {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      color: ${colors.navy};
+      margin-bottom: 2px;
+    }
+
+    .advisor-card-inline .contact {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 13px;
+      color: ${colors.textSecondary};
     }
 
     /* ================================================
@@ -1016,10 +1147,7 @@ function getBaseStyles(): string {
     .mb-4 { margin-bottom: 16px; }
     .mb-6 { margin-bottom: 24px; }
     .font-bold { font-weight: 700; }
-
-    .avoid-break {
-      page-break-inside: avoid;
-    }
+    .avoid-break { page-break-inside: avoid; }
   `;
 }
 
@@ -1027,9 +1155,6 @@ function getBaseStyles(): string {
 // PAGE GENERATORS
 // ============================================================
 
-/**
- * Generate page header
- */
 function pageHeader(clientName: string): string {
   return `
     <div class="page-header">
@@ -1039,9 +1164,6 @@ function pageHeader(clientName: string): string {
   `;
 }
 
-/**
- * Generate page footer
- */
 function pageFooter(pageNumber: number): string {
   return `
     <div class="page-footer">
@@ -1051,68 +1173,41 @@ function pageFooter(pageNumber: number): string {
   `;
 }
 
-/**
- * Generate Cover Page — Uses REPORT_COPY.cover for all text
- */
+// ============================================================
+// COVER PAGE — Premium, Minimal
+// ============================================================
 function generateCoverPage(
   clientName: string,
   date: string,
   consultant: { name: string; email: string; phone: string }
 ): string {
   const copy = REPORT_COPY.cover;
-  const benefitsList = copy.benefits.map(b => `
-            <li>
-              <span class="checkmark">✓</span>
-              <span>${b}</span>
-            </li>`).join("");
 
   return `
     <div class="page cover-page">
-      <div class="cover-header">
-        <!-- TODO: Replace with actual logo image: <img src="/path/to/inspired-mortgage-logo.png" alt="Inspired Mortgage" /> -->
-        <div class="logo-text">Inspired Mortgage</div>
+      <div class="cover-top">
+        <div class="cover-logo">Inspired Mortgage</div>
+        <div class="cover-tagline">${copy.tagline}</div>
       </div>
       <div class="cover-body">
-        <div class="cover-tagline">
-          <h1>${copy.tagline}</h1>
-        </div>
+        <div class="cover-label">${copy.preparedForLabel}</div>
+        <div class="cover-client-name">${clientName}</div>
+        <div class="cover-date">${date}</div>
         <div class="cover-divider"></div>
-        <div class="cover-client-info">
-          <div class="prepared-for">${copy.preparedForLabel}</div>
-          <div class="client-name">${clientName}</div>
-          <div class="date">${date}</div>
+        <div class="cover-advisor-card">
+          <div class="cover-advisor-label">${copy.advisorLabel}</div>
+          <div class="cover-advisor-name">${consultant.name}</div>
+          <div class="cover-advisor-detail">${consultant.email}</div>
+          ${consultant.phone ? `<div class="cover-advisor-detail">${consultant.phone}</div>` : ""}
         </div>
-        <div class="cover-callout">
-          <p class="callout-text">
-            ${copy.applicationNotice}
-          </p>
-          <ul class="callout-list">
-            ${benefitsList}
-          </ul>
-        </div>
-        <div class="cover-advisor">
-          <div class="advisor-card">
-            <div class="label">${copy.advisorLabel}</div>
-            <div class="name">${consultant.name}</div>
-            <div class="contact">${consultant.email}</div>
-            <div class="contact">${consultant.phone}</div>
-          </div>
-        </div>
-      </div>
-      <div class="cover-footer-note">
-        <p>${copy.readingTime}</p>
-        <p style="font-size: 12px; color: rgba(255,255,255,0.7); margin-top: 8px; line-height: 1.5;">${copy.readingEncouragement.split('\n\n')[0]}</p>
-      </div>
-      <div class="cover-closing" style="text-align: center; margin-top: 12px; font-style: italic; color: rgba(255,255,255,0.8); font-size: 14px;">
-        ${copy.closingLine}
       </div>
     </div>
   `;
 }
 
-/**
- * Generate What You Told Us Page
- */
+// ============================================================
+// WHAT YOU TOLD US — Reading encouragement moved here from cover
+// ============================================================
 function generateWhatYouToldUsPage(
   clientName: string,
   bullets: string[],
@@ -1120,6 +1215,7 @@ function generateWhatYouToldUsPage(
   vars: Record<string, string> = {}
 ): string {
   const copy = REPORT_COPY.whatYouToldUs;
+  const coverCopy = REPORT_COPY.cover;
   const introText = replaceVariables(copy.intro, vars);
   const outroText = replaceVariables(copy.outro, vars);
 
@@ -1129,32 +1225,42 @@ function generateWhatYouToldUsPage(
       <li>
         <span class="bullet"></span>
         <span>${bullet}</span>
-      </li>
-    `
+      </li>`
     )
     .join("");
 
   const introParagraphs = introText.split(/\n\n+/).filter(p => p.trim()).map(p =>
-    `<p style="color: ${colors.slate}; margin-bottom: 16px; font-size: 16px; line-height: 1.7;">${p}</p>`
+    `<p style="margin-bottom: 14px;">${p}</p>`
   ).join("");
 
   const outroParagraphs = outroText.split(/\n\n+/).filter(p => p.trim()).map(p =>
-    `<p style="color: ${colors.slate}; margin-bottom: 16px; font-size: 16px; line-height: 1.7;">${p}</p>`
+    `<p style="margin-bottom: 14px;">${p}</p>`
   ).join("");
+
+  // Reading encouragement moved from cover page
+  const readingEncParagraphs = coverCopy.readingEncouragement.split('\n\n').filter(p => p.trim()).map(p =>
+    `<p style="font-size: 13px; color: ${colors.textSecondary}; line-height: 1.6; margin-bottom: 6px;">${p}</p>`
+  ).join('');
 
   return `
     <div class="page">
       <div class="page-inner">
         ${pageHeader(clientName)}
         <div class="page-content">
+          <div style="background: ${colors.bgWarm}; border-left: 4px solid ${colors.gold}; border-radius: 0 8px 8px 0; padding: 16px 24px; margin-bottom: 28px;">
+            <p style="font-size: 13px; color: ${colors.textSecondary}; margin-bottom: 6px; font-style: italic;">${coverCopy.readingTime}</p>
+            ${readingEncParagraphs}
+            <p style="font-size: 13px; color: ${colors.navy}; font-weight: 600; margin-top: 8px; font-style: italic;">${coverCopy.closingLine}</p>
+          </div>
+
           <div class="section-header">
+            
             <h2>${copy.heading}</h2>
-            <div class="underline"></div>
           </div>
 
           ${introParagraphs}
 
-          <ul class="bullet-list" style="background: ${colors.cream}; padding: 24px 24px 24px 40px; border-radius: 12px; margin-bottom: 24px;">
+          <ul class="bullet-list" style="background: ${colors.bgLight}; border: 1px solid ${colors.border}; padding: 20px 24px 8px 24px; border-radius: 10px; margin: 20px 0;">
             ${bulletItems}
           </ul>
 
@@ -1166,183 +1272,221 @@ function generateWhatYouToldUsPage(
   `;
 }
 
-/**
- * Generate Scenario 1 Pages - Sub-2% Fixed → Renewal Trap
- */
+// ============================================================
+// SCENARIO 1 — Sub-2% Fixed → Renewal Trap
+// ============================================================
 function generateScenario1Pages(
   clientName: string,
-  data: ReportHTMLProps["extractedData"]
+  data: ReportHTMLProps["extractedData"],
+  startPageNumber: number,
+  vars: Record<string, string> = {}
 ): string[] {
+  const copy = REPORT_COPY.scenarios.scenario1;
   const oldPayment = formatCurrency(data.oldPayment || 2045);
   const newPayment = formatCurrency(data.newPayment || 2689);
   const paymentDiff = formatCurrency(data.paymentDifference || 644);
-  const fiveYearTotal = formatCurrency(data.fiveYearsOfPayments || 161340);
-  const previousRate = formatPercent(data.previousRate || 0.0189);
-  // Use the actual currentMarketRate if provided, otherwise check for null/undefined explicitly
-  const currentRate = data.currentMarketRate != null ? formatPercent(data.currentMarketRate) : formatPercent(0.045);
-  const mortgageAmount = formatCurrency(data.mortgageAmount || 485000);
-  const originalAm = data.originalAmortization || 25;
-  const currentAm = data.currentAmortization || 20;
 
+  const introParagraphs = replaceVariables(copy.intro, vars).split(/\n\n+/).filter(p => p.trim()).map((p, i) =>
+    i === 0 ? `<p style="margin-bottom: 14px;">${p}</p>` : `<p style="margin-bottom: 14px;"><strong>${p}</strong></p>`
+  ).join("");
+
+  const amortParagraphs = replaceVariables(copy.amortizationContext, vars).split(/\n\n+/).filter(p => p.trim()).map(p =>
+    `<p style="margin-bottom: 14px;">${p}</p>`
+  ).join("");
+
+  const bankParagraphs = replaceVariables(copy.bankSolution, vars).split(/\n\n+/).filter(p => p.trim()).map((p, i) =>
+    i === 1 ? `<p style="margin-top: 14px;"><strong>${p}</strong></p>` : `<p style="margin-top: 14px;">${p}</p>`
+  ).join("");
+
+  // PAGE 1: The Problem
   const page1 = `
     <div class="page">
       <div class="page-inner">
         ${pageHeader(clientName)}
         <div class="page-content">
           <div class="section-header">
-            <h2>What Happened on Your Last Term</h2>
-            <div class="underline"></div>
+            
+            <h2>${copy.heading}</h2>
           </div>
 
-          <p class="mb-4"><strong>Here's the thing: your last term was actually great.</strong></p>
+          ${introParagraphs}
+          ${amortParagraphs}
 
-          <p class="mb-4">You locked in at ${previousRate}—one of the lowest fixed rates in Canadian history. Your payments were predictable. Your principal was dropping steadily. You did everything right.</p>
-
-          <p class="mb-4"><strong>The problem isn't what happened. The problem is what's about to happen.</strong></p>
-
-          <p class="mb-4">You started with a ${originalAm}-year amortization. After five years of payments, you're now at ${currentAm} years remaining. You made real progress.</p>
-
-          <p class="mb-4">But at today's rates, keeping the same amortization would push your payment from approximately ${oldPayment} to ${newPayment}—a difference of ${paymentDiff} per month.</p>
-
-          <div class="comparison-container">
-            <div class="comparison-card old">
-              <div class="label">Your Old Payment</div>
-              <div class="value">${oldPayment}</div>
+          <div class="metrics-row">
+            <div class="metric-card neutral">
+              <div class="metric-label">Your Old Payment</div>
+              <div class="metric-value">${oldPayment}</div>
+              <div class="metric-subtitle">per month</div>
             </div>
             <div class="comparison-arrow">→</div>
-            <div class="comparison-card new">
-              <div class="label">Your New Payment</div>
-              <div class="value">${newPayment}</div>
+            <div class="metric-card highlight">
+              <div class="metric-label">Your New Payment</div>
+              <div class="metric-value accent">${newPayment}</div>
+              <div class="metric-subtitle">per month</div>
             </div>
           </div>
 
-          <div class="text-center">
-            <div class="difference-box">
-              <div class="label">Monthly Increase</div>
-              <div class="value">+${paymentDiff}</div>
+          <div style="text-align: center; margin: 20px 0;">
+            <div style="display: inline-block; background: linear-gradient(135deg, ${colors.navyDark}, ${colors.navy}); color: ${colors.white}; border-radius: 10px; padding: 18px 40px; text-align: center;">
+              <div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.7; margin-bottom: 4px;">Monthly Increase</div>
+              <div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 32px; font-weight: 700;">+${paymentDiff}</div>
             </div>
           </div>
 
-          <p class="mt-4">For most people, that's not manageable. So the bank offers a simple solution: add 5 years back onto your amortization. Payment problem solved.</p>
-
-          <p class="mt-4"><strong>Except here's what that actually means:</strong></p>
+          ${bankParagraphs}
         </div>
-        ${pageFooter(3)}
+        ${pageFooter(startPageNumber)}
       </div>
     </div>
   `;
+
+  // PAGE 2: Impact + Active Management
+  const impactParagraphs = replaceVariables(copy.impactDetail, vars).split(/\n\n+/).filter(p => p.trim()).map(p =>
+    `<p style="margin-top: 14px;">${p}</p>`
+  ).join("");
+
+  const transitionParagraphs = replaceVariables(copy.transitionToSolution, vars).split(/\n\n+/).filter(p => p.trim()).map(p =>
+    `<p style="margin-top: 14px;">${p}</p>`
+  ).join("");
+
+  const summaryParagraphs = replaceVariables(copy.activeManagement.summary, vars).split(/\n\n+/).filter(p => p.trim()).map(p =>
+    `<p style="margin-top: 14px;">${p}</p>`
+  ).join("");
+
+  const empathyParagraphs = replaceVariables(copy.activeManagement.empathy, vars).split(/\n\n+/).filter(p => p.trim()).map((p, i, arr) =>
+    i === arr.length - 1 ? `<p style="margin-top: 14px;"><strong>${p}</strong></p>` : `<p style="margin-top: 14px;">${p}</p>`
+  ).join("");
+
+  const timelineItems = copy.activeManagement.timeline.map(item => `
+    <div class="timeline-item">
+      <div class="timeline-year">${item.year.split(' (')[0]}</div>
+      <div class="timeline-rate">${item.year.includes('(') ? item.year.match(/\(([^)]+)\)/)?.[1] || '' : ''}</div>
+      <div class="timeline-text">${item.action.replace(/"/g, '&quot;')}</div>
+    </div>`).join("");
 
   const page2 = `
     <div class="page">
       <div class="page-inner">
         ${pageHeader(clientName)}
         <div class="page-content">
-          <div class="impact-statement" style="margin-top: 0;">
-            <h2>Five years of payments.<br>Zero progress.</h2>
+          <div class="impact-banner" style="margin-top: 0;">
+            <h2>${copy.impactHeading.replace('. ', '.<br>')}</h2>
           </div>
 
-          <p class="mt-6">You'll make another 60 payments—roughly ${fiveYearTotal} out of your pocket—and at the end of it, you'll still have ${currentAm} years remaining. Exactly where you are today.</p>
+          ${impactParagraphs}
+          ${transitionParagraphs}
+        </div>
+        ${pageFooter(startPageNumber + 1)}
+      </div>
+    </div>
+  `;
 
-          <p class="mt-4">All that ground you gained with your sub-2% rate? Given back. The years of principal reduction you earned? Erased on paper.</p>
-
-          <p class="mt-4">And the bank won't explain this. They'll send you a renewal letter with a checkbox. You'll sign it because the payment looks affordable. And you won't realize what you gave up until years later—if ever.</p>
-
-          <div class="section-header mt-6">
-            <h2>The Difference Active Management Makes</h2>
-            <div class="underline"></div>
+  const page2b = `
+    <div class="page">
+      <div class="page-inner">
+        ${pageHeader(clientName)}
+        <div class="page-content">
+          <div class="section-header" style="margin-top: 0;">
+            <h2>${copy.activeManagement.heading}</h2>
           </div>
 
-          <p class="mb-4">Here's what would have happened if you'd had someone watching your mortgage the whole time:</p>
+          <p style="margin-bottom: 14px;">${replaceVariables(copy.activeManagement.intro, vars)}</p>
 
           <div class="timeline">
             <h3>What Active Management Looks Like</h3>
             <div class="timeline-items">
-              <div class="timeline-item">
-                <div class="timeline-year">Year 1</div>
-                <div class="timeline-rate">2.9%</div>
-                <div class="timeline-text">We call you.<br>"Bump payment slightly now."</div>
-              </div>
-              <div class="timeline-item">
-                <div class="timeline-year">Year 2</div>
-                <div class="timeline-rate">3.8%</div>
-                <div class="timeline-text">We call you.<br>"Another small increase."</div>
-              </div>
-              <div class="timeline-item">
-                <div class="timeline-year">Year 3</div>
-                <div class="timeline-rate">4.2%</div>
-                <div class="timeline-text">We call you.<br>"Consider locking in."</div>
-              </div>
-              <div class="timeline-item">
-                <div class="timeline-year">Now</div>
-                <div class="timeline-rate">Prepared</div>
-                <div class="timeline-text">No payment shock.<br>No surprises.</div>
-              </div>
+              ${timelineItems}
             </div>
           </div>
 
-          <p class="mt-4">By the time you reached renewal, your payments would have already adjusted gradually. No shock. No scramble. And instead of needing to extend your amortization, you'd have accelerated it—years ahead of where you are now.</p>
+          ${summaryParagraphs}
+          ${empathyParagraphs}
         </div>
-        ${pageFooter(4)}
+        ${pageFooter(startPageNumber + 2)}
       </div>
     </div>
   `;
+
+  // PAGE 3: What We Look For + Outcome + Verification
+  const whatWeLookForItems = copy.whatWeLookFor.items.map(item =>
+    `<p style="margin-bottom: 10px;"><strong>${item.title}:</strong> ${replaceVariables(item.body, vars).split(/\n\n/)[0]}</p>`
+  ).join("");
+
+  const outcomeParagraphs = replaceVariables(copy.outcome.body, vars).split(/\n\n+/).filter(p => p.trim()).map(p =>
+    `<p style="margin-bottom: 14px;">${p}</p>`
+  ).join("");
 
   const page3 = `
     <div class="page">
       <div class="page-inner">
         ${pageHeader(clientName)}
         <div class="page-content">
-          <p class="mb-4"><strong>This wasn't your fault.</strong> Nobody explained the options. Nobody showed you what was coming. Nobody called you before that renewal letter arrived.</p>
-
-          <p class="mb-6"><strong>Nobody did that for you last time. We will this time.</strong></p>
-
           <div class="section-header">
-            <h2>What We Look For Instead</h2>
-            <div class="underline"></div>
+            <h2>${copy.whatWeLookFor.heading}</h2>
           </div>
 
-          <p class="mb-4">There may be ways to reduce your overall interest cost across this next term that let you hold your amortization—or at least minimize the damage:</p>
+          <p style="margin-bottom: 14px;">${replaceVariables(copy.whatWeLookFor.intro, vars)}</p>
 
-          <p class="mb-2"><strong>Rate optimization:</strong> Not just today's rate, but actively managing through the term as rates move. If we can save you 0.5% through a strategic relock in year two or three, that savings doesn't just reduce your payment—it accelerates your amortization. Every dollar that would have gone to interest now goes to principal.</p>
-
-          <p class="mb-2"><strong>Debt restructuring:</strong> If you're carrying other debts—car loans, lines of credit, credit cards—there may be a consolidation play that reduces your total monthly outflow while keeping your mortgage amortization intact.</p>
-
-          <p class="mb-4"><strong>Cash flow reallocation:</strong> With regular check-ins throughout your next term, we look for moments when you can increase your payments—even slightly—to claw back amortization. A small raise at work. A car loan that gets paid off. These are opportunities to move forward, but only if someone asks the question.</p>
+          ${whatWeLookForItems}
 
           <div class="pullquote">
-            <p>Our goal isn't just to set up your mortgage and disappear. It's to keep optimizing, keep asking, and keep you moving toward debt-free faster than you thought possible.</p>
-          </div>
-
-          <div class="verification-box">
-            <div class="verification-header">
-              <span class="title">Verify This Yourself</span>
-              <span class="copy-hint">Copy prompt below</span>
-            </div>
-            <div class="verification-body">
-              <p class="instruction">Ask any AI (ChatGPT, Claude, Google):</p>
-              <div class="verification-prompt">I have a ${mortgageAmount} mortgage. I was paying ${previousRate} and now I'm renewing at ${currentRate}. What's the payment difference and how much will I pay over 5 years?</div>
-            </div>
+            <p>${replaceVariables(copy.whatWeLookFor.closing, vars)}</p>
           </div>
         </div>
-        ${pageFooter(5)}
+        ${pageFooter(startPageNumber + 3)}
       </div>
     </div>
   `;
 
-  return [page1, page2, page3];
+  const page4 = `
+    <div class="page">
+      <div class="page-inner">
+        ${pageHeader(clientName)}
+        <div class="page-content">
+          <div class="section-header">
+            <h2>${copy.outcome.heading}</h2>
+          </div>
+
+          ${outcomeParagraphs}
+
+          <div class="verification-box">
+            <div class="verification-header">
+              <span class="title">${copy.verificationBox.heading}</span>
+              <span class="copy-hint">Copy prompt below</span>
+            </div>
+            <div class="verification-body">
+              <p class="instruction">${copy.verificationBox.instruction}</p>
+              <div class="verification-prompt">${replaceVariables(copy.verificationBox.prompt, vars)}</div>
+            </div>
+          </div>
+        </div>
+        ${pageFooter(startPageNumber + 4)}
+      </div>
+    </div>
+  `;
+
+  return [page1, page2, page2b, page3, page4];
 }
 
-/**
- * Generate Scenario 2 Pages - Variable → Panic Lock
- */
+// ============================================================
+// SCENARIO 2 — Variable → Panic Lock
+// ============================================================
 function generateScenario2Pages(
   clientName: string,
-  data: ReportHTMLProps["extractedData"]
+  data: ReportHTMLProps["extractedData"],
+  startPageNumber: number,
+  vars: Record<string, string> = {}
 ): string[] {
-  const originalRate = formatPercent(data.originalRate || 0.0145);
-  const lockInRate = formatPercent(data.lockInRate || 0.0579);
+  const copy = REPORT_COPY.scenarios.scenario2;
   const extraInterest = formatCurrency(data.estimatedExtraInterest || 38675);
-  const mortgageAmount = formatCurrency(data.mortgageAmount || 520000);
+
+  const introParagraphs = replaceVariables(copy.intro, vars).split(/\n\n+/).filter(p => p.trim()).map((p, i, arr) =>
+    i === arr.length - 1 ? `<p style="margin-bottom: 14px;"><strong>${p}</strong></p>` : `<p style="margin-bottom: 14px;">${p}</p>`
+  ).join("");
+
+  const costParagraphs = replaceVariables(copy.costExplanation, vars).split(/\n\n+/).filter(p => p.trim()).map(p =>
+    `<p style="margin-top: 14px;">${p}</p>`
+  ).join("");
 
   const page1 = `
     <div class="page">
@@ -1350,93 +1494,58 @@ function generateScenario2Pages(
         ${pageHeader(clientName)}
         <div class="page-content">
           <div class="section-header">
-            <h2>What Happened on Your Last Term</h2>
-            <div class="underline"></div>
+            
+            <h2>${copy.heading}</h2>
           </div>
 
-          <p class="mb-4">You started with a variable rate at ${originalRate}—a great rate at the time. Then rates started climbing. The headlines got scary. Your bank called and offered to "lock you in for protection."</p>
-
-          <p class="mb-4">It felt responsible. It felt safe. But here's what actually happened:</p>
+          ${introParagraphs}
 
           <div class="cost-highlight">
-            <div class="label">Estimated Extra Interest Paid</div>
+            <div class="label">${copy.costHighlight.label}</div>
             <div class="value">${extraInterest}</div>
-            <div class="subtitle">Over the remaining term vs. staying variable</div>
+            <div class="subtitle">${copy.costHighlight.subtext}</div>
           </div>
 
-          <p class="mt-4">You locked in at ${lockInRate} when rates were at their peak. Since then, rates have dropped—but you're stuck paying the higher rate until your term ends.</p>
-
-          <div class="pullquote">
-            <p>The bank wasn't protecting you. They were protecting their revenue.</p>
-          </div>
-
-          <p class="mt-4">Variable rate mortgages are designed to fluctuate. That's the trade-off for historically lower rates. But when the fluctuation happened, your bank positioned a lock-in as a safety measure—when it was actually a revenue opportunity for them.</p>
+          ${costParagraphs}
         </div>
-        ${pageFooter(3)}
+        ${pageFooter(startPageNumber)}
       </div>
     </div>
   `;
+
+  const empathyParagraphs = replaceVariables(copy.empathy, vars).split(/\n\n+/).filter(p => p.trim()).map((p, i) =>
+    i === 0 ? `<p style="margin-bottom: 14px;"><strong>${p}</strong></p>` : `<p style="margin-bottom: 14px;">${p}</p>`
+  ).join("");
+
+  const futureParagraphs = replaceVariables(copy.futureRisk.body, vars).split(/\n\n+/).filter(p => p.trim()).map(p =>
+    `<p style="margin-bottom: 14px;">${p}</p>`
+  ).join("");
 
   const page2 = `
     <div class="page">
       <div class="page-inner">
         ${pageHeader(clientName)}
         <div class="page-content">
-          <div class="section-header">
-            <h2>This Wasn't Your Fault</h2>
-            <div class="underline"></div>
-          </div>
-
-          <p class="mb-4">When rates are rising and the news is alarming, locking in feels like the responsible choice. But nobody told you:</p>
-
-          <ul class="bullet-list">
-            <li>
-              <span class="bullet"></span>
-              <span>Variable rates historically outperform fixed rates over time</span>
-            </li>
-            <li>
-              <span class="bullet"></span>
-              <span>Banks make more money when you lock in at peak rates</span>
-            </li>
-            <li>
-              <span class="bullet"></span>
-              <span>The "protection" they offered came with a significant cost</span>
-            </li>
-            <li>
-              <span class="bullet"></span>
-              <span>There were other strategies—like trigger rate management—that could have helped</span>
-            </li>
-          </ul>
+          ${empathyParagraphs}
 
           <div class="section-header mt-6">
-            <h2>Here's What Would Have Happened</h2>
-            <div class="underline"></div>
+            <h2>${copy.futureRisk.heading}</h2>
           </div>
 
-          <p class="mb-4">If someone had been watching your mortgage:</p>
-
-          <p class="mb-2"><strong>When your rate crossed 3.5%:</strong> We would have called. "Rates are climbing. Let's discuss whether locking in now makes sense before it gets worse."</p>
-
-          <p class="mb-2"><strong>When you were considering locking in at ${lockInRate}:</strong> We would have run the numbers. "Here's what locking in costs you vs. riding it out. Here's the break-even point."</p>
-
-          <p class="mb-4"><strong>When rates started falling after you locked in:</strong> We would have called again. "Rates have dropped significantly. Let's calculate whether breaking your mortgage and relocking makes financial sense."</p>
-
-          <p class="mt-4">Instead, you were left to react alone, under stress, with incomplete information. The pattern only breaks if someone is actually paying attention.</p>
-
-          <p class="mt-4"><strong>Nobody did that for you last time. We will this time.</strong></p>
+          ${futureParagraphs}
 
           <div class="verification-box">
             <div class="verification-header">
-              <span class="title">Verify This Yourself</span>
+              <span class="title">${copy.verificationBox.heading}</span>
               <span class="copy-hint">Copy prompt below</span>
             </div>
             <div class="verification-body">
-              <p class="instruction">Ask any AI (ChatGPT, Claude, Google):</p>
-              <div class="verification-prompt">I have a ${mortgageAmount} mortgage. I started at ${originalRate} variable and locked in at ${lockInRate} with 3 years remaining. If rates dropped 1.5% since then, how much extra interest am I paying?</div>
+              <p class="instruction">${copy.verificationBox.instruction}</p>
+              <div class="verification-prompt">${copy.verificationBox.prompt}</div>
             </div>
           </div>
         </div>
-        ${pageFooter(4)}
+        ${pageFooter(startPageNumber + 1)}
       </div>
     </div>
   `;
@@ -1444,56 +1553,73 @@ function generateScenario2Pages(
   return [page1, page2];
 }
 
-/**
- * Generate Scenario 3 Pages - Fixed Payment Variable → Negative Amortization
- */
+// ============================================================
+// SCENARIO 3 — Fixed Payment Variable → Negative Amortization
+// ============================================================
 function generateScenario3Pages(
   clientName: string,
-  data: ReportHTMLProps["extractedData"]
+  data: ReportHTMLProps["extractedData"],
+  startPageNumber: number,
+  vars: Record<string, string> = {}
 ): string[] {
-  const mortgageAmount = formatCurrency(data.mortgageAmount || 415000);
-  const fixedPayment = formatCurrency(data.fixedPayment || 1850);
+  const copy = REPORT_COPY.scenarios.scenario3;
   const originalAm = data.originalAmortization || 25;
   const currentAm = data.currentAmortization || 26;
 
+  const introParagraphs = replaceVariables(copy.intro, vars).split(/\n\n+/).filter(p => p.trim()).map(p =>
+    `<p style="margin-bottom: 14px;">${p}</p>`
+  ).join("");
+
+  const explanationParagraphs = replaceVariables(copy.explanation.body, vars).split(/\n\n+/).filter(p => p.trim()).map(p =>
+    `<p style="margin-bottom: 14px;">${p}</p>`
+  ).join("");
+
   const page1 = `
     <div class="page">
       <div class="page-inner">
         ${pageHeader(clientName)}
         <div class="page-content">
           <div class="section-header">
-            <h2>What Happened on Your Last Term</h2>
-            <div class="underline"></div>
+            
+            <h2>${copy.heading}</h2>
           </div>
 
-          <p class="mb-4">You chose a variable rate mortgage with fixed payments of ${fixedPayment}/month. It seemed like the best of both worlds—variable rate savings with predictable payments.</p>
+          ${introParagraphs}
 
-          <p class="mb-4">But when rates rose, something happened that your bank never warned you about:</p>
+          <h3 class="mt-6">${copy.explanation.heading}</h3>
 
-          <div class="impact-statement">
+          ${explanationParagraphs}
+
+          <div class="impact-banner">
             <h2>You made every payment.<br>You now owe more than before.</h2>
           </div>
 
-          <div class="comparison-container">
-            <div class="comparison-card old">
-              <div class="label">Original Amortization</div>
-              <div class="value">${originalAm} years</div>
+          <div class="metrics-row">
+            <div class="metric-card neutral">
+              <div class="metric-label">Original Amortization</div>
+              <div class="metric-value">${originalAm}</div>
+              <div class="metric-subtitle">years</div>
             </div>
             <div class="comparison-arrow">→</div>
-            <div class="comparison-card new">
-              <div class="label">Current Amortization</div>
-              <div class="value">${currentAm} years</div>
+            <div class="metric-card gold">
+              <div class="metric-label">Current Amortization</div>
+              <div class="metric-value negative">${currentAm}</div>
+              <div class="metric-subtitle">years — going backwards</div>
             </div>
           </div>
-
-          <p class="mt-4">This is called <strong>negative amortization</strong>. Your fixed payment no longer covered the interest, so the unpaid interest got added to your balance. You were going backwards without knowing it.</p>
-
-          <p class="mt-4">Every month, you thought you were paying down your mortgage. Every month, your balance was actually growing. And your bank knew—they just didn't tell you.</p>
         </div>
-        ${pageFooter(3)}
+        ${pageFooter(startPageNumber)}
       </div>
     </div>
   `;
+
+  const empathyParagraphs = replaceVariables(copy.empathy.body, vars).split(/\n\n+/).filter(p => p.trim()).map(p =>
+    `<p style="margin-bottom: 14px;">${p}</p>`
+  ).join("");
+
+  const futureParagraphs = replaceVariables(copy.futureRisk.body, vars).split(/\n\n+/).filter(p => p.trim()).map((p, i, arr) =>
+    i === arr.length - 1 ? `<p style="margin-bottom: 14px;"><strong>${p}</strong></p>` : `<p style="margin-bottom: 14px;">${p}</p>`
+  ).join("");
 
   const page2 = `
     <div class="page">
@@ -1501,60 +1627,29 @@ function generateScenario3Pages(
         ${pageHeader(clientName)}
         <div class="page-content">
           <div class="section-header">
-            <h2>This Wasn't Your Fault</h2>
-            <div class="underline"></div>
+            <h2>${copy.empathy.heading}</h2>
           </div>
 
-          <p class="mb-4">Your bank had a responsibility to tell you this was happening. They didn't. No phone call. No letter. No warning until you looked at your statement and saw your balance had increased.</p>
-
-          <ul class="bullet-list">
-            <li>
-              <span class="bullet"></span>
-              <span>You weren't told about trigger rates or trigger points</span>
-            </li>
-            <li>
-              <span class="bullet"></span>
-              <span>You weren't offered the option to increase your payment</span>
-            </li>
-            <li>
-              <span class="bullet"></span>
-              <span>You weren't warned that your amortization was extending</span>
-            </li>
-            <li>
-              <span class="bullet"></span>
-              <span>You weren't given a strategy to get back on track</span>
-            </li>
-          </ul>
+          ${empathyParagraphs}
 
           <div class="section-header mt-6">
-            <h2>Here's What Would Have Happened</h2>
-            <div class="underline"></div>
+            <h2>${copy.futureRisk.heading}</h2>
           </div>
 
-          <p class="mb-4">If someone had been watching your mortgage:</p>
-
-          <p class="mb-2"><strong>When rates started rising:</strong> We would have called. "Your fixed payment may not cover the interest soon. Let's increase it slightly now to stay on track."</p>
-
-          <p class="mb-2"><strong>When you hit your trigger rate:</strong> We would have called. "Your payment no longer covers the interest. Here are your options: increase payment, lock in, or switch to adjustable payments."</p>
-
-          <p class="mb-4"><strong>When your amortization started extending:</strong> We would have called. "Your mortgage is going backwards. Here's exactly what's happening and how to fix it."</p>
-
-          <p class="mt-4">Your bank had all this information. They chose not to share it. We don't operate that way.</p>
-
-          <p class="mt-4"><strong>Nobody did that for you last time. We will this time.</strong></p>
+          ${futureParagraphs}
 
           <div class="verification-box">
             <div class="verification-header">
-              <span class="title">Verify This Yourself</span>
+              <span class="title">${copy.verificationBox.heading}</span>
               <span class="copy-hint">Copy prompt below</span>
             </div>
             <div class="verification-body">
-              <p class="instruction">Ask any AI (ChatGPT, Claude, Google):</p>
-              <div class="verification-prompt">I have a ${mortgageAmount} mortgage with fixed payments of ${fixedPayment}. If rates rose from 1.65% to 5.5%, would my payment still cover the interest? What happens if it doesn't?</div>
+              <p class="instruction">${copy.verificationBox.instruction}</p>
+              <div class="verification-prompt">${copy.verificationBox.prompt}</div>
             </div>
           </div>
         </div>
-        ${pageFooter(4)}
+        ${pageFooter(startPageNumber + 1)}
       </div>
     </div>
   `;
@@ -1562,51 +1657,40 @@ function generateScenario3Pages(
   return [page1, page2];
 }
 
-/**
- * Generate Debt Consolidation Page — Uses REPORT_COPY.debtConsolidation for all text
- */
+// ============================================================
+// DEBT CONSOLIDATION
+// ============================================================
 function generateDebtConsolidationPage(
   clientName: string,
   mortgageAmount: number,
   otherDebts: Array<{ type: string; balance: number; payment: number }>,
   pageNumber: number
-): string {
+): string[] {
   const copy = REPORT_COPY.debtConsolidation;
-  const totalDebt =
-    mortgageAmount + otherDebts.reduce((sum, d) => sum + d.balance, 0);
   const totalPayments = otherDebts.reduce((sum, d) => sum + d.payment, 0);
 
-  const debtRows = otherDebts
-    .map(
-      (debt) => `
-      <tr>
-        <td>${debt.type}</td>
-        <td class="text-right">${formatCurrency(debt.balance)}</td>
-        <td class="text-right">${formatCurrency(debt.payment)}/mo</td>
-      </tr>
-    `
-    )
-    .join("");
-
-  // Build example debts from approved copy
-  const exampleDebtRows = copy.example.debts.map(d => `
-      <tr><td>${d.type}</td><td class="text-right">${formatCurrency(d.balance)}</td><td class="text-right">${formatCurrency(d.payment)}/mo</td></tr>
+  const exampleDebtRows = copy.example.debts.map((d, i) => `
+    <tr${i % 2 === 1 ? ` style="background: ${colors.bgLight};"` : ''}>
+      <td>${d.type}</td>
+      <td class="text-right">${formatCurrency(d.balance)}</td>
+      <td class="text-right">${formatCurrency(d.payment)}/mo</td>
+    </tr>
   `).join("");
 
-  return `
+  const page1 = `
     <div class="page">
       <div class="page-inner">
         ${pageHeader(clientName)}
         <div class="page-content">
           <div class="section-header">
+            
             <h2>${copy.heading}</h2>
-            <div class="underline"></div>
           </div>
 
-          ${copy.intro.split('\n\n').map(p => `<p class="mb-4">${p}</p>`).join('')}
+          ${copy.intro.split('\n\n').map(p => `<p style="margin-bottom: 14px;">${p}</p>`).join('')}
 
-          <h3 class="mt-6">${copy.example.heading}</h3>
-          <p class="mb-4">${copy.example.setup}</p>
+          <h3 class="mt-6" style="margin-bottom: 10px;">${copy.example.heading}</h3>
+          <p style="margin-bottom: 14px;">${copy.example.setup}</p>
 
           <table class="data-table">
             <thead>
@@ -1621,48 +1705,106 @@ function generateDebtConsolidationPage(
             </tbody>
           </table>
 
-          <p class="mb-4">${copy.example.totalOutflow}</p>
-          <p class="mb-4">${copy.example.bankPath}</p>
+          <p style="margin-bottom: 10px;">${copy.example.totalOutflow}</p>
+          <p style="margin-bottom: 14px;">${copy.example.bankPath}</p>
 
-          <h3 class="mt-6">${copy.solution.heading}</h3>
-          <p class="mb-4">${copy.solution.body}</p>
+          <h3 class="mt-6" style="margin-bottom: 10px;">${copy.solution.heading}</h3>
+          <p style="margin-bottom: 14px;">${copy.solution.body}</p>
 
-          <div class="cta-box">
-            <p style="font-size: 18px; font-weight: 700;">${copy.solution.impactLine}</p>
+          <div style="background: ${colors.goldLight}; border: 2px solid ${colors.goldBorder}; border-radius: 10px; padding: 20px 28px; text-align: center; margin: 20px 0;">
+            <p style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 18px; font-weight: 700; color: ${colors.gold};">${copy.solution.impactLine}</p>
           </div>
 
-          <p class="mb-4" style="font-style: italic;">${copy.solution.clientReaction}</p>
-
-          <h3 class="mt-6">${copy.noteOnIncreasingMortgage.heading}</h3>
-          ${copy.noteOnIncreasingMortgage.body.split('\n\n').map(p => `<p class="mb-4">${p}</p>`).join('')}
-
-          <h3 class="mt-6">${copy.relevance.heading}</h3>
-          ${copy.relevance.body.split('\n\n').map(p => `<p class="mb-4">${p}</p>`).join('')}
+          <p style="margin-bottom: 14px; font-style: italic;">${copy.solution.clientReaction}</p>
         </div>
         ${pageFooter(pageNumber)}
       </div>
     </div>
   `;
+
+  const page2 = `
+    <div class="page">
+      <div class="page-inner">
+        ${pageHeader(clientName)}
+        <div class="page-content">
+          <h3 style="margin-bottom: 10px;">${copy.noteOnIncreasingMortgage.heading}</h3>
+          ${copy.noteOnIncreasingMortgage.body.split('\n\n').map(p => `<p style="margin-bottom: 14px;">${p}</p>`).join('')}
+
+          <h3 class="mt-6" style="margin-bottom: 10px;">${copy.relevance.heading}</h3>
+          ${copy.relevance.body.split('\n\n').map(p => `<p style="margin-bottom: 14px;">${p}</p>`).join('')}
+        </div>
+        ${pageFooter(pageNumber + 1)}
+      </div>
+    </div>
+  `;
+
+  return [page1, page2];
 }
 
-/**
- * Generate Application Link Page
- */
+// ============================================================
+// APPLICATION LINK / CTA PAGE
+// ============================================================
 function generateApplicationLinkPage(
   clientName: string,
   applicationLink: string,
   message: string,
-  pageNumber: number
+  pageNumber: number,
+  variant: "afterScenario" | "afterGuarantee" = "afterScenario"
 ): string {
+  const ctaCopy = REPORT_COPY.ctaPages[variant];
+
+  const benefitsList = ctaCopy.benefits.map(b => `
+    <li style="display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; font-size: 14px; color: ${colors.textPrimary}; line-height: 1.6;">
+      <span style="color: ${colors.success}; font-weight: 700; font-size: 16px; flex-shrink: 0; margin-top: 1px;">✓</span>
+      <span>${b}</span>
+    </li>
+  `).join("");
+
+  const guaranteeCopy = REPORT_COPY.ctaPages.afterGuarantee;
+  const testimonialHtml = variant === "afterGuarantee" ? `
+    <div style="background: ${colors.bgWarm}; border-left: 4px solid ${colors.gold}; border-radius: 0 8px 8px 0; padding: 20px 24px; margin: 24px 0; text-align: left;">
+      <p style="font-size: 15px; font-style: italic; color: ${colors.textPrimary}; line-height: 1.65; margin-bottom: 8px;">${guaranteeCopy.testimonial.quote}</p>
+      <p style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 12px; color: ${colors.textMuted}; font-weight: 600;">${guaranteeCopy.testimonial.attribution}</p>
+    </div>
+  ` : "";
+
   return `
     <div class="page">
       <div class="page-inner">
         ${pageHeader(clientName)}
-        <div class="page-content" style="display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;">
-          <div class="cta-box" style="max-width: 520px;">
-            <p style="color: rgba(255,255,255,0.9); font-size: 16px; margin-bottom: 20px; line-height: 1.7;">${message}</p>
-            <a href="${applicationLink}" style="display: inline-block; background: ${colors.white}; color: ${colors.brandPurple}; padding: 14px 32px; border-radius: 8px; font-weight: 700; font-size: 16px; text-decoration: none;">Start Your Application →</a>
+        <div class="page-content">
+          <div class="section-header">
+            
+            <h2>${ctaCopy.heading}</h2>
           </div>
+
+          <p style="font-size: 15px; color: ${colors.textSecondary}; line-height: 1.75; margin-bottom: 28px;">${ctaCopy.message}</p>
+
+          <h3 style="font-size: 17px; font-weight: 600; color: ${colors.navy}; margin-bottom: 16px;">${ctaCopy.subheading}</h3>
+
+          <ul style="list-style: none; padding: 0; margin-bottom: 28px;">
+            ${benefitsList}
+          </ul>
+
+          <div class="cta-box">
+            <h3>Ready to See What's Possible?</h3>
+            <p style="color: rgba(255,255,255,0.7); font-size: 13px; margin-bottom: 8px;">10-15 minutes · No credit impact · No obligation</p>
+            <a href="${applicationLink}" class="cta-button">Start Your Application →</a>
+          </div>
+
+          ${testimonialHtml}
+
+          <div class="callout-box" style="margin-top: 20px;">
+            <h4>${ctaCopy.reassurance.heading}</h4>
+            <p>${ctaCopy.reassurance.body}</p>
+          </div>
+
+          ${variant === "afterScenario" ? `
+          <div class="callout-box warm" style="margin-top: 16px;">
+            <h4>${(ctaCopy as typeof REPORT_COPY.ctaPages.afterScenario).urgency.heading}</h4>
+            <p>${(ctaCopy as typeof REPORT_COPY.ctaPages.afterScenario).urgency.body}</p>
+          </div>
+          ` : ""}
         </div>
         ${pageFooter(pageNumber)}
       </div>
@@ -1670,9 +1812,9 @@ function generateApplicationLinkPage(
   `;
 }
 
-/**
- * Generate Our Approach Page (single page, uses REPORT_COPY)
- */
+// ============================================================
+// OUR APPROACH
+// ============================================================
 function generateOurApproachPage(
   clientName: string,
   consultant: { name: string; email: string; phone: string },
@@ -1682,7 +1824,7 @@ function generateOurApproachPage(
   const copy = REPORT_COPY.ourApproach;
   const introText = replaceVariables(copy.intro, vars);
   const introParagraphs = introText.split(/\n\n+/).filter(p => p.trim()).map(p =>
-    `<p class="mb-4">${p}</p>`
+    `<p style="margin-bottom: 14px;">${p}</p>`
   ).join("");
 
   const differentiatorItems = copy.differentiators.items.map(item => `
@@ -1698,20 +1840,20 @@ function generateOurApproachPage(
         ${pageHeader(clientName)}
         <div class="page-content">
           <div class="section-header">
+            
             <h2>${copy.heading}</h2>
-            <div class="underline"></div>
           </div>
 
           ${introParagraphs}
 
-          <h3 class="mb-2">${copy.differentiators.heading}</h3>
+          <h3 style="margin-bottom: 10px;">${copy.differentiators.heading}</h3>
           <ul class="bullet-list">
             ${differentiatorItems}
           </ul>
 
-          <p class="mt-4">${copy.closing}</p>
+          <p style="margin-top: 16px; margin-bottom: 24px;">${copy.closing}</p>
 
-          <div class="callout-box">
+          <div class="callout-box accent" style="border: 2px solid ${colors.accent}; margin-bottom: 24px;">
             <h4>${copy.promise.heading}</h4>
             <p>${copy.promise.body}</p>
           </div>
@@ -1727,9 +1869,9 @@ function generateOurApproachPage(
   `;
 }
 
-/**
- * Generate $5,000 Penalty Guarantee Page (uses REPORT_COPY)
- */
+// ============================================================
+// $5,000 PENALTY GUARANTEE — Premium Certificate
+// ============================================================
 function generateGuaranteePage(
   clientName: string,
   pageNumber: number
@@ -1749,28 +1891,28 @@ function generateGuaranteePage(
         ${pageHeader(clientName)}
         <div class="page-content">
           <div class="section-header">
-            <h2>${copy.heading}</h2>
-            <div class="underline"></div>
+            <h2>Our Promise to You</h2>
           </div>
 
           <div class="guarantee-certificate">
+            <div class="guarantee-shield">✦</div>
             <div class="amount">${copy.certificate.amount}</div>
-            <div class="title">${copy.certificate.title}</div>
+            <div class="g-title">${copy.certificate.title}</div>
             <p>${copy.certificate.body}</p>
-            <p style="font-weight: 700; margin-top: 12px;">${copy.certificate.subtext}</p>
+            <p style="font-weight: 700; margin-top: 12px; color: ${colors.navy};">${copy.certificate.subtext}</p>
           </div>
 
-          <h3 class="mb-2">${copy.howItWorks.heading}</h3>
-          <ul class="bullet-list mb-4">
+          <h3 style="margin-bottom: 10px;">${copy.howItWorks.heading}</h3>
+          <ul class="bullet-list" style="margin-bottom: 20px;">
             ${exampleItems}
           </ul>
 
-          <p class="mb-4">${copy.howItWorks.explanation}</p>
+          <p style="margin-bottom: 20px;">${copy.howItWorks.explanation}</p>
 
-          <div class="callout-box">
-            <h4>${copy.askYourBank.heading}</h4>
-            <p style="font-style: italic;">${copy.askYourBank.prompt}</p>
-            <p style="font-weight: 700; margin-top: 12px;">${copy.askYourBank.punchline}</p>
+          <div style="background: ${colors.navy}; border-radius: 10px; padding: 24px 28px; margin-top: 16px;">
+            <h4 style="color: ${colors.white}; font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 15px; margin-bottom: 10px;">${copy.askYourBank.heading}</h4>
+            <p style="font-style: italic; color: rgba(255,255,255,0.85); font-size: 14px; line-height: 1.6;">${copy.askYourBank.prompt}</p>
+            <p style="font-weight: 700; margin-top: 12px; color: ${colors.goldBorder}; font-size: 14px;">${copy.askYourBank.punchline}</p>
           </div>
         </div>
         ${pageFooter(pageNumber)}
@@ -1779,119 +1921,9 @@ function generateGuaranteePage(
   `;
 }
 
-/**
- * OLD: Generate Our Approach Pages — REPLACED by generateOurApproachPage + generateGuaranteePage
- * Keeping for reference during migration, will be removed
- */
-function _deprecated_generateOurApproachPages(
-  clientName: string,
-  consultant: { name: string; email: string; phone: string },
-  startPageNumber: number
-): string[] {
-  // Page 1: Our Approach
-  const approachPage = `
-    <div class="page">
-      <div class="page-inner">
-        ${pageHeader(clientName)}
-        <div class="page-content">
-          <div class="section-header">
-            <h2>Our Approach</h2>
-            <div class="underline"></div>
-          </div>
-
-          <p class="approach-intro">The Inspired Team has over 90 years combined experience in the Canadian mortgage space. We've seen every rate cycle, every market panic, every "this time is different" moment.</p>
-
-          <p class="mb-4">And here's what we've learned: the mortgage industry is designed to benefit banks, not borrowers. We built Inspired Mortgage to change that.</p>
-
-          <p class="mb-4">Here's what makes us different:</p>
-
-          <ul class="bullet-list">
-            <li>
-              <span class="bullet"></span>
-              <span><strong>We work for you, not the banks.</strong> We're paid the same regardless of which lender you choose. Our only job is finding you the best deal.</span>
-            </li>
-            <li>
-              <span class="bullet"></span>
-              <span><strong>We watch your mortgage.</strong> Not just at renewal—throughout your entire term. If something changes, we call you.</span>
-            </li>
-            <li>
-              <span class="bullet"></span>
-              <span><strong>We explain the math.</strong> Every recommendation comes with numbers you can verify yourself.</span>
-            </li>
-            <li>
-              <span class="bullet"></span>
-              <span><strong>We make lenders compete.</strong> 30+ lenders. One application. You see every offer.</span>
-            </li>
-          </ul>
-
-          <p class="mt-4">After decades in this industry, we could have done anything. Instead, we built this.</p>
-
-          <div class="callout-box">
-            <h4>The Inspired Mortgage Promise</h4>
-            <p>You'll never sign a renewal letter without knowing your options. You'll never be surprised by rate changes. You'll never wonder if you got the best deal.</p>
-          </div>
-
-          <div class="signature-block">
-            <div class="name">${consultant.name}</div>
-            <div class="title">${getAdvisorTitle(consultant.name)}, Inspired Mortgage</div>
-          </div>
-        </div>
-        ${pageFooter(startPageNumber)}
-      </div>
-    </div>
-  `;
-
-  // Page 2: $5,000 Penalty Guarantee
-  const guaranteePage = `
-    <div class="page">
-      <div class="page-inner">
-        ${pageHeader(clientName)}
-        <div class="page-content">
-          <div class="section-header">
-            <h2>The $5,000 Penalty Guarantee</h2>
-            <div class="underline"></div>
-          </div>
-
-          <div class="guarantee-certificate">
-            <div class="amount">$5,000</div>
-            <div class="title">Penalty Guarantee</div>
-            <p>If your penalty exceeds $5,000 when refinancing with us, we cover the difference. Guaranteed.</p>
-          </div>
-
-          <h3 class="mb-2">How It Works</h3>
-          <ul class="bullet-list mb-4">
-            <li>
-              <span class="bullet"></span>
-              <span>Your penalty is $8,000? You pay $5,000, we cover $3,000.</span>
-            </li>
-            <li>
-              <span class="bullet"></span>
-              <span>Your penalty is $12,000? You pay $5,000, we cover $7,000.</span>
-            </li>
-            <li>
-              <span class="bullet"></span>
-              <span>Your penalty is $4,500? You pay $4,500, no coverage needed.</span>
-            </li>
-          </ul>
-
-          <p class="mb-4">This guarantee exists because we believe in our ability to find you a better deal. If the savings from your new rate don't justify the penalty, we make up the difference.</p>
-
-          <div class="callout-box">
-            <h4>Ask Your Bank</h4>
-            <p>Call your current lender and ask: "What would my penalty be if I broke my mortgage today?" They're required to tell you. That number helps us calculate whether refinancing makes sense—and whether the guarantee applies.</p>
-          </div>
-        </div>
-        ${pageFooter(startPageNumber + 1)}
-      </div>
-    </div>
-  `;
-
-  return [approachPage, guaranteePage];
-}
-
-/**
- * Generate Fixed Rate Strategy Pages (FULL REWRITE FROM APPROVED COPY)
- */
+// ============================================================
+// FIXED RATE STRATEGY
+// ============================================================
 function generateFixedRateStrategyPages(
   clientName: string,
   startPageNumber: number
@@ -1915,39 +1947,39 @@ function generateFixedRateStrategyPages(
   `).join("");
 
   const whatWeDoParagraphs = copy.whatWeDoDifferently.body.split(/\n\n+/).filter(p => p.trim()).map(p =>
-    `<p class="mb-4">${p}</p>`
+    `<p style="margin-bottom: 14px;">${p}</p>`
   ).join("");
 
   const monitoringParagraphs = copy.monthlyMonitoring.body.split(/\n\n+/).filter(p => p.trim()).map(p =>
-    `<p class="mb-4">${p}</p>`
+    `<p style="margin-bottom: 14px;">${p}</p>`
   ).join("");
 
   const resultParagraphs = copy.borrowerComparison.result.body.split(/\n\n+/).filter(p => p.trim()).map(p =>
-    `<p class="mb-4">${p}</p>`
+    `<p style="margin-bottom: 14px;">${p}</p>`
   ).join("");
 
   const askYourBankParagraphs = copy.askYourBank.split(/\n\n+/).filter(p => p.trim());
 
-  // Page 1: Intro + When + What We Do + Monthly Monitoring
+  // Page 1
   const page1 = `
     <div class="page">
       <div class="page-inner">
         ${pageHeader(clientName)}
         <div class="page-content">
           <div class="section-header">
+            
             <h2>${copy.heading}</h2>
-            <div class="underline"></div>
           </div>
 
-          <p class="mb-4">${copy.intro}</p>
+          <p style="margin-bottom: 14px;">${copy.intro}</p>
 
-          <h3 class="mb-2">${copy.whenItMakesSense.heading}</h3>
+          <h3 style="margin-bottom: 10px;">${copy.whenItMakesSense.heading}</h3>
           <ul class="bullet-list mb-6">${whenItems}</ul>
 
-          <h3 class="mb-2">${copy.whatWeDoDifferently.heading}</h3>
+          <h3 style="margin-bottom: 10px;">${copy.whatWeDoDifferently.heading}</h3>
           ${whatWeDoParagraphs}
 
-          <h3 class="mb-2">${copy.monthlyMonitoring.heading}</h3>
+          <h3 style="margin-bottom: 10px;">${copy.monthlyMonitoring.heading}</h3>
           ${monitoringParagraphs}
         </div>
         ${pageFooter(startPageNumber)}
@@ -1955,27 +1987,27 @@ function generateFixedRateStrategyPages(
     </div>
   `;
 
-  // Page 2: Strategic Relock + Borrower Comparison
+  // Page 2
   const page2 = `
     <div class="page">
       <div class="page-inner">
         ${pageHeader(clientName)}
         <div class="page-content">
-          <h3 class="mb-2">${copy.strategicRelock.heading}</h3>
-          <p class="mb-4">${copy.strategicRelock.body}</p>
-          <ul class="bullet-list mb-4">${relockSteps}</ul>
-          <p class="mb-4">${copy.strategicRelock.closing}</p>
+          <h3 style="margin-bottom: 10px;">${copy.strategicRelock.heading}</h3>
+          <p style="margin-bottom: 14px;">${copy.strategicRelock.body}</p>
+          <ul class="bullet-list" style="margin-bottom: 14px;">${relockSteps}</ul>
+          <p style="margin-bottom: 14px;">${copy.strategicRelock.closing}</p>
 
-          <h3 class="mb-2 mt-6">${copy.borrowerComparison.heading}</h3>
-          <p class="mb-4">${copy.borrowerComparison.intro}</p>
+          <h3 style="margin-top: 24px; margin-bottom: 10px;">${copy.borrowerComparison.heading}</h3>
+          <p style="margin-bottom: 14px;">${copy.borrowerComparison.intro}</p>
 
-          <div style="display: flex; gap: 16px; margin: 20px 0;">
-            <div style="flex: 1; background: ${colors.lightGray}; border-radius: 12px; padding: 20px;">
-              <h4 style="font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: ${colors.slate}; margin-bottom: 12px;">${copy.borrowerComparison.borrowerA.label}</h4>
+          <div style="display: flex; gap: 16px; margin: 20px 0; align-items: flex-start;">
+            <div style="flex: 1; background: ${colors.bgCard}; border: 1px solid ${colors.border}; border-radius: 10px; padding: 20px;">
+              <h4 style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: ${colors.textMuted}; margin-bottom: 12px;">${copy.borrowerComparison.borrowerA.label}</h4>
               <ul class="bullet-list" style="margin: 0;">${borrowerASteps}</ul>
             </div>
-            <div style="flex: 1; background: #ECFDF5; border: 2px solid #059669; border-radius: 12px; padding: 20px;">
-              <h4 style="font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: #059669; margin-bottom: 12px;">${copy.borrowerComparison.borrowerB.label}</h4>
+            <div style="flex: 1; background: ${colors.successLight}; border: 2px solid ${colors.success}; border-radius: 10px; padding: 20px;">
+              <h4 style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: ${colors.success}; margin-bottom: 12px;">${copy.borrowerComparison.borrowerB.label}</h4>
               <ul class="bullet-list" style="margin: 0;">${borrowerBSteps}</ul>
             </div>
           </div>
@@ -1985,22 +2017,22 @@ function generateFixedRateStrategyPages(
     </div>
   `;
 
-  // Page 3: The Difference + Ask Your Bank
+  // Page 3
   const page3 = `
     <div class="page">
       <div class="page-inner">
         ${pageHeader(clientName)}
-        <div class="page-content">
-          <div class="impact-statement" style="margin-top: 0;">
+        <div class="page-content" style="display: flex; flex-direction: column; justify-content: center;">
+          <div class="impact-banner" style="margin-top: 0;">
             <h2>${copy.borrowerComparison.result.heading}</h2>
           </div>
 
           ${resultParagraphs}
 
-          <h3 class="mb-2 mt-6">Ask Your Bank</h3>
-          <div class="callout-box">
-            <p style="font-style: italic;">${askYourBankParagraphs[0] || ""}</p>
-            ${askYourBankParagraphs.length > 1 ? `<p style="font-weight: 700; margin-top: 12px;">${askYourBankParagraphs[1]}</p>` : ""}
+          <h3 style="margin-top: 32px; margin-bottom: 14px;">Ask Your Bank</h3>
+          <div style="background: ${colors.navy}; border-radius: 10px; padding: 28px 32px;">
+            <p style="font-style: italic; color: rgba(255,255,255,0.85); font-size: 15px; line-height: 1.7;">${askYourBankParagraphs[0] || ""}</p>
+            ${askYourBankParagraphs.length > 1 ? `<p style="font-weight: 700; margin-top: 14px; color: ${colors.goldBorder}; font-size: 15px;">${askYourBankParagraphs[1]}</p>` : ""}
           </div>
         </div>
         ${pageFooter(startPageNumber + 2)}
@@ -2011,9 +2043,9 @@ function generateFixedRateStrategyPages(
   return [page1, page2, page3];
 }
 
-/**
- * Generate Variable Rate Strategy Pages (FULL REWRITE FROM APPROVED COPY)
- */
+// ============================================================
+// VARIABLE RATE STRATEGY
+// ============================================================
 function generateVariableRateStrategyPages(
   clientName: string,
   startPageNumber: number,
@@ -2026,54 +2058,54 @@ function generateVariableRateStrategyPages(
   `).join("");
 
   const introParagraphs = replaceVariables(copy.intro, vars).split(/\n\n+/).filter(p => p.trim()).map(p =>
-    `<p class="mb-4">${p}</p>`
+    `<p style="margin-bottom: 14px;">${p}</p>`
   ).join("");
 
   const howItPlaysOutParagraphs = replaceVariables(copy.howItPlaysOut.body, vars).split(/\n\n+/).filter(p => p.trim()).map(p =>
-    `<p class="mb-4">${p}</p>`
+    `<p style="margin-bottom: 14px;">${p}</p>`
   ).join("");
 
   const dangerParagraphs = replaceVariables(copy.dangerOfGoingItAlone.body, vars).split(/\n\n+/).filter(p => p.trim()).map(p =>
-    `<p class="mb-4">${p}</p>`
+    `<p style="margin-bottom: 14px;">${p}</p>`
   ).join("");
 
-  // Page 1: Intro + When + What We Do + Strategy
+  // Page 1
   const page1 = `
     <div class="page">
       <div class="page-inner">
         ${pageHeader(clientName)}
         <div class="page-content">
           <div class="section-header">
+            
             <h2>${copy.heading}</h2>
-            <div class="underline"></div>
           </div>
 
           ${introParagraphs}
 
-          <h3 class="mb-2">${copy.whenItMakesSense.heading}</h3>
+          <h3 style="margin-bottom: 10px;">${copy.whenItMakesSense.heading}</h3>
           <ul class="bullet-list mb-6">${whenItems}</ul>
 
-          <h3 class="mb-2">${copy.whatWeDoDifferently.heading}</h3>
-          <p class="mb-4">${replaceVariables(copy.whatWeDoDifferently.body, vars)}</p>
+          <h3 style="margin-bottom: 10px;">${copy.whatWeDoDifferently.heading}</h3>
+          <p style="margin-bottom: 14px;">${replaceVariables(copy.whatWeDoDifferently.body, vars)}</p>
 
-          <h3 class="mb-2">${copy.strategy.heading}</h3>
-          <p class="mb-4">${replaceVariables(copy.strategy.body, vars)}</p>
+          <h3 style="margin-bottom: 10px;">${copy.strategy.heading}</h3>
+          <p style="margin-bottom: 14px;">${replaceVariables(copy.strategy.body, vars)}</p>
         </div>
         ${pageFooter(startPageNumber)}
       </div>
     </div>
   `;
 
-  // Page 2: How It Plays Out + Danger of Going It Alone
+  // Page 2
   const page2 = `
     <div class="page">
       <div class="page-inner">
         ${pageHeader(clientName)}
         <div class="page-content">
-          <h3 class="mb-2">${copy.howItPlaysOut.heading}</h3>
+          <h3 style="margin-bottom: 10px;">${copy.howItPlaysOut.heading}</h3>
           ${howItPlaysOutParagraphs}
 
-          <h3 class="mb-2 mt-6">${copy.dangerOfGoingItAlone.heading}</h3>
+          <h3 style="margin-top: 24px; margin-bottom: 10px;">${copy.dangerOfGoingItAlone.heading}</h3>
           ${dangerParagraphs}
         </div>
         ${pageFooter(startPageNumber + 1)}
@@ -2084,9 +2116,9 @@ function generateVariableRateStrategyPages(
   return [page1, page2];
 }
 
-/**
- * Generate Cash Back Strategy Pages (NEW — FROM APPROVED COPY)
- */
+// ============================================================
+// CASH BACK STRATEGY
+// ============================================================
 function generateCashBackStrategyPages(
   clientName: string,
   startPageNumber: number,
@@ -2099,11 +2131,11 @@ function generateCashBackStrategyPages(
   `).join("");
 
   const whatWeDoParagraphs = replaceVariables(copy.whatWeDoDifferently.body, vars).split(/\n\n+/).filter(p => p.trim()).map(p =>
-    `<p class="mb-4">${p}</p>`
+    `<p style="margin-bottom: 14px;">${p}</p>`
   ).join("");
 
   const storyParagraphs = replaceVariables(copy.trueStory.body, vars).split(/\n\n+/).filter(p => p.trim()).map(p =>
-    `<p class="mb-4">${p}</p>`
+    `<p style="margin-bottom: 14px;">${p}</p>`
   ).join("");
 
   const mathLines = copy.trueStory.math.lines.map(line => `
@@ -2111,33 +2143,33 @@ function generateCashBackStrategyPages(
   `).join("");
 
   const outcomeParagraphs = replaceVariables(copy.trueStory.outcome, vars).split(/\n\n+/).filter(p => p.trim()).map(p =>
-    `<p class="mb-4">${p}</p>`
+    `<p style="margin-bottom: 14px;">${p}</p>`
   ).join("");
 
   const howItCouldWorkParagraphs = replaceVariables(copy.howItCouldWork.body, vars).split(/\n\n+/).filter(p => p.trim()).map(p =>
-    `<p class="mb-4">${p}</p>`
+    `<p style="margin-bottom: 14px;">${p}</p>`
   ).join("");
 
-  // Page 1: Intro + When + What We Do + True Story
+  // Page 1
   const page1 = `
     <div class="page">
       <div class="page-inner">
         ${pageHeader(clientName)}
         <div class="page-content">
           <div class="section-header">
+            
             <h2>${copy.heading}</h2>
-            <div class="underline"></div>
           </div>
 
-          <p class="mb-4">${replaceVariables(copy.intro, vars)}</p>
+          <p style="margin-bottom: 14px;">${replaceVariables(copy.intro, vars)}</p>
 
-          <h3 class="mb-2">${copy.whenItMakesSense.heading}</h3>
+          <h3 style="margin-bottom: 10px;">${copy.whenItMakesSense.heading}</h3>
           <ul class="bullet-list mb-6">${whenItems}</ul>
 
-          <h3 class="mb-2">${copy.whatWeDoDifferently.heading}</h3>
+          <h3 style="margin-bottom: 10px;">${copy.whatWeDoDifferently.heading}</h3>
           ${whatWeDoParagraphs}
 
-          <h3 class="mb-2">${copy.trueStory.heading}</h3>
+          <h3 style="margin-bottom: 10px;">${copy.trueStory.heading}</h3>
           ${storyParagraphs}
         </div>
         ${pageFooter(startPageNumber)}
@@ -2145,14 +2177,14 @@ function generateCashBackStrategyPages(
     </div>
   `;
 
-  // Page 2: Math + Outcome + Verification + How It Could Work
+  // Page 2
   const page2 = `
     <div class="page">
       <div class="page-inner">
         ${pageHeader(clientName)}
         <div class="page-content">
-          <h3 class="mb-2">${copy.trueStory.math.heading}</h3>
-          <ul class="bullet-list mb-4">${mathLines}</ul>
+          <h3 style="margin-bottom: 10px;">${copy.trueStory.math.heading}</h3>
+          <ul class="bullet-list" style="margin-bottom: 16px;">${mathLines}</ul>
 
           ${outcomeParagraphs}
 
@@ -2167,7 +2199,7 @@ function generateCashBackStrategyPages(
             </div>
           </div>
 
-          <h3 class="mb-2 mt-6">${copy.howItCouldWork.heading}</h3>
+          <h3 style="margin-top: 24px; margin-bottom: 10px;">${copy.howItCouldWork.heading}</h3>
           ${howItCouldWorkParagraphs}
         </div>
         ${pageFooter(startPageNumber + 1)}
@@ -2178,9 +2210,9 @@ function generateCashBackStrategyPages(
   return [page1, page2];
 }
 
-/**
- * Generate What Happens Next Page (uses REPORT_COPY)
- */
+// ============================================================
+// WHAT HAPPENS NEXT — Final CTA Page
+// ============================================================
 function generateWhatHappensNextPage(
   clientName: string,
   consultant: { name: string; email: string; phone: string; calLink: string },
@@ -2202,28 +2234,28 @@ function generateWhatHappensNextPage(
     <div class="page">
       <div class="page-inner">
         ${pageHeader(clientName)}
-        <div class="page-content">
+        <div class="page-content" style="display: flex; flex-direction: column; justify-content: center;">
           <div class="section-header">
+            
             <h2>${copy.heading}</h2>
-            <div class="underline"></div>
           </div>
 
           <div class="steps-container">
             ${stepsHtml}
           </div>
 
-          <div class="cta-box">
+          <div class="cta-box" style="margin-top: 32px;">
             <h3>${copy.ctaBox.heading}</h3>
-            <a href="${applicationLink}" style="display: inline-block; background: ${colors.white}; color: ${colors.brandPurple}; padding: 14px 32px; border-radius: 8px; font-weight: 700; font-size: 16px; text-decoration: none; margin-top: 12px;">Start Your Application →</a>
+            <a href="${applicationLink}" class="cta-button">Start Your Application →</a>
           </div>
 
-          <div class="mt-6">
-            <h3 class="mb-4">${copy.advisorBlock.label}</h3>
-            <div class="advisor-card">
+          <div style="margin-top: 32px;">
+            <h3 style="margin-bottom: 14px;">${copy.advisorBlock.label}</h3>
+            <div class="advisor-card-inline">
               <div class="label">Contact</div>
               <div class="name">${consultant.name}</div>
               <div class="contact">${consultant.email}</div>
-              <div class="contact">${consultant.phone}</div>
+              ${consultant.phone ? `<div class="contact">${consultant.phone}</div>` : ""}
             </div>
           </div>
         </div>

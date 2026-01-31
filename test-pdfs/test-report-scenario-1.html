@@ -1,0 +1,1838 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Post-Discovery Report - Sarah Mitchell</title>
+  <style>
+    
+    @page {
+      size: letter;
+      margin: 0;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Georgia', 'Times New Roman', 'Palatino', serif;
+      font-size: 14px;
+      line-height: 1.65;
+      color: #1e293b;
+      background: #ffffff;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* ================================================
+       PAGE FOUNDATION
+       ================================================ */
+    .page {
+      width: 8.5in;
+      min-height: 11in;
+      height: 11in;
+      padding: 0;
+      position: relative;
+      page-break-after: always;
+      background: #ffffff;
+      overflow: hidden;
+    }
+
+    .page:last-child {
+      page-break-after: auto;
+    }
+
+    .page-inner {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .page-content {
+      flex: 1;
+      padding: 32px 56px 32px 56px;
+    }
+
+    /* ================================================
+       TYPOGRAPHY
+       ================================================ */
+    h1 {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 40px;
+      font-weight: 300;
+      line-height: 1.2;
+      letter-spacing: -0.02em;
+      color: #1e293b;
+    }
+
+    h2 {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 28px;
+      font-weight: 700;
+      line-height: 1.3;
+      letter-spacing: -0.01em;
+      color: #1e293b;
+    }
+
+    h3 {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 20px;
+      font-weight: 600;
+      line-height: 1.4;
+      color: #1e293b;
+    }
+
+    h4 {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      line-height: 1.4;
+      color: #1e293b;
+    }
+
+    p {
+      font-size: 15px;
+      line-height: 1.75;
+      color: #475569;
+    }
+
+    /* ================================================
+       COVER PAGE
+       ================================================ */
+    .cover-page {
+      display: flex;
+      flex-direction: column;
+      height: 11in;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cover-top {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #334155 100%);
+      height: 320px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .cover-top::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #625FFF, #d97706);
+    }
+
+    .cover-logo {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      margin-bottom: 24px;
+      opacity: 0.9;
+    }
+
+    .cover-tagline {
+      color: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 32px;
+      font-weight: 300;
+      letter-spacing: 1px;
+      text-align: center;
+      line-height: 1.3;
+      max-width: 500px;
+      padding: 0 40px;
+    }
+
+    .cover-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 64px 40px 64px;
+    }
+
+    .cover-label {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 11px;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      margin-bottom: 16px;
+    }
+
+    .cover-client-name {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 36px;
+      font-weight: 300;
+      color: #1e293b;
+      letter-spacing: -0.5px;
+      margin-bottom: 8px;
+    }
+
+    .cover-date {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 14px;
+      color: #94a3b8;
+      margin-bottom: 48px;
+    }
+
+    .cover-divider {
+      width: 48px;
+      height: 1px;
+      background: #e2e8f0;
+      margin-bottom: 48px;
+    }
+
+    .cover-advisor-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 20px 28px;
+      text-align: center;
+      min-width: 280px;
+    }
+
+    .cover-advisor-label {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 10px;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 8px;
+    }
+
+    .cover-advisor-name {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 17px;
+      font-weight: 600;
+      color: #1e293b;
+      margin-bottom: 4px;
+    }
+
+    .cover-advisor-detail {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 13px;
+      color: #475569;
+      line-height: 1.5;
+    }
+
+    /* ================================================
+       PAGE HEADER & FOOTER
+       ================================================ */
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 48px;
+      border-bottom: 1px solid #e2e8f0;
+      flex-shrink: 0;
+    }
+
+    .page-header .logo {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      color: #1e293b;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .page-header .client {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 11px;
+      color: #94a3b8;
+    }
+
+    .page-footer {
+      padding: 12px 48px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid #e2e8f0;
+      flex-shrink: 0;
+    }
+
+    .page-footer .website {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 10px;
+      color: #94a3b8;
+      letter-spacing: 0.5px;
+    }
+
+    .page-footer .page-number {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 10px;
+      color: #94a3b8;
+    }
+
+    /* ================================================
+       SECTION HEADER
+       ================================================ */
+    .section-header {
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid #1e293b;
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+    }
+
+    .section-header h2 {
+      color: #1e293b;
+      font-size: 26px;
+      margin: 0;
+    }
+
+    .section-icon {
+      font-size: 22px;
+      flex-shrink: 0;
+    }
+
+    /* ================================================
+       BULLET LIST
+       ================================================ */
+    .bullet-list {
+      list-style: none;
+      padding: 0;
+    }
+
+    .bullet-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      margin-bottom: 12px;
+      font-size: 14px;
+      line-height: 1.65;
+      color: #1e293b;
+    }
+
+    .bullet-list .bullet {
+      flex-shrink: 0;
+      width: 6px;
+      height: 6px;
+      background: #625FFF;
+      border-radius: 50%;
+      margin-top: 8px;
+    }
+
+    /* ================================================
+       METRIC CARDS — Dashboard Style
+       ================================================ */
+    .metrics-row {
+      display: flex;
+      gap: 16px;
+      margin: 24px 0;
+    }
+
+    .metric-card {
+      flex: 1;
+      border-radius: 10px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .metric-card.neutral {
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+    }
+
+    .metric-card.highlight {
+      background: #ede9fe;
+      border: 2px solid #625FFF;
+    }
+
+    .metric-card.gold {
+      background: #fef3c7;
+      border: 2px solid #f59e0b;
+    }
+
+    .metric-label {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #94a3b8;
+      margin-bottom: 8px;
+    }
+
+    .metric-value {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 36px;
+      font-weight: 700;
+      color: #1e293b;
+      line-height: 1.1;
+    }
+
+    .metric-value.accent {
+      color: #625FFF;
+    }
+
+    .metric-value.gold {
+      color: #d97706;
+    }
+
+    .metric-value.negative {
+      color: #dc2626;
+    }
+
+    .metric-subtitle {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 12px;
+      color: #94a3b8;
+      margin-top: 4px;
+    }
+
+    .comparison-arrow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      color: #94a3b8;
+      padding: 0 4px;
+      flex-shrink: 0;
+    }
+
+    /* ================================================
+       IMPACT BANNER — Full Width Navy
+       ================================================ */
+    .impact-banner {
+      background: #1e293b;
+      color: #ffffff;
+      padding: 28px 48px;
+      text-align: center;
+      margin: 24px -48px;
+    }
+
+    .impact-banner h2 {
+      font-size: 26px;
+      font-weight: 700;
+      color: #ffffff;
+      line-height: 1.3;
+    }
+
+    .impact-banner p {
+      color: rgba(255, 255, 255, 0.75);
+      font-size: 14px;
+      margin-top: 8px;
+    }
+
+    /* ================================================
+       PULLQUOTE — Key Insight Callout
+       ================================================ */
+    .pullquote {
+      border-left: 4px solid #625FFF;
+      padding: 20px 28px;
+      margin: 28px 0;
+      background: #f8fafc;
+      border-radius: 0 8px 8px 0;
+    }
+
+    .pullquote p {
+      font-size: 16px;
+      font-style: italic;
+      color: #1e293b;
+      line-height: 1.65;
+    }
+
+    .pullquote .attribution {
+      font-size: 12px;
+      font-style: normal;
+      color: #94a3b8;
+      margin-top: 8px;
+    }
+
+    /* ================================================
+       CALLOUT BOX
+       ================================================ */
+    .callout-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 24px 28px;
+      margin: 24px 0;
+    }
+
+    .callout-box h4 {
+      font-size: 15px;
+      font-weight: 600;
+      color: #1e293b;
+      margin-bottom: 10px;
+    }
+
+    .callout-box p {
+      font-size: 14px;
+      color: #475569;
+      line-height: 1.65;
+    }
+
+    .callout-box.warm {
+      background: #faf8f5;
+      border-color: #e8ddd0;
+    }
+
+    .callout-box.accent {
+      background: #ede9fe;
+      border-color: #c4b5fd;
+    }
+
+    /* ================================================
+       TIMELINE
+       ================================================ */
+    .timeline {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 28px;
+      margin: 24px 0;
+    }
+
+    .timeline h3 {
+      color: #1e293b;
+      margin-bottom: 20px;
+      font-size: 17px;
+    }
+
+    .timeline-items {
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .timeline-item {
+      flex: 1;
+      text-align: center;
+      position: relative;
+      padding: 0 8px;
+    }
+
+    .timeline-item:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      top: 14px;
+      right: 0;
+      width: 50%;
+      height: 2px;
+      background: #625FFF;
+    }
+
+    .timeline-item:not(:first-child)::before {
+      content: '';
+      position: absolute;
+      top: 14px;
+      left: 0;
+      width: 50%;
+      height: 2px;
+      background: #625FFF;
+    }
+
+    .timeline-year {
+      display: inline-block;
+      background: #1e293b;
+      color: #ffffff;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      margin-bottom: 10px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .timeline-rate {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      color: #1e293b;
+      margin-bottom: 6px;
+    }
+
+    .timeline-text {
+      font-size: 11px;
+      color: #475569;
+      line-height: 1.4;
+    }
+
+    /* ================================================
+       VERIFICATION BOX
+       ================================================ */
+    .verification-box {
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      overflow: hidden;
+      margin: 24px 0;
+    }
+
+    .verification-header {
+      background: #1e293b;
+      color: #ffffff;
+      padding: 10px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .verification-header .title {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .verification-header .copy-hint {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 10px;
+      opacity: 0.7;
+    }
+
+    .verification-body {
+      padding: 20px;
+      background: #f8fafc;
+    }
+
+    .verification-body .instruction {
+      font-size: 13px;
+      color: #475569;
+      margin-bottom: 12px;
+    }
+
+    .verification-prompt {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 16px;
+      font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
+      font-size: 12px;
+      color: #1e293b;
+      line-height: 1.6;
+    }
+
+    /* ================================================
+       DATA TABLE — Modern
+       ================================================ */
+    .data-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      margin: 20px 0;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid #e2e8f0;
+    }
+
+    .data-table th,
+    .data-table td {
+      padding: 14px 18px;
+      text-align: left;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    }
+
+    .data-table th {
+      background: #1e293b;
+      color: #ffffff;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+    }
+
+    .data-table td {
+      font-size: 14px;
+      color: #1e293b;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    .data-table tbody tr:nth-child(even) {
+      background: #f8fafc;
+    }
+
+    .data-table tbody tr:last-child td {
+      border-bottom: none;
+      font-weight: 700;
+      background: #f1f5f9;
+    }
+
+    .data-table .text-right {
+      text-align: right;
+    }
+
+    /* ================================================
+       GUARANTEE CERTIFICATE
+       ================================================ */
+    .guarantee-certificate {
+      border: 2px solid #1e293b;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+      padding: 40px;
+      text-align: center;
+      margin: 28px 0;
+      position: relative;
+    }
+
+    .guarantee-certificate::before {
+      content: '';
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      right: 8px;
+      bottom: 8px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      pointer-events: none;
+    }
+
+    .guarantee-shield {
+      font-size: 48px;
+      margin-bottom: 12px;
+    }
+
+    .guarantee-certificate .amount {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 56px;
+      font-weight: 700;
+      color: #1e293b;
+      margin-bottom: 4px;
+    }
+
+    .guarantee-certificate .g-title {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 20px;
+      font-weight: 600;
+      color: #1e293b;
+      margin-bottom: 16px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .guarantee-certificate p {
+      font-size: 14px;
+      color: #475569;
+      max-width: 440px;
+      margin: 0 auto;
+      line-height: 1.65;
+    }
+
+    /* ================================================
+       STEPS
+       ================================================ */
+    .steps-container {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 12px;
+      margin: 32px 0;
+    }
+
+    .step {
+      flex: 1;
+      text-align: center;
+      max-width: 170px;
+    }
+
+    .step-number {
+      width: 48px;
+      height: 48px;
+      background: #1e293b;
+      color: #ffffff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+      margin: 0 auto 14px auto;
+    }
+
+    .step h4 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #1e293b;
+      margin-bottom: 6px;
+    }
+
+    .step p {
+      font-size: 12px;
+      color: #475569;
+      line-height: 1.5;
+    }
+
+    .step-arrow {
+      display: flex;
+      align-items: center;
+      padding-top: 12px;
+      color: #94a3b8;
+      font-size: 20px;
+    }
+
+    /* ================================================
+       CTA BOX
+       ================================================ */
+    .cta-box {
+      background: #1e293b;
+      color: #ffffff;
+      border-radius: 12px;
+      padding: 32px 36px;
+      text-align: center;
+      margin: 28px 0;
+    }
+
+    .cta-box h3 {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      color: #ffffff;
+      font-size: 22px;
+      margin-bottom: 12px;
+    }
+
+    .cta-box p {
+      color: rgba(255, 255, 255, 0.8);
+      font-size: 14px;
+    }
+
+    .cta-button {
+      display: inline-block;
+      background: #ffffff;
+      color: #1e293b;
+      padding: 14px 36px;
+      border-radius: 8px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-weight: 700;
+      font-size: 16px;
+      text-decoration: none;
+      margin-top: 16px;
+    }
+
+    /* ================================================
+       COST HIGHLIGHT — Scenario 2
+       ================================================ */
+    .cost-highlight {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      color: #ffffff;
+      border-radius: 12px;
+      padding: 32px 40px;
+      text-align: center;
+      margin: 24px 0;
+    }
+
+    .cost-highlight .label {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      opacity: 0.7;
+      margin-bottom: 8px;
+    }
+
+    .cost-highlight .value {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 48px;
+      font-weight: 700;
+    }
+
+    .cost-highlight .subtitle {
+      font-size: 13px;
+      opacity: 0.7;
+      margin-top: 8px;
+    }
+
+    /* ================================================
+       SIGNATURE BLOCK
+       ================================================ */
+    .signature-block {
+      margin-top: 28px;
+      padding-top: 20px;
+      border-top: 1px solid #e2e8f0;
+    }
+
+    .signature-block .name {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 17px;
+      font-weight: 600;
+      color: #1e293b;
+    }
+
+    .signature-block .title {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 13px;
+      color: #94a3b8;
+    }
+
+    /* ================================================
+       ADVISOR CARD — Inline
+       ================================================ */
+    .advisor-card-inline {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 18px 24px;
+      display: inline-block;
+    }
+
+    .advisor-card-inline .label {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 10px;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 6px;
+    }
+
+    .advisor-card-inline .name {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      color: #1e293b;
+      margin-bottom: 2px;
+    }
+
+    .advisor-card-inline .contact {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 13px;
+      color: #475569;
+    }
+
+    /* ================================================
+       UTILITY CLASSES
+       ================================================ */
+    .text-center { text-align: center; }
+    .text-left { text-align: left; }
+    .mt-2 { margin-top: 8px; }
+    .mt-4 { margin-top: 16px; }
+    .mt-6 { margin-top: 24px; }
+    .mb-2 { margin-bottom: 8px; }
+    .mb-4 { margin-bottom: 16px; }
+    .mb-6 { margin-bottom: 24px; }
+    .font-bold { font-weight: 700; }
+    .avoid-break { page-break-inside: avoid; }
+  
+  </style>
+</head>
+<body>
+  
+    <div class="page cover-page">
+      <div class="cover-top">
+        <div class="cover-logo">Inspired Mortgage</div>
+        <div class="cover-tagline">SEE LENDERS COMPETE FOR YOUR BUSINESS</div>
+      </div>
+      <div class="cover-body">
+        <div class="cover-label">Prepared for</div>
+        <div class="cover-client-name">Sarah Mitchell</div>
+        <div class="cover-date">January 16, 2026</div>
+        <div class="cover-divider"></div>
+        <div class="cover-advisor-card">
+          <div class="cover-advisor-label">YOUR ADVISOR</div>
+          <div class="cover-advisor-name">Greg Williamson</div>
+          <div class="cover-advisor-detail">greg@inspired.mortgage</div>
+          <div class="cover-advisor-detail">(416) 555-0123</div>
+        </div>
+      </div>
+    </div>
+  
+
+    <div class="page">
+      <div class="page-inner">
+        
+    <div class="page-header">
+      <div class="logo">Inspired Mortgage</div>
+      <div class="client">Sarah Mitchell</div>
+    </div>
+  
+        <div class="page-content">
+          <div style="background: #faf8f5; border-left: 4px solid #d97706; border-radius: 0 8px 8px 0; padding: 16px 24px; margin-bottom: 28px;">
+            <p style="font-size: 13px; color: #475569; margin-bottom: 6px; font-style: italic;">This report takes about 10 minutes to read.</p>
+            <p style="font-size: 13px; color: #475569; line-height: 1.6; margin-bottom: 6px;">We'd encourage you to take that time. The decisions ahead of you—rate type, lender, timing—will impact your finances for years. This document was built specifically for your situation, and it's designed to make sure you understand your options clearly.</p><p style="font-size: 13px; color: #475569; line-height: 1.6; margin-bottom: 6px;">Even if you choose not to work with us, you'll walk away more informed than most Canadians ever get about their mortgage.</p>
+            <p style="font-size: 13px; color: #1e293b; font-weight: 600; margin-top: 8px; font-style: italic;">Markets change. So should your mortgage strategy.</p>
+          </div>
+
+          <div class="section-header">
+            
+            <h2>What You Told Us</h2>
+          </div>
+
+          <p style="margin-bottom: 14px;">Sarah, thank you for sharing your story with us. Your mortgage isn't just numbers on a page—it's your home, your family's security, and years of hard work. We take that seriously.</p><p style="margin-bottom: 14px;">Here's what we heard during our conversation:</p>
+
+          <ul class="bullet-list" style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 20px 24px 8px 24px; border-radius: 10px; margin: 20px 0;">
+            
+      <li>
+        <span class="bullet"></span>
+        <span>You're coming up for renewal on your $485,000 mortgage with TD Bank</span>
+      </li>
+      <li>
+        <span class="bullet"></span>
+        <span>Your current rate of 1.89% has served you well, but you're concerned about payment shock at renewal</span>
+      </li>
+      <li>
+        <span class="bullet"></span>
+        <span>You mentioned wanting to keep your monthly payments manageable while not extending your timeline</span>
+      </li>
+      <li>
+        <span class="bullet"></span>
+        <span>You have a car loan ($32,000) and line of credit ($18,500) you'd like to potentially consolidate</span>
+      </li>
+      <li>
+        <span class="bullet"></span>
+        <span>Your goal is to be mortgage-free before retirement in 15 years</span>
+      </li>
+      <li>
+        <span class="bullet"></span>
+        <span>You're open to exploring both fixed and variable rate options for this next term</span>
+      </li>
+      <li>
+        <span class="bullet"></span>
+        <span>You mentioned your household income has increased since you first got the mortgage</span>
+      </li>
+          </ul>
+
+          <p style="margin-bottom: 14px;">We've designed the rest of this report around your specific situation. No generic advice—just a clear-eyed look at what happened on your last term, what it means for you today, and what we can do differently going forward.</p><p style="margin-bottom: 14px;">Take your time with the following pages. We want you to understand not just what we recommend, but why—so you can make the best decision for your family.</p>
+        </div>
+        
+    <div class="page-footer">
+      <div class="website">inspired.mortgage</div>
+      <div class="page-number">Page 2</div>
+    </div>
+  
+      </div>
+    </div>
+  
+
+    <div class="page">
+      <div class="page-inner">
+        
+    <div class="page-header">
+      <div class="logo">Inspired Mortgage</div>
+      <div class="client">Sarah Mitchell</div>
+    </div>
+  
+        <div class="page-content">
+          <div class="section-header">
+            
+            <h2>What Happened on Your Last Term</h2>
+          </div>
+
+          <p style="margin-bottom: 14px;">Here's the thing: your last term was actually great.</p><p style="margin-bottom: 14px;"><strong>You locked in at 1.89%—one of the lowest fixed rates in Canadian history. Your payments were predictable. Your principal was dropping steadily. You did everything right.</strong></p><p style="margin-bottom: 14px;"><strong>The problem isn't what happened. The problem is what's about to happen.</strong></p>
+          <p style="margin-bottom: 14px;">You started with a 25-year amortization. After five years of payments, you're now at 20 years remaining. You made real progress.</p><p style="margin-bottom: 14px;">But at today's rates, keeping the same amortization would push your payment from approximately $2,045 to $2,689—a difference of $644 per month.</p>
+
+          <div class="metrics-row">
+            <div class="metric-card neutral">
+              <div class="metric-label">Your Old Payment</div>
+              <div class="metric-value">$2,045</div>
+              <div class="metric-subtitle">per month</div>
+            </div>
+            <div class="comparison-arrow">→</div>
+            <div class="metric-card highlight">
+              <div class="metric-label">Your New Payment</div>
+              <div class="metric-value accent">$2,689</div>
+              <div class="metric-subtitle">per month</div>
+            </div>
+          </div>
+
+          <div style="text-align: center; margin: 20px 0;">
+            <div style="display: inline-block; background: linear-gradient(135deg, #0f172a, #1e293b); color: #ffffff; border-radius: 10px; padding: 18px 40px; text-align: center;">
+              <div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.7; margin-bottom: 4px;">Monthly Increase</div>
+              <div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 32px; font-weight: 700;">+$644</div>
+            </div>
+          </div>
+
+          <p style="margin-top: 14px;">For most people, that's not manageable. So the bank offers a simple solution: add 5 years back onto your amortization. Payment problem solved.</p><p style="margin-top: 14px;"><strong>Except here's what that actually means:</strong></p>
+        </div>
+        
+    <div class="page-footer">
+      <div class="website">inspired.mortgage</div>
+      <div class="page-number">Page 3</div>
+    </div>
+  
+      </div>
+    </div>
+  
+
+    <div class="page">
+      <div class="page-inner">
+        
+    <div class="page-header">
+      <div class="logo">Inspired Mortgage</div>
+      <div class="client">Sarah Mitchell</div>
+    </div>
+  
+        <div class="page-content">
+          <div class="impact-banner" style="margin-top: 0;">
+            <h2>Five years of payments.<br>Zero progress.</h2>
+          </div>
+
+          <p style="margin-top: 14px;">You'll make another 60 payments—roughly $161,340 out of your pocket—and at the end of it, you'll still have 20 years remaining. Exactly where you are today.</p><p style="margin-top: 14px;">All that ground you gained with your sub-2% rate? Given back. The years of principal reduction you earned? Erased on paper.</p><p style="margin-top: 14px;">And the bank won't explain this. They'll send you a renewal letter with a checkbox. You'll sign it because the payment looks affordable. And you won't realize what you gave up until years later—if ever.</p>
+          <p style="margin-top: 14px;">This isn't bad luck you have to accept.</p><p style="margin-top: 14px;">Yes, rates are higher than they were. That's reality. But "extend your amortization and move on" isn't the only answer—it's just the easiest one for your bank to process.</p>
+        </div>
+        
+    <div class="page-footer">
+      <div class="website">inspired.mortgage</div>
+      <div class="page-number">Page 4</div>
+    </div>
+  
+      </div>
+    </div>
+  
+
+    <div class="page">
+      <div class="page-inner">
+        
+    <div class="page-header">
+      <div class="logo">Inspired Mortgage</div>
+      <div class="client">Sarah Mitchell</div>
+    </div>
+  
+        <div class="page-content">
+          <div class="section-header" style="margin-top: 0;">
+            <h2>The Difference Active Management Makes</h2>
+          </div>
+
+          <p style="margin-bottom: 14px;">Here's what would have happened if you'd had someone watching your mortgage the whole time:</p>
+
+          <div class="timeline">
+            <h3>What Active Management Looks Like</h3>
+            <div class="timeline-items">
+              
+    <div class="timeline-item">
+      <div class="timeline-year">Year 1</div>
+      <div class="timeline-rate">2.9%</div>
+      <div class="timeline-text">We call you. &quot;Consider bumping your payment up as if your rate was 2.9%. You won't feel much difference now, but you'll thank yourself at renewal.&quot;</div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-year">Year 2</div>
+      <div class="timeline-rate">3.8%</div>
+      <div class="timeline-text">We call you. &quot;Another small increase.&quot;</div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-year">Year 3</div>
+      <div class="timeline-rate">4.2%</div>
+      <div class="timeline-text">We call you. &quot;Consider locking in.&quot;</div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-year">Now</div>
+      <div class="timeline-rate"></div>
+      <div class="timeline-text">Prepared. No payment shock. No surprises.</div>
+    </div>
+            </div>
+          </div>
+
+          <p style="margin-top: 14px;">By the time you reached renewal, your payments would have already adjusted gradually. No shock. No scramble. And instead of needing to extend your amortization, you'd have accelerated it—years ahead of where you are now, ready to absorb the higher rate environment without losing ground.</p><p style="margin-top: 14px;">That's what active management means. Not just getting you a rate today—but making sure the next five years don't undo your progress.</p>
+          <p style="margin-top: 14px;">This wasn't your fault. Nobody explained the options. Nobody showed you what was coming. Nobody called you before that renewal letter arrived.</p><p style="margin-top: 14px;"><strong>Nobody did that for you last time. We will this time.</strong></p>
+        </div>
+        
+    <div class="page-footer">
+      <div class="website">inspired.mortgage</div>
+      <div class="page-number">Page 5</div>
+    </div>
+  
+      </div>
+    </div>
+  
+
+    <div class="page">
+      <div class="page-inner">
+        
+    <div class="page-header">
+      <div class="logo">Inspired Mortgage</div>
+      <div class="client">Sarah Mitchell</div>
+    </div>
+  
+        <div class="page-content">
+          <div class="section-header">
+            <h2>What We Look For Instead</h2>
+          </div>
+
+          <p style="margin-bottom: 14px;">There may be ways to reduce your overall interest cost across this next term that let you hold your amortization—or at least minimize the damage:</p>
+
+          <p style="margin-bottom: 10px;"><strong>Rate optimization:</strong> Not just today's rate, but actively managing through the term as rates move. If we can save you 0.5% through a strategic relock in year two or three, that savings doesn't just reduce your payment—it accelerates your amortization. Every dollar that would have gone to interest now goes to principal. A single well-timed relock could recover a year or more of the amortization you'd otherwise lose.</p><p style="margin-bottom: 10px;"><strong>Debt restructuring:</strong> If you're carrying other debts—car loans, lines of credit, credit cards—there may be a consolidation play that reduces your total monthly outflow while keeping your mortgage amortization intact.</p><p style="margin-bottom: 10px;"><strong>Cash flow reallocation:</strong> Sometimes the answer isn't in the mortgage itself but in how your overall debt is structured. And sometimes it's about what happens during the term, not just at the start.</p>
+
+          <div class="pullquote">
+            <p>The point is: you have options beyond "extend and accept." But we can't find them without the application.</p>
+          </div>
+        </div>
+        
+    <div class="page-footer">
+      <div class="website">inspired.mortgage</div>
+      <div class="page-number">Page 6</div>
+    </div>
+  
+      </div>
+    </div>
+  
+
+    <div class="page">
+      <div class="page-inner">
+        
+    <div class="page-header">
+      <div class="logo">Inspired Mortgage</div>
+      <div class="client">Sarah Mitchell</div>
+    </div>
+  
+        <div class="page-content">
+          <div class="section-header">
+            <h2>What Could Happen With Active Management</h2>
+          </div>
+
+          <p style="margin-bottom: 14px;">We find a combination of rate strategy, term selection, and possibly debt restructuring that holds your amortization at 20 years—or close to it.</p><p style="margin-bottom: 14px;">Every time rates move favorably, we act. Every time there's an opportunity to accelerate, we take it. Five years from now, you're at 15 years remaining. Then 10. Then done.</p><p style="margin-bottom: 14px;">The difference between these two paths is years of your life and tens of thousands of dollars.</p><p style="margin-bottom: 14px;">We can't promise we'll find the perfect solution for your situation. But we can promise we'll look—which is more than your bank will ever do.</p>
+
+          <div class="verification-box">
+            <div class="verification-header">
+              <span class="title">Want to understand why this matters?</span>
+              <span class="copy-hint">Copy prompt below</span>
+            </div>
+            <div class="verification-body">
+              <p class="instruction">Copy and paste this prompt into Google or any AI tool:</p>
+              <div class="verification-prompt">If a Canadian homeowner had a mortgage at 1.8% for 5 years and now renews at 4.5%, what happens to their payment? If they extend their amortization to keep payments affordable, how much progress do they lose? Over a 25-year mortgage, what's the real cost of extending amortization by 5 years at renewal? Also, what would it cost in total extra payments if I simply increase my amortization from 20 years to 25 years at today's rates?</div>
+            </div>
+          </div>
+        </div>
+        
+    <div class="page-footer">
+      <div class="website">inspired.mortgage</div>
+      <div class="page-number">Page 7</div>
+    </div>
+  
+      </div>
+    </div>
+  
+
+    <div class="page">
+      <div class="page-inner">
+        
+    <div class="page-header">
+      <div class="logo">Inspired Mortgage</div>
+      <div class="client">Sarah Mitchell</div>
+    </div>
+  
+        <div class="page-content">
+          <div class="section-header">
+            
+            <h2>Your Next Step</h2>
+          </div>
+
+          <p style="font-size: 15px; color: #475569; line-height: 1.75; margin-bottom: 28px;">Ready to see which strategies fit your situation? Complete your application and we'll build your personalized Lender Comparison Report—including real numbers from 30+ lenders competing for your business.</p>
+
+          <h3 style="font-size: 17px; font-weight: 600; color: #1e293b; margin-bottom: 16px;">What the Application Unlocks</h3>
+
+          <ul style="list-style: none; padding: 0; margin-bottom: 28px;">
+            
+    <li style="display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; font-size: 14px; color: #1e293b; line-height: 1.6;">
+      <span style="color: #059669; font-weight: 700; font-size: 16px; flex-shrink: 0; margin-top: 1px;">✓</span>
+      <span>Access to 30+ lenders competing for your business</span>
+    </li>
+  
+    <li style="display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; font-size: 14px; color: #1e293b; line-height: 1.6;">
+      <span style="color: #059669; font-weight: 700; font-size: 16px; flex-shrink: 0; margin-top: 1px;">✓</span>
+      <span>A side-by-side Lender Comparison Report with real rates</span>
+    </li>
+  
+    <li style="display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; font-size: 14px; color: #1e293b; line-height: 1.6;">
+      <span style="color: #059669; font-weight: 700; font-size: 16px; flex-shrink: 0; margin-top: 1px;">✓</span>
+      <span>Personalized strategy recommendations based on your full financial picture</span>
+    </li>
+  
+    <li style="display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; font-size: 14px; color: #1e293b; line-height: 1.6;">
+      <span style="color: #059669; font-weight: 700; font-size: 16px; flex-shrink: 0; margin-top: 1px;">✓</span>
+      <span>Our $5,000 Penalty Guarantee — protection no bank will offer</span>
+    </li>
+  
+          </ul>
+
+          <div class="cta-box">
+            <h3>Ready to See What's Possible?</h3>
+            <p style="color: rgba(255,255,255,0.7); font-size: 13px; margin-bottom: 8px;">10-15 minutes · No credit impact · No obligation</p>
+            <a href="https://www.inspired.mortgage/start-here" class="cta-button">Start Your Application →</a>
+          </div>
+
+          
+
+          <div class="callout-box" style="margin-top: 20px;">
+            <h4>No Commitment Required</h4>
+            <p>The application is not a commitment to proceed. It's how we gather the information needed to make lenders compete for your business. There's no credit impact, no obligation, and no pressure. You'll receive your personalized Lender Comparison Report within 24-48 hours—and then you decide.</p>
+          </div>
+
+          
+          <div class="callout-box warm" style="margin-top: 16px;">
+            <h4>Why Timing Matters</h4>
+            <p>Mortgage rates change daily. The rates available today may not be available next week. By completing your application now, we can lock in today's best options while you review your report and make your decision.</p>
+          </div>
+          
+        </div>
+        
+    <div class="page-footer">
+      <div class="website">inspired.mortgage</div>
+      <div class="page-number">Page 8</div>
+    </div>
+  
+      </div>
+    </div>
+  
+
+    <div class="page">
+      <div class="page-inner">
+        
+    <div class="page-header">
+      <div class="logo">Inspired Mortgage</div>
+      <div class="client">Sarah Mitchell</div>
+    </div>
+  
+        <div class="page-content">
+          <div class="section-header">
+            
+            <h2>The Opportunity You Might Not See</h2>
+          </div>
+
+          <p style="margin-bottom: 14px;">There's something we look for on every file that most banks never mention—because it doesn't help them.</p><p style="margin-bottom: 14px;">When you bring us your full financial picture—not just your mortgage, but your debts, your cash flow, your goals—we sometimes find restructuring opportunities that change everything.</p>
+
+          <h3 class="mt-6" style="margin-bottom: 10px;">Here's a real example from this week:</h3>
+          <p style="margin-bottom: 14px;">A client came to us with a straightforward renewal. $215,000 mortgage at $1,200/month with 20 years remaining. Standard stuff.
+
+But he also had:</p>
+
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Debt</th>
+                <th class="text-right">Balance</th>
+                <th class="text-right">Payment</th>
+              </tr>
+            </thead>
+            <tbody>
+              
+    <tr>
+      <td>Car loan</td>
+      <td class="text-right">$75,000</td>
+      <td class="text-right">$1,555/mo</td>
+    </tr>
+  
+    <tr style="background: #f8fafc;">
+      <td>Home renovation loan</td>
+      <td class="text-right">$46,000</td>
+      <td class="text-right">$450/mo</td>
+    </tr>
+  
+            </tbody>
+          </table>
+
+          <p style="margin-bottom: 10px;">Total monthly outflow: $3,205 across three debts.</p>
+          <p style="margin-bottom: 14px;">If he renewed at his bank, he'd keep making those three separate payments for years—the car loan for 5 years, the reno loan for 10, the mortgage for 20. High interest on the consumer debt. Cash flow squeezed every month.</p>
+
+          <h3 class="mt-6" style="margin-bottom: 10px;">Here's what we found:</h3>
+          <p style="margin-bottom: 14px;">By consolidating everything into a single new mortgage of $336,000—and keeping his total payment at the same $3,205 he was already paying—we reduced his total time to debt-free from 20 years to 10 years.</p>
+
+          <div style="background: #fef3c7; border: 2px solid #f59e0b; border-radius: 10px; padding: 20px 28px; text-align: center; margin: 20px 0;">
+            <p style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 18px; font-weight: 700; color: #d97706;">Same monthly cash flow. Half the time. Completely debt-free a decade sooner.</p>
+          </div>
+
+          <p style="margin-bottom: 14px; font-style: italic;">He had no idea this was possible. His bank certainly wasn't going to tell him.</p>
+        </div>
+        
+    <div class="page-footer">
+      <div class="website">inspired.mortgage</div>
+      <div class="page-number">Page 9</div>
+    </div>
+  
+      </div>
+    </div>
+  
+
+    <div class="page">
+      <div class="page-inner">
+        
+    <div class="page-header">
+      <div class="logo">Inspired Mortgage</div>
+      <div class="client">Sarah Mitchell</div>
+    </div>
+  
+        <div class="page-content">
+          <h3 style="margin-bottom: 10px;">A note on "increasing your mortgage":</h3>
+          <p style="margin-bottom: 14px;">When we talk about debt consolidation, some people hesitate—"I don't want a bigger mortgage."</p><p style="margin-bottom: 14px;">We get it. But here's the reality: your total debt doesn't change. If you owe $215,000 on your mortgage plus $121,000 in other debts, you owe $336,000. Period.</p><p style="margin-bottom: 14px;">The question isn't whether you have debt. The question is how that debt is structured—and whether the structure is working for you or against you.</p><p style="margin-bottom: 14px;">Consolidating doesn't add debt. It repositions it. And when done strategically, it can cut years off your path to debt-free.</p>
+
+          <h3 class="mt-6" style="margin-bottom: 10px;">Why this matters for you:</h3>
+          <p style="margin-bottom: 14px;">We don't know yet if there's a similar opportunity in your situation. That's what the application unlocks—it lets us see the full picture and look for restructuring plays that most lenders ignore.</p><p style="margin-bottom: 14px;">This is one of the reasons we ask for more information than a typical rate quote requires. We're not just shopping rates. We're looking for the move that changes your trajectory.</p>
+        </div>
+        
+    <div class="page-footer">
+      <div class="website">inspired.mortgage</div>
+      <div class="page-number">Page 10</div>
+    </div>
+  
+      </div>
+    </div>
+  
+
+    <div class="page">
+      <div class="page-inner">
+        
+    <div class="page-header">
+      <div class="logo">Inspired Mortgage</div>
+      <div class="client">Sarah Mitchell</div>
+    </div>
+  
+        <div class="page-content">
+          <div class="section-header">
+            
+            <h2>Our Approach</h2>
+          </div>
+
+          <p style="margin-bottom: 14px;">The Inspired Team has over 90 years combined experience in the Canadian mortgage space. We've seen every rate cycle, every market panic, every "this time is different" moment.</p><p style="margin-bottom: 14px;">And here's what we've learned: the mortgage industry is designed to benefit banks, not borrowers. We built Inspired Mortgage to change that.</p>
+
+          <h3 style="margin-bottom: 10px;">Here's what makes us different:</h3>
+          <ul class="bullet-list">
+            
+    <li>
+      <span class="bullet"></span>
+      <span><strong>We work for you, not the banks.</strong> We're paid the same regardless of which lender you choose. Our only job is finding you the best deal.</span>
+    </li>
+  
+    <li>
+      <span class="bullet"></span>
+      <span><strong>We watch your mortgage.</strong> Not just at renewal—throughout your entire term. If something changes, we call you.</span>
+    </li>
+  
+    <li>
+      <span class="bullet"></span>
+      <span><strong>We explain the math.</strong> Every recommendation comes with numbers you can verify yourself.</span>
+    </li>
+  
+    <li>
+      <span class="bullet"></span>
+      <span><strong>We make lenders compete.</strong> 30+ lenders. One application. You see every offer.</span>
+    </li>
+  
+          </ul>
+
+          <p style="margin-top: 16px; margin-bottom: 24px;">After decades in this industry, we could have done anything. Instead, we built this.</p>
+
+          <div class="callout-box accent" style="border: 2px solid #625FFF; margin-bottom: 24px;">
+            <h4>The Inspired Mortgage Promise</h4>
+            <p>You'll never sign a renewal letter without knowing your options. You'll never be surprised by rate changes. You'll never wonder if you got the best deal.</p>
+          </div>
+
+          <div class="signature-block">
+            <div class="name">Greg Williamson</div>
+            <div class="title">Founder, Inspired Mortgage</div>
+          </div>
+        </div>
+        
+    <div class="page-footer">
+      <div class="website">inspired.mortgage</div>
+      <div class="page-number">Page 11</div>
+    </div>
+  
+      </div>
+    </div>
+  
+
+    <div class="page">
+      <div class="page-inner">
+        
+    <div class="page-header">
+      <div class="logo">Inspired Mortgage</div>
+      <div class="client">Sarah Mitchell</div>
+    </div>
+  
+        <div class="page-content">
+          <div class="section-header">
+            <h2>Our Promise to You</h2>
+          </div>
+
+          <div class="guarantee-certificate">
+            <div class="guarantee-shield">✦</div>
+            <div class="amount">$5,000</div>
+            <div class="g-title">Penalty Guarantee</div>
+            <p>If your penalty exceeds $5,000 when refinancing with us, we cover the difference. Guaranteed.</p>
+            <p style="font-weight: 700; margin-top: 12px; color: #1e293b;">For penalties under $5,000, we split it 50/50.</p>
+          </div>
+
+          <h3 style="margin-bottom: 10px;">How It Works</h3>
+          <ul class="bullet-list" style="margin-bottom: 20px;">
+            
+    <li>
+      <span class="bullet"></span>
+      <span>Your penalty is $12,000? You pay $5,000, we cover $7,000.</span>
+    </li>
+  
+    <li>
+      <span class="bullet"></span>
+      <span>Your penalty is $8,000? You pay $5,000, we cover $3,000.</span>
+    </li>
+  
+    <li>
+      <span class="bullet"></span>
+      <span>Your penalty is $4,500? We split it 50/50—you pay $2,250, we cover $2,250.</span>
+    </li>
+  
+          </ul>
+
+          <p style="margin-bottom: 20px;">This guarantee exists because we believe in our ability to find you a better deal. If the savings from your new rate don't justify the penalty, we make up the difference.</p>
+
+          <div style="background: #1e293b; border-radius: 10px; padding: 24px 28px; margin-top: 16px;">
+            <h4 style="color: #ffffff; font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 15px; margin-bottom: 10px;">Ask Your Bank</h4>
+            <p style="font-style: italic; color: rgba(255,255,255,0.85); font-size: 14px; line-height: 1.6;">Ask your bank: "If I renew with you, will you guarantee that I will not pay any higher of a penalty than $5,000? And if the penalty is lower than $5,000, will you split it with me 50/50—for any reason I break the mortgage, including selling my house?"</p>
+            <p style="font-weight: 700; margin-top: 12px; color: #f59e0b; font-size: 14px;">If they say no, then the risk of renewing with them is way too high. You will not have an opportunity to renegotiate and get a lower rate in the future.</p>
+          </div>
+        </div>
+        
+    <div class="page-footer">
+      <div class="website">inspired.mortgage</div>
+      <div class="page-number">Page 12</div>
+    </div>
+  
+      </div>
+    </div>
+  
+
+    <div class="page">
+      <div class="page-inner">
+        
+    <div class="page-header">
+      <div class="logo">Inspired Mortgage</div>
+      <div class="client">Sarah Mitchell</div>
+    </div>
+  
+        <div class="page-content">
+          <div class="section-header">
+            
+            <h2>See the $5,000 Guarantee in Action</h2>
+          </div>
+
+          <p style="font-size: 15px; color: #475569; line-height: 1.75; margin-bottom: 28px;">See what this looks like for your mortgage. Complete your application to unlock your Lender Comparison Report—including which lenders offer fair penalties and how the $5,000 Guarantee applies to your specific situation.</p>
+
+          <h3 style="font-size: 17px; font-weight: 600; color: #1e293b; margin-bottom: 16px;">What You'll Receive</h3>
+
+          <ul style="list-style: none; padding: 0; margin-bottom: 28px;">
+            
+    <li style="display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; font-size: 14px; color: #1e293b; line-height: 1.6;">
+      <span style="color: #059669; font-weight: 700; font-size: 16px; flex-shrink: 0; margin-top: 1px;">✓</span>
+      <span>Your exact penalty amount from each lender</span>
+    </li>
+  
+    <li style="display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; font-size: 14px; color: #1e293b; line-height: 1.6;">
+      <span style="color: #059669; font-weight: 700; font-size: 16px; flex-shrink: 0; margin-top: 1px;">✓</span>
+      <span>How the $5,000 Guarantee applies to your situation</span>
+    </li>
+  
+    <li style="display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; font-size: 14px; color: #1e293b; line-height: 1.6;">
+      <span style="color: #059669; font-weight: 700; font-size: 16px; flex-shrink: 0; margin-top: 1px;">✓</span>
+      <span>A clear comparison showing which lenders offer fair terms</span>
+    </li>
+  
+    <li style="display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; font-size: 14px; color: #1e293b; line-height: 1.6;">
+      <span style="color: #059669; font-weight: 700; font-size: 16px; flex-shrink: 0; margin-top: 1px;">✓</span>
+      <span>The math behind whether breaking your current mortgage makes sense</span>
+    </li>
+  
+          </ul>
+
+          <div class="cta-box">
+            <h3>Ready to See What's Possible?</h3>
+            <p style="color: rgba(255,255,255,0.7); font-size: 13px; margin-bottom: 8px;">10-15 minutes · No credit impact · No obligation</p>
+            <a href="https://www.inspired.mortgage/start-here" class="cta-button">Start Your Application →</a>
+          </div>
+
+          
+    <div style="background: #faf8f5; border-left: 4px solid #d97706; border-radius: 0 8px 8px 0; padding: 20px 24px; margin: 24px 0; text-align: left;">
+      <p style="font-size: 15px; font-style: italic; color: #1e293b; line-height: 1.65; margin-bottom: 8px;">"I had no idea I was overpaying until Inspired Mortgage showed me the numbers. The $5,000 Penalty Guarantee made the decision easy—I'm saving over $400 a month now."</p>
+      <p style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 12px; color: #94a3b8; font-weight: 600;">— Recent Inspired Mortgage Client</p>
+    </div>
+  
+
+          <div class="callout-box" style="margin-top: 20px;">
+            <h4>We Do the Heavy Lifting</h4>
+            <p>Once you complete the application, our team reviews your full financial picture and shops your mortgage to 30+ lenders. You don't need to call anyone, negotiate anything, or fill out multiple applications. One application. Every option. Delivered to you in a clear, easy-to-read report.</p>
+          </div>
+
+          
+        </div>
+        
+    <div class="page-footer">
+      <div class="website">inspired.mortgage</div>
+      <div class="page-number">Page 13</div>
+    </div>
+  
+      </div>
+    </div>
+  
+
+    <div class="page">
+      <div class="page-inner">
+        
+    <div class="page-header">
+      <div class="logo">Inspired Mortgage</div>
+      <div class="client">Sarah Mitchell</div>
+    </div>
+  
+        <div class="page-content">
+          <div class="section-header">
+            
+            <h2>Strategy: Fixed Rate Mortgage</h2>
+          </div>
+
+          <p style="margin-bottom: 14px;">A fixed rate locks in your interest rate for the entire term—typically 5 years. Your payment stays exactly the same, no matter what happens in the market.</p>
+
+          <h3 style="margin-bottom: 10px;">When Fixed Makes Sense</h3>
+          <ul class="bullet-list mb-6">
+    <li><span class="bullet"></span><span>You value predictability and want to know exactly what you'll pay each month</span></li>
+  
+    <li><span class="bullet"></span><span>Your budget is tight and you can't absorb payment increases</span></li>
+  
+    <li><span class="bullet"></span><span>You believe rates will rise significantly during your term</span></li>
+  
+    <li><span class="bullet"></span><span>You sleep better knowing your rate won't change</span></li>
+  </ul>
+
+          <h3 style="margin-bottom: 10px;">What We Do Differently</h3>
+          <p style="margin-bottom: 14px;">Most people just take the rate their bank offers. We make lenders compete—and the difference can be significant.</p><p style="margin-bottom: 14px;">But here's the thing: getting you a competitive rate today is just the beginning. The real value happens during your term.</p>
+
+          <h3 style="margin-bottom: 10px;">Monthly Mortgage Monitoring</h3>
+          <p style="margin-bottom: 14px;">Every month, we send you a customized report that analyzes your fixed rate relative to current market rates. You'll always know exactly where you stand.</p><p style="margin-bottom: 14px;">Why this matters: Let's say you lock in today at 4.30%. Fourteen months from now, the same 5-year fixed rate is available at 3.75%. Your bank will never tell you this. They're happy to keep collecting your higher payments.</p><p style="margin-bottom: 14px;">We'll notify you immediately. And because of our $5,000 Penalty Guarantee (with 50/50 split on penalties under $5,000), you can actually do something about it.</p>
+        </div>
+        
+    <div class="page-footer">
+      <div class="website">inspired.mortgage</div>
+      <div class="page-number">Page 14</div>
+    </div>
+  
+      </div>
+    </div>
+  
+
+    <div class="page">
+      <div class="page-inner">
+        
+    <div class="page-header">
+      <div class="logo">Inspired Mortgage</div>
+      <div class="client">Sarah Mitchell</div>
+    </div>
+  
+        <div class="page-content">
+          <h3 style="margin-bottom: 10px;">Strategic Relock: How It Works</h3>
+          <p style="margin-bottom: 14px;">When rates drop significantly, we run the math:</p>
+          <ul class="bullet-list" style="margin-bottom: 14px;">
+    <li><span class="bullet"></span><span>What's your current penalty?</span></li>
+  
+    <li><span class="bullet"></span><span>What will you save with the lower rate?</span></li>
+  
+    <li><span class="bullet"></span><span>Does it make sense to break and relock?</span></li>
+  </ul>
+          <p style="margin-bottom: 14px;">If the savings outweigh the penalty—and with our guarantee protecting you—we execute a strategic relock. You get a brand new 5-year term at the lower rate, and you keep more money in your pocket.</p>
+
+          <h3 style="margin-top: 24px; margin-bottom: 10px;">Real Example: Two Strategic Relocks in One Term</h3>
+          <p style="margin-bottom: 14px;">Let's compare two borrowers with identical $500,000 mortgages, both starting at 4.30%:</p>
+
+          <div style="display: flex; gap: 16px; margin: 20px 0; align-items: flex-start;">
+            <div style="flex: 1; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px;">
+              <h4 style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: #94a3b8; margin-bottom: 12px;">BORROWER A: Renews with their bank</h4>
+              <ul class="bullet-list" style="margin: 0;">
+    <li><span class="bullet"></span><span>Locks in at 4.30% for 5 years</span></li>
+  
+    <li><span class="bullet"></span><span>Rates drop to 3.75% at month 14—bank never calls</span></li>
+  
+    <li><span class="bullet"></span><span>Rates drop to 3.25% at month 32—bank still never calls</span></li>
+  
+    <li><span class="bullet"></span><span>Pays 4.30% for the entire 60 months</span></li>
+  
+    <li><span class="bullet"></span><span>Total interest paid over 5 years: approximately $103,500</span></li>
+  </ul>
+            </div>
+            <div style="flex: 1; background: #ecfdf5; border: 2px solid #059669; border-radius: 10px; padding: 20px;">
+              <h4 style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: #059669; margin-bottom: 12px;">BORROWER B: Works with Inspired Mortgage</h4>
+              <ul class="bullet-list" style="margin: 0;">
+    <li><span class="bullet"></span><span>Locks in at 4.30%</span></li>
+  
+    <li><span class="bullet"></span><span>Month 14: Rates drop to 3.75%. We call. Penalty is $4,200—we split it 50/50 ($2,100 each). Relock at 3.75% for new 5-year term.</span></li>
+  
+    <li><span class="bullet"></span><span>Month 32 (18 months into new term): Rates drop to 3.25%. We call again. Penalty is $3,800—we split it 50/50 ($1,900 each). Relock at 3.25%.</span></li>
+  
+    <li><span class="bullet"></span><span>Total penalties paid by borrower: $4,000</span></li>
+  
+    <li><span class="bullet"></span><span>Total interest paid: approximately $78,200</span></li>
+  </ul>
+            </div>
+          </div>
+        </div>
+        
+    <div class="page-footer">
+      <div class="website">inspired.mortgage</div>
+      <div class="page-number">Page 15</div>
+    </div>
+  
+      </div>
+    </div>
+  
+
+    <div class="page">
+      <div class="page-inner">
+        
+    <div class="page-header">
+      <div class="logo">Inspired Mortgage</div>
+      <div class="client">Sarah Mitchell</div>
+    </div>
+  
+        <div class="page-content" style="display: flex; flex-direction: column; justify-content: center;">
+          <div class="impact-banner" style="margin-top: 0;">
+            <h2>THE DIFFERENCE</h2>
+          </div>
+
+          <p style="margin-bottom: 14px;">Borrower B saves over $21,000 in interest, minus $4,000 in penalties = net savings of $17,000+</p><p style="margin-bottom: 14px;">And here's what most people miss: Borrower B also now has a rate locked at 3.25% going forward, while Borrower A is about to renew into whatever the market offers in year 6.</p><p style="margin-bottom: 14px;">This is active management. This is what your bank will never do.</p>
+
+          <h3 style="margin-top: 32px; margin-bottom: 14px;">Ask Your Bank</h3>
+          <div style="background: #1e293b; border-radius: 10px; padding: 28px 32px;">
+            <p style="font-style: italic; color: rgba(255,255,255,0.85); font-size: 15px; line-height: 1.7;">Before you renew with them, ask: "If rates drop significantly during my term, will you call me? Will you help me relock at the lower rate? Will you guarantee my penalty won't exceed $5,000?"</p>
+            <p style="font-weight: 700; margin-top: 14px; color: #f59e0b; font-size: 15px;">You already know the answer.</p>
+          </div>
+        </div>
+        
+    <div class="page-footer">
+      <div class="website">inspired.mortgage</div>
+      <div class="page-number">Page 16</div>
+    </div>
+  
+      </div>
+    </div>
+  
+
+    <div class="page">
+      <div class="page-inner">
+        
+    <div class="page-header">
+      <div class="logo">Inspired Mortgage</div>
+      <div class="client">Sarah Mitchell</div>
+    </div>
+  
+        <div class="page-content">
+          <div class="section-header">
+            
+            <h2>Strategy: Variable Rate Mortgage</h2>
+          </div>
+
+          <p style="margin-bottom: 14px;">Variable rates move with the market—which means risk, but also opportunity. Right now, based on our analysis, we're in a cycle that looks flat to slightly declining. That's a window.</p><p style="margin-bottom: 14px;">But here's what you need to understand: a variable rate is only as good as the management behind it.</p>
+
+          <h3 style="margin-bottom: 10px;">When Variable Makes Sense</h3>
+          <ul class="bullet-list mb-6">
+    <li><span class="bullet"></span><span>You can handle some payment fluctuation</span></li>
+  
+    <li><span class="bullet"></span><span>You believe rates will stay flat or decrease</span></li>
+  
+    <li><span class="bullet"></span><span>You want lower penalties if you need to break your mortgage early</span></li>
+  
+    <li><span class="bullet"></span><span>Historically, variable rates have outperformed fixed rates over time</span></li>
+  </ul>
+
+          <h3 style="margin-bottom: 10px;">What We Do Differently</h3>
+          <p style="margin-bottom: 14px;">We don't guess at market timing. We track the signals that matter—Bank of Canada policy, bond yields, inflation trends, employment data, and how lenders are pricing risk. We've mapped these cycles for years. When the indicators shift, we act.</p>
+
+          <h3 style="margin-bottom: 10px;">The Strategy</h3>
+          <p style="margin-bottom: 14px;">Start variable, benefit from lower payments while rates drift down, and watch for the signals that tell us we're approaching the bottom of the cycle. When those signals appear, we reach out to discuss locking into a fixed rate—ideally 1–1.5% below today's rates.</p>
+        </div>
+        
+    <div class="page-footer">
+      <div class="website">inspired.mortgage</div>
+      <div class="page-number">Page 17</div>
+    </div>
+  
+      </div>
+    </div>
+  
+
+    <div class="page">
+      <div class="page-inner">
+        
+    <div class="page-header">
+      <div class="logo">Inspired Mortgage</div>
+      <div class="client">Sarah Mitchell</div>
+    </div>
+  
+        <div class="page-content">
+          <h3 style="margin-bottom: 10px;">How This Could Play Out For You</h3>
+          <p style="margin-bottom: 14px;">You start variable at today's rates. Over the next 12–18 months, the Bank of Canada continues easing. Your rate drops incrementally. When we see signs the cycle is turning—inflation ticking up, bond yields rising—we reach out. You lock in at the bottom, a full 1–1.5% below today's fixed rates. That's active management in action.</p><p style="margin-bottom: 14px;">On your $485,000 mortgage, a 1.25% rate drop saves you roughly $6,063 per year—and over $30,313 across a typical term. That's not a rounding error. That's a family vacation every year. Or years shaved off your amortization. Or tens of thousands in interest you never pay.</p>
+
+          <h3 style="margin-top: 24px; margin-bottom: 10px;">The Danger of Going It Alone</h3>
+          <p style="margin-bottom: 14px;">In 2022 and 2023, we saw what happens when no one is watching.</p><p style="margin-bottom: 14px;">Variable rates spiked. Homeowners who had chosen variable—often on good advice at the time—watched their rates climb month after month. But here's what made it worse: most banks kept their payments the same.</p><p style="margin-bottom: 14px;">That sounds harmless. It wasn't.</p><p style="margin-bottom: 14px;">What actually happened is that a larger and larger portion of each payment went to interest—and almost nothing went to principal. Some homeowners made payments for two full years and barely moved the needle on what they owed. They had no warning. No call from their bank. No one watching.</p><p style="margin-bottom: 14px;">By the time they realized what had happened, the damage was done—tens of thousands in extra interest, years added to their mortgage, and no easy way out.</p><p style="margin-bottom: 14px;">That's what unmanaged variable looks like.</p><p style="margin-bottom: 14px;">Managed variable means someone is watching. Someone runs the numbers monthly. Someone calls when the math changes. Someone tells you when it's time to lock in—and when it's time to wait.</p><p style="margin-bottom: 14px;">That's what we do.</p><p style="margin-bottom: 14px;">And if the time comes to lock in and there's a penalty involved—even on a variable rate mortgage—you're protected by our $5,000 Mortgage Penalty Guarantee. Your out-of-pocket will never exceed $5,000 (and if the penalty is under $5,000, we split it 50/50). We cover the rest.</p><p style="margin-bottom: 14px;">That's not a promise you'll find anywhere else.</p>
+        </div>
+        
+    <div class="page-footer">
+      <div class="website">inspired.mortgage</div>
+      <div class="page-number">Page 18</div>
+    </div>
+  
+      </div>
+    </div>
+  
+
+    <div class="page">
+      <div class="page-inner">
+        
+    <div class="page-header">
+      <div class="logo">Inspired Mortgage</div>
+      <div class="client">Sarah Mitchell</div>
+    </div>
+  
+        <div class="page-content" style="display: flex; flex-direction: column; justify-content: center;">
+          <div class="section-header">
+            
+            <h2>What Happens Next</h2>
+          </div>
+
+          <div class="steps-container">
+            
+    <div class="step">
+      <div class="step-number">1</div>
+      <h4>Complete Your Application</h4>
+      <p>10-15 minutes. No credit impact.</p>
+    </div>
+    <div class="step-arrow">→</div>
+  
+    <div class="step">
+      <div class="step-number">2</div>
+      <h4>Receive Your Lender Comparison Report</h4>
+      <p>Within 24-48 hours of receiving your completed application, we'll shop your mortgage to 30+ lenders and send you real rates with a side-by-side comparison.</p>
+    </div>
+    <div class="step-arrow">→</div>
+  
+    <div class="step">
+      <div class="step-number">3</div>
+      <h4>Make Your Decision</h4>
+      <p>No pressure. No obligation. Just clear information to decide what's best.</p>
+    </div>
+    
+  
+          </div>
+
+          <div class="cta-box" style="margin-top: 32px;">
+            <h3>Ready to See What's Possible?</h3>
+            <a href="https://www.inspired.mortgage/start-here" class="cta-button">Start Your Application →</a>
+          </div>
+
+          <div style="margin-top: 32px;">
+            <h3 style="margin-bottom: 14px;">Your Advisor</h3>
+            <div class="advisor-card-inline">
+              <div class="label">Contact</div>
+              <div class="name">Greg Williamson</div>
+              <div class="contact">greg@inspired.mortgage</div>
+              <div class="contact">(416) 555-0123</div>
+            </div>
+          </div>
+        </div>
+        
+    <div class="page-footer">
+      <div class="website">inspired.mortgage</div>
+      <div class="page-number">Page 19</div>
+    </div>
+  
+      </div>
+    </div>
+  
+</body>
+</html>
