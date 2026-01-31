@@ -10,7 +10,7 @@
  * - Generous whitespace throughout
  */
 
-import { REPORT_COPY } from "@/lib/report-copy";
+import { REPORT_COPY, getAdvisorTitle } from "@/lib/report-copy";
 import { replaceVariables, buildVariableMap } from "@/lib/report-helpers";
 
 export interface ReportHTMLProps {
@@ -889,6 +889,9 @@ function getBaseStyles(): string {
 
     .data-table tbody tr:last-child td {
       border-bottom: none;
+    }
+
+    .data-table tbody tr.total-row td {
       font-weight: 700;
       background: ${colors.bgCard};
     }
@@ -1857,7 +1860,7 @@ function generateOurApproachPage(
 
           <div class="signature-block">
             <div class="name">${consultant.name}</div>
-            <div class="title">${consultant.name.toLowerCase().includes("greg") ? "Founder" : "Mortgage Advisor"}, Inspired Mortgage</div>
+            <div class="title">${getAdvisorTitle(consultant.name)}, Inspired Mortgage</div>
           </div>
         </div>
         ${pageFooter(pageNumber)}

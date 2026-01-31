@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { generateReportHTML, type ReportHTMLProps } from "@/lib/generate-report-html";
 import { generatePDFFromHTML } from "@/lib/generate-report-puppeteer";
+import { getAdvisorPhone } from "@/lib/report-copy";
 
 /**
  * POST /api/reports/generate-pdf
@@ -62,7 +63,7 @@ export async function POST(request: NextRequest) {
       consultant: {
         name: consultant.name,
         email: consultant.email,
-        phone: consultant.phone,
+        phone: getAdvisorPhone(consultant.name, consultant.phone),
         calLink: consultant.calLink || "",
       },
       bullets: bullets as string[],

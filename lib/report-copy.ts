@@ -3,6 +3,25 @@
 // Source: /Users/clawdbot/clawd/docs/inspired-mortgage/reports/APPROVED-COPY-DO-NOT-MODIFY.md
 // Any changes must be approved by Greg before implementation.
 
+// Advisor title lookup — update here when titles change
+export const ADVISOR_TITLES: Record<string, string> = {
+  "Greg Williamson": "Co-Founder",
+  "Jakub Huncik": "Mortgage Advisor",
+};
+
+// Fallback phone numbers (used when DB phone is empty)
+export const ADVISOR_PHONES: Record<string, string> = {
+  "Greg Williamson": "403-560-2354",
+};
+
+export function getAdvisorTitle(name: string): string {
+  return ADVISOR_TITLES[name] || "Mortgage Advisor";
+}
+
+export function getAdvisorPhone(name: string, dbPhone?: string): string {
+  return dbPhone || ADVISOR_PHONES[name] || "";
+}
+
 export const REPORT_COPY = {
   // ===========================================================================
   // COVER PAGE

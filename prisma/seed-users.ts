@@ -5,6 +5,7 @@ const teamMembers = [
     email: "greg@inspired.mortgage",
     name: "Greg Williamson",
     role: "ADVISOR" as const,
+    phone: "403-560-2354",
     calLink: "https://cal.com/team/inspired-mortgage/mortgage-discovery-call",
   },
   {
