@@ -11,6 +11,7 @@ const teamMembers = [
     email: "jakub@inspired.mortgage",
     name: "Jakub Huncik",
     role: "ADVISOR" as const,
+    phone: "778-912-4488",
     calLink: "https://cal.com/team/inspired-mortgage/mortgage-discovery-call",
   },
   {

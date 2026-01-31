@@ -3,7 +3,7 @@
  * Premium design using HTML/CSS for Puppeteer PDF generation
  */
 
-import { REPORT_COPY } from "@/lib/report-copy";
+import { REPORT_COPY, getAdvisorTitle } from "@/lib/report-copy";
 import { replaceVariables, buildVariableMap } from "@/lib/report-helpers";
 
 export interface ReportHTMLProps {
@@ -817,6 +817,9 @@ function getBaseStyles(): string {
 
     .data-table tr:last-child td {
       border-bottom: 2px solid ${colors.charcoal};
+    }
+
+    .data-table tr.total-row td {
       font-weight: 600;
     }
 
@@ -1715,7 +1718,7 @@ function generateOurApproachPage(
 
           <div class="signature-block">
             <div class="name">${consultant.name}</div>
-            <div class="title">${consultant.name.toLowerCase().includes("greg") ? "Founder" : "Mortgage Advisor"}, Inspired Mortgage</div>
+            <div class="title">${getAdvisorTitle(consultant.name)}, Inspired Mortgage</div>
           </div>
         </div>
         ${pageFooter(pageNumber)}
@@ -1830,7 +1833,7 @@ function _deprecated_generateOurApproachPages(
 
           <div class="signature-block">
             <div class="name">${consultant.name}</div>
-            <div class="title">${consultant.name.toLowerCase().includes("greg") ? "Founder" : "Mortgage Advisor"}, Inspired Mortgage</div>
+            <div class="title">${getAdvisorTitle(consultant.name)}, Inspired Mortgage</div>
           </div>
         </div>
         ${pageFooter(startPageNumber)}

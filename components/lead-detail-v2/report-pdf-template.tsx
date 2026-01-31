@@ -15,7 +15,7 @@ import {
   Path,
 } from "@react-pdf/renderer";
 import { formatCurrency, formatPercent } from "@/lib/mortgage-calculations";
-import { REPORT_COPY } from "@/lib/report-copy";
+import { REPORT_COPY, getAdvisorTitle } from "@/lib/report-copy";
 import { replaceVariables, buildVariableMap, replaceAndSplit } from "@/lib/report-helpers";
 
 // Consultant/Advisor details
@@ -996,7 +996,7 @@ function CoverPage({
       <View style={styles.coverFooter}>
         <Text style={styles.coverAdvisorLabel}>{copy.advisorLabel}</Text>
         <Text style={styles.coverAdvisorName}>{consultant.name}</Text>
-        <Text style={styles.coverAdvisorTitle}>Mortgage Advisor, Inspired Mortgage</Text>
+        <Text style={styles.coverAdvisorTitle}>{getAdvisorTitle(consultant.name)}, Inspired Mortgage</Text>
         {consultant.email && <Text style={styles.coverWebsite}>{consultant.email}</Text>}
         {consultant.phone && <Text style={[styles.coverWebsite, { color: colors.bodyText }]}>{consultant.phone}</Text>}
       </View>
@@ -1569,7 +1569,7 @@ function OurApproachPage({ consultant, vars }: { consultant: ConsultantInfo; var
       <View style={styles.advisorBox}>
         <Text style={styles.contactName}>{consultant.name}</Text>
         <Text style={styles.contactTitle}>
-          {consultant.name.toLowerCase().includes("greg") ? "Founder" : "Mortgage Advisor"}, Inspired Mortgage
+          {getAdvisorTitle(consultant.name)}, Inspired Mortgage
         </Text>
       </View>
 
@@ -1931,7 +1931,7 @@ function WhatHappensNextPage({ consultant, applicationLink, vars }: { consultant
       <View style={styles.contactBox}>
         <Text style={styles.contactLabel}>{copy.advisorBlock.label}</Text>
         <Text style={styles.contactName}>{consultant.name}</Text>
-        <Text style={styles.contactTitle}>Mortgage Advisor, Inspired Mortgage</Text>
+        <Text style={styles.contactTitle}>{getAdvisorTitle(consultant.name)}, Inspired Mortgage</Text>
         <Text style={styles.contactDetail}>{consultant.email}</Text>
         {consultant.phone && (
           <Text style={styles.contactDetail}>{consultant.phone}</Text>
