@@ -12,6 +12,7 @@ export const ADVISOR_TITLES: Record<string, string> = {
 // Fallback phone numbers (used when DB phone is empty)
 export const ADVISOR_PHONES: Record<string, string> = {
   "Greg Williamson": "403-560-2354",
+  "Jakub Huncik": "778-912-4488",
 };
 
 export function getAdvisorTitle(name: string): string {
