@@ -12,6 +12,7 @@
 
 import { REPORT_COPY, getAdvisorTitle } from "@/lib/report-copy";
 import { replaceVariables, buildVariableMap } from "@/lib/report-helpers";
+import { calculateScenario1Data, calculateScenario2Data } from "@/lib/mortgage-calculations";
 
 export interface ReportHTMLProps {
   clientName: string;
@@ -116,8 +117,36 @@ export function generateReportHTML(props: ReportHTMLProps): string {
     includeDebtConsolidation,
     includeCashBack,
     applicationLink,
-    extractedData,
+    extractedData: rawExtractedData,
   } = props;
+
+  // Create a mutable copy — never mutate the caller's object
+  const extractedData = { ...rawExtractedData };
+
+  // Scenario 1: Calculate payment values from rates + principal if available
+  if (extractedData.mortgageAmount && extractedData.previousRate && extractedData.currentMarketRate) {
+    const calculated = calculateScenario1Data({
+      mortgageAmount: extractedData.mortgageAmount,
+      currentAmortization: extractedData.currentAmortization || 20,
+      previousRate: extractedData.previousRate,
+      currentMarketRate: extractedData.currentMarketRate,
+    });
+    // Prefer AI-extracted values, fall back to calculated
+    extractedData.oldPayment = extractedData.oldPayment || calculated.oldPayment;
+    extractedData.newPayment = extractedData.newPayment || calculated.newPayment;
+    extractedData.paymentDifference = extractedData.paymentDifference || calculated.paymentDifference;
+    extractedData.fiveYearsOfPayments = extractedData.fiveYearsOfPayments || calculated.fiveYearsOfPayments;
+  }
+
+  // Scenario 2: Calculate extra interest from rate differential if available
+  if (extractedData.mortgageAmount && extractedData.originalRate && extractedData.lockInRate) {
+    const calculated = calculateScenario2Data({
+      mortgageAmount: extractedData.mortgageAmount,
+      originalRate: extractedData.originalRate,
+      lockInRate: extractedData.lockInRate,
+    });
+    extractedData.estimatedExtraInterest = extractedData.estimatedExtraInterest || calculated.estimatedExtraInterest;
+  }
 
   const vars = buildVariableMap({
     clientName,

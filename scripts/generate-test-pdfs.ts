@@ -21,9 +21,10 @@ const clientName = "Sarah Mitchell";
 const date = "January 16, 2026";
 const consultant = {
   name: "Greg Williamson",
+  title: "Co-Founder",
   email: "greg@inspired.mortgage",
-  phone: "(416) 555-0123",
-  calLink: "cal.com/inspired-mortgage/greg",
+  phone: "(403) 560-2354",
+  calLink: "cal.com/greg762/15min",
 };
 
 // Application link for testing
@@ -54,10 +55,8 @@ const scenario1Props: ReportHTMLProps = {
     currentAmortization: 20,
     previousRate: 0.0189,
     currentMarketRate: 0.0449,
-    oldPayment: 2045,
-    newPayment: 2689,
-    paymentDifference: 644,
-    fiveYearsOfPayments: 161340,
+    // oldPayment, newPayment, paymentDifference, fiveYearsOfPayments
+    // are now CALCULATED by mortgage-calculations.ts — no hardcoded values
     otherDebts: [
       { type: "Car loan", balance: 32000, payment: 625 },
       { type: "Line of credit", balance: 18500, payment: 285 },
@@ -90,7 +89,7 @@ const scenario2Props: ReportHTMLProps = {
     currentAmortization: 22,
     originalRate: 0.0145,
     lockInRate: 0.0579,
-    estimatedExtraInterest: 38675,
+    // estimatedExtraInterest is now CALCULATED by mortgage-calculations.ts
   },
 };
 
@@ -120,6 +119,13 @@ const scenario3Props: ReportHTMLProps = {
     originalRate: 0.0165,
     fixedPayment: 1850,
   },
+};
+
+// Scenario 1 + Cash Back: Full package with cash back option
+const scenario1CashBackProps: ReportHTMLProps = {
+  ...scenario1Props,
+  includeCashBack: true,
+  includeDebtConsolidation: true,
 };
 
 async function generatePDF(props: ReportHTMLProps, filename: string) {
@@ -156,6 +162,7 @@ async function main() {
       generatePDF(scenario1Props, "test-report-scenario-1.pdf"),
       generatePDF(scenario2Props, "test-report-scenario-2.pdf"),
       generatePDF(scenario3Props, "test-report-scenario-3.pdf"),
+      generatePDF(scenario1CashBackProps, "test-report-scenario-1-cashback.pdf"),
     ]);
 
     console.log("\n=== Generation Complete ===\n");
