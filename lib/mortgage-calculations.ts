@@ -201,11 +201,12 @@ export function calculateScenario1Data(data: {
     data.currentAmortization
   );
 
+  const roundedNew = Math.round(newPayment);
   return {
     oldPayment: Math.round(oldPayment),
-    newPayment: Math.round(newPayment),
-    paymentDifference: Math.round(newPayment - oldPayment),
-    fiveYearsOfPayments: calculateFiveYearsOfPayments(newPayment),
+    newPayment: roundedNew,
+    paymentDifference: roundedNew - Math.round(oldPayment),
+    fiveYearsOfPayments: roundedNew * 60,
   };
 }
 
