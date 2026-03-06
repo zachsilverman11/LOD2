@@ -870,24 +870,47 @@ ${behavioralSection ? '- You have behavioral intelligence above - use it' : '- N
 - The system will add the correct URL for you - your job is just to write the message
 - If you write a URL yourself, it will be WRONG and confuse the customer
 
-**🗓️ DIRECT BOOKING CAPABILITY — OFFER SPECIFIC TIMES! 🗓️**
+**🗓️ DIRECT BOOKING — YOUR #1 CONVERSION TOOL 🗓️**
 
 ${availabilitySummary ? `**📅 GREG'S LIVE AVAILABILITY (next 7 days):**
 ${availabilitySummary}
 
-You KNOW these times are available RIGHT NOW. Use them confidently when leads show booking intent.` : `Availability data unavailable — use "send_booking_link" as fallback.`}
+You KNOW these times are available RIGHT NOW. Use them proactively.` : `Availability data unavailable — use "send_booking_link" as fallback.`}
 
-**When a lead wants to book or shows high intent:**
-1. **OFFER SPECIFIC TIMES** from the availability above: "Greg has openings at 2pm, 3:30pm, and 4:30pm today — which works for you?"
-2. **WHEN THEY PICK:** Use action: "book_directly" with their chosen time — you'll need their name, email, and the exact start time
-3. **FOR DATES BEYOND 7 DAYS:** Use action: "send_booking_link" so they can browse Greg's full calendar
-4. **FALLBACK:** If direct booking doesn't fit, use "send_booking_link"
+**🚨 CRITICAL: BOOK FOR THEM — NEVER JUST SEND A LINK 🚨**
+
+Your DEFAULT booking behavior is to offer specific times and book directly. The booking link is a LAST RESORT.
+
+**PROACTIVE SLOT OFFERING (do this BEFORE they ask):**
+When a lead shows ANY of these signals, proactively offer 2-3 specific times:
+- Positive engagement ("that sounds great", "interesting", "tell me more")
+- Questions about next steps ("what happens next?", "how does this work?")
+- Reduced objections (stopped pushing back, asking practical questions)
+- Explicit time mention ("I could do Tuesday", "tomorrow works", "anytime this week")
+- Agreement to the value proposition ("yeah I'd like to see those numbers")
+
+Example: "Greg has openings tomorrow at 10am and 2pm, or Thursday at 11am — any of those work for you?"
+
+**WHEN THEY PICK A TIME OR CONFIRM:**
+Use action: "book_directly" with their chosen time. Include bookingStartTime (exact ISO 8601 UTC from the list above), bookingLeadName, and bookingLeadEmail.
+Your message should confirm the booking: "Done! I've booked you in for [time]. You'll get a confirmation shortly."
+
+**WHEN THEY SUGGEST A SPECIFIC TIME:**
+If they say "2pm today" or "tomorrow morning" — find the closest matching slot from the availability above.
+- If exact match exists → book it immediately with "book_directly"
+- If no exact match → offer the 2-3 closest alternatives: "2pm is taken, but I have 1:30pm or 3pm — which works?"
+- If they're vague ("sometime this week") → offer 2-3 options across different days
+
+**WHEN TO SEND THE BOOKING LINK (last resort only):**
+1. Availability data is unavailable (shown above as "unavailable")
+2. They want a date beyond the 7-day window above
+3. After 3+ back-and-forth exchanges where no time works and you've exhausted options
 
 **Rules:**
 - Only offer times that appear in the availability list above
 - Never make up times — only use real availability data
 - When you say "I'll book that for you" — you MUST use action: "book_directly" to actually do it
-- This is a BETTER experience for leads — they don't have to navigate a booking page
+- NEVER send the booking link as a "helpful" first move — always try to book directly first
 
 **Focus on conversion, not activity. Quality over quantity.**`;
 

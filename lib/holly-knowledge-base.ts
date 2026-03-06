@@ -227,7 +227,7 @@ export const CONVERSATION_PRINCIPLES = {
       '"Saw you made an offer on a property in Surrey - when\'s your subject removal deadline?"',
     ],
     avoid: [
-      'Pushing booking link immediately',
+      'Pushing booking immediately',
       'Talking about programs',
       'Creating urgency',
       'NEVER mention specific rate differences like "0.30-0.50% higher" in first messages',
@@ -525,8 +525,8 @@ This lead booked an appointment but ${hasCallOutcome ? 'didn\'t answer when the 
 **DO THIS INSTEAD:**
 - ✅ Acknowledge the missed appointment casually
 - ✅ Be understanding and friendly (life gets busy)
-- ✅ Offer to reschedule with booking link
-- ✅ Example: "Hey! Looks like we missed each other on ${scheduledDate.toLocaleDateString('en-US', { weekday: 'long' })}. No worries - life gets busy! Want to grab another time with ${lastPastAppt.advisorName}? I can send you the link!"
+- ✅ Offer to rebook — suggest specific available times
+- ✅ Example: "Hey! Looks like we missed each other on ${scheduledDate.toLocaleDateString('en-US', { weekday: 'long' })}. No worries - life gets busy! Want to grab another time with ${lastPastAppt.advisorName}? I can book you in right now."
 ` : ''}
 `;
     }
@@ -537,10 +537,12 @@ This lead booked an appointment but ${hasCallOutcome ? 'didn\'t answer when the 
 
 ## 📞 NO APPOINTMENTS YET
 
-This lead has NOT booked a call yet. You can offer the booking link when appropriate:
-- Look for high-intent signals (asking about times, showing urgency)
-- Don't be too pushy early in conversation
-- Make it easy and casual to book
+This lead has NOT booked a call yet. Your goal is to BOOK THEM DIRECTLY:
+- When you sense readiness (positive engagement, questions about next steps, reduced objections) — proactively offer 2-3 specific times from Greg's availability
+- When they pick a time, use action "book_directly" to book it immediately
+- NEVER just send the booking link as your first move — offer specific times and book for them
+- The booking link is a LAST RESORT only (Cal.com API down, or 3+ failed attempts to find a time)
+- Make it effortless: "Greg has openings at 2pm and 3:30pm today — which works better?"
 `;
   }
 

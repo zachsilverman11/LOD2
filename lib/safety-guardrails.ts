@@ -146,7 +146,7 @@ export function validateDecision(
   if (
     context.lead.appointments &&
     context.lead.appointments.length > 0 &&
-    decision.action === 'send_booking_link'
+    (decision.action === 'send_booking_link' || decision.action === 'book_directly')
   ) {
     errors.push('Lead already has an appointment scheduled - cannot double-book');
   }
@@ -247,8 +247,8 @@ export function validateDecision(
     errors.push('Message cannot be empty or whitespace only');
   }
 
-  // === HARD RULE: Never promise specific call times ===
-  if (decision.message) {
+  // === HARD RULE: Never promise specific call times UNLESS booking directly ===
+  if (decision.message && decision.action !== 'book_directly') {
     const message = decision.message.toLowerCase();
 
     // Allow acknowledging existing bookings (e.g., "your 2pm booking", "saw your booking")
@@ -268,7 +268,7 @@ export function validateDecision(
       const violations = forbiddenPatterns.filter(pattern => pattern.test(message));
       if (violations.length > 0) {
         errors.push(
-          'CRITICAL: Message promises a specific call time. Leads MUST book through Cal.com. Never say "will call you at [time]" - instead use send_booking_link action.'
+          'CRITICAL: Message promises a specific call time without using book_directly. Use action: "book_directly" to actually book the slot, or "send_booking_link" to let them self-book.'
         );
       }
     }

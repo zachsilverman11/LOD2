@@ -2,8 +2,9 @@ import OpenAI from "openai";
 import { prisma } from "./db";
 import { sendSms } from "./sms";
 import { sendEmail } from "./email";
-import { sendErrorAlert } from "./slack";
+import { sendErrorAlert, sendSlackNotification } from "./slack";
 import { quickDelay } from "./human-delay";
+import { createDirectBooking } from "./calcom";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || "placeholder-for-build",
@@ -39,13 +40,18 @@ interface AIDecision {
     | "send_application_link"
     | "escalate"
     | "do_nothing"
-    | "move_stage";
+    | "move_stage"
+    | "book_appointment_directly";
   message?: string;
   emailSubject?: string;
   emailBody?: string;
   followupHours?: number;
   newStage?: string;
   reasoning: string;
+  bookingStartTime?: string;
+  bookingLeadName?: string;
+  bookingLeadEmail?: string;
+  bookingLeadTimezone?: string;
 }
 
 /**
@@ -1601,6 +1607,166 @@ export async function executeDecision(
             },
           });
           throw error;
+        }
+      }
+      break;
+
+    case "book_appointment_directly":
+      if (decision.bookingStartTime && decision.message) {
+        try {
+          const eventTypeId = parseInt(process.env.CALCOM_EVENT_TYPE_ID || "3298267", 10);
+          const attendeeName = decision.bookingLeadName || `${lead.firstName || ""} ${lead.lastName || ""}`.trim() || "Lead";
+          const attendeeEmail = decision.bookingLeadEmail || lead.email || "";
+          const attendeeTimezone = decision.bookingLeadTimezone || "America/Vancouver";
+
+          if (!attendeeEmail) {
+            console.error(`[Direct Booking] No email for lead ${leadId} — falling back to booking link`);
+            // Fall through to send_booking_link behavior
+            const bookingUrl = process.env.CAL_COM_BOOKING_URL || "https://cal.com/your-link";
+            const fallbackMsg = `${decision.message}\n\n${bookingUrl}`;
+            await sendSms({ to: lead.phone, body: fallbackMsg });
+            await prisma.communication.create({
+              data: {
+                leadId,
+                channel: "SMS",
+                direction: "OUTBOUND",
+                content: fallbackMsg,
+                intent: "booking_link_sent",
+                metadata: { aiReasoning: decision.reasoning, fallbackReason: "no_email" },
+              },
+            });
+            await updateLeadAfterContact(leadId, lead.status);
+            break;
+          }
+
+          // Create the booking via Cal.com API
+          const booking = await createDirectBooking({
+            eventTypeId,
+            start: decision.bookingStartTime,
+            attendee: {
+              name: attendeeName,
+              email: attendeeEmail,
+              timeZone: attendeeTimezone,
+            },
+            metadata: { source: "holly-direct-booking", leadId },
+          });
+
+          console.log(`[Direct Booking] ✅ Booked for lead ${leadId}: ${booking.uid} at ${booking.startTime}`);
+
+          // Create the appointment in our database
+          const startTime = new Date(booking.startTime);
+          const endTime = booking.endTime ? new Date(booking.endTime) : new Date(startTime.getTime() + 15 * 60000);
+          await prisma.appointment.create({
+            data: {
+              leadId,
+              calComBookingUid: booking.uid,
+              scheduledAt: startTime,
+              scheduledFor: startTime,
+              duration: Math.round((endTime.getTime() - startTime.getTime()) / 60000),
+              status: "scheduled",
+              bookingSource: "HOLLY",
+              advisorName: "Greg Williamson",
+              advisorEmail: "greg@inspired.mortgage",
+              notes: "Booked directly by Holly via Cal.com API",
+            },
+          });
+
+          // Update lead status to CALL_SCHEDULED
+          await prisma.lead.update({
+            where: { id: leadId },
+            data: {
+              status: "CALL_SCHEDULED",
+              lastContactedAt: new Date(),
+            },
+          });
+
+          // Send confirmation SMS
+          await sendSms({ to: lead.phone, body: decision.message });
+
+          await prisma.communication.create({
+            data: {
+              leadId,
+              channel: "SMS",
+              direction: "OUTBOUND",
+              content: decision.message,
+              intent: "booking_confirmed",
+              metadata: {
+                aiReasoning: decision.reasoning,
+                bookingUid: booking.uid,
+                bookedAt: booking.startTime,
+                directBooking: true,
+              },
+            },
+          });
+
+          // Log activity
+          await prisma.leadActivity.create({
+            data: {
+              leadId,
+              type: "APPOINTMENT_BOOKED",
+              channel: "SMS",
+              subject: "Holly booked appointment directly",
+              content: `Holly booked a discovery call for ${startTime.toLocaleString("en-US", { timeZone: attendeeTimezone, weekday: "long", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true })}`,
+              metadata: { bookingUid: booking.uid, directBooking: true },
+            },
+          });
+
+          // Slack notification
+          await sendSlackNotification({
+            type: "call_booked",
+            leadName: attendeeName,
+            leadId,
+            details: `🤖 Holly booked directly! ${startTime.toLocaleString("en-US", { timeZone: attendeeTimezone, weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true })}`,
+          });
+
+        } catch (error) {
+          console.error(`[Direct Booking] ❌ Failed for lead ${leadId}:`, error);
+
+          // Fallback: send booking link instead
+          try {
+            const bookingUrl = process.env.CAL_COM_BOOKING_URL || "https://cal.com/your-link";
+            const fallbackMessage = decision.message.includes("booked")
+              ? `Hey ${lead.firstName || "there"}! I'm having a bit of trouble locking that time in on my end. Here's Greg's calendar so you can grab it directly — should only take a sec!\n\n${bookingUrl}`
+              : `${decision.message}\n\n${bookingUrl}`;
+
+            await sendSms({ to: lead.phone, body: fallbackMessage });
+
+            await prisma.communication.create({
+              data: {
+                leadId,
+                channel: "SMS",
+                direction: "OUTBOUND",
+                content: fallbackMessage,
+                intent: "booking_link_sent",
+                metadata: {
+                  aiReasoning: decision.reasoning,
+                  directBookingFailed: true,
+                  error: error instanceof Error ? error.message : String(error),
+                },
+              },
+            });
+
+            await updateLeadAfterContact(leadId, lead.status);
+
+            await prisma.leadActivity.create({
+              data: {
+                leadId,
+                type: "NOTE_ADDED",
+                channel: "SYSTEM",
+                subject: "⚠️ Direct booking failed — sent link as fallback",
+                content: `Holly tried to book directly but Cal.com API returned an error. Sent booking link instead.\n\nError: ${error instanceof Error ? error.message : String(error)}`,
+              },
+            });
+          } catch (fallbackError) {
+            await sendErrorAlert({
+              error: fallbackError instanceof Error ? fallbackError : new Error(String(fallbackError)),
+              context: {
+                location: "ai-conversation-enhanced - book_appointment_directly fallback",
+                leadId,
+                details: { originalError: error instanceof Error ? error.message : String(error) },
+              },
+            });
+          }
         }
       }
       break;
