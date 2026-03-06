@@ -41,6 +41,9 @@ type SavedReport = {
   mortgageAmount: number;
   scenario: number;
   includeDebtConsolidation: boolean;
+  includeCashBack: boolean;
+  applicationLink: string;
+  partnerName: string | null;
   extractedData: ExtractedData | null;
   sentToEmail: string | null;
   sentAt: string | null;
@@ -450,7 +453,9 @@ export function ReportsTab({ lead }: ReportsTabProps) {
           mortgageAmount: formatCurrency(report.mortgageAmount),
           scenario: report.scenario ? (report.scenario as 0 | 1 | 2 | 3) : null,
           includeDebtConsolidation: report.includeDebtConsolidation || false,
-          applicationLink: "https://stressfree.mtg-app.com/signup",
+          includeCashBack: report.includeCashBack || false,
+          applicationLink: report.applicationLink || "https://stressfree.mtg-app.com/signup",
+          partnerName: report.partnerName || null,
           extractedData: report.extractedData || {},
         }),
       });

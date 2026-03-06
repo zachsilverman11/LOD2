@@ -20,6 +20,9 @@ export async function POST(request: NextRequest) {
       mortgageAmount,
       scenario,
       includeDebtConsolidation,
+      includeCashBack,
+      applicationLink,
+      partnerName,
       extractedData,
     } = body;
 
@@ -58,6 +61,9 @@ export async function POST(request: NextRequest) {
         mortgageAmount: parseFloat(String(mortgageAmount)),
         scenario: scenario || 1,
         includeDebtConsolidation: includeDebtConsolidation || false,
+        includeCashBack: includeCashBack || false,
+        applicationLink: applicationLink || "https://stressfree.mtg-app.com/signup",
+        partnerName: partnerName || null,
         extractedData: extractedData || null,
       },
       include: {

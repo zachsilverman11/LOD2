@@ -792,12 +792,15 @@ async function processSmartFollowUps() {
           },
         });
 
-        await sendSlackNotification({
-          type: "lead_rotting",
-          leadName: `${lead.firstName} ${lead.lastName}`,
-          leadId: lead.id,
-          details: `60 days, ${outboundCount} messages, no response. Archived to LOST.`,
-        });
+        const hasBooking60 = await hasUpcomingAppointment(lead.id);
+        if (!hasBooking60) {
+          await sendSlackAlertWithDedup({
+            type: "lead_rotting",
+            leadName: `${lead.firstName} ${lead.lastName}`,
+            leadId: lead.id,
+            details: `60 days, ${outboundCount} messages, no response. Archived to LOST.`,
+          }, 24);
+        }
 
         console.log(`[Automation] Lead ${lead.id} moved to LOST after 60 days`);
         continue;
@@ -1191,12 +1194,12 @@ async function processApplicationNudges() {
         data: { lastContactedAt: now },
       });
 
-      await sendSlackNotification({
-        type: "lead_updated",
+      await sendSlackAlertWithDedup({
+        type: "app_nudge",
         leadName: `${lead.firstName} ${lead.lastName}`,
         leadId: lead.id,
         details: "📝 Application started 24h ago - Holly sent encouragement",
-      });
+      }, 24);
     } catch (error) {
       console.error(`[Automation] Error sending 24h app nudge to lead ${lead.id}:`, error);
     }
@@ -1217,12 +1220,12 @@ async function processApplicationNudges() {
         data: { lastContactedAt: now },
       });
 
-      await sendSlackNotification({
-        type: "lead_updated",
+      await sendSlackAlertWithDedup({
+        type: "app_nudge",
         leadName: `${lead.firstName} ${lead.lastName}`,
         leadId: lead.id,
         details: "⚠️ Application started 48h ago - Holly sent urgent nudge",
-      });
+      }, 24);
     } catch (error) {
       console.error(`[Automation] Error sending 48h app nudge to lead ${lead.id}:`, error);
     }
@@ -1260,12 +1263,12 @@ async function processApplicationNudges() {
         data: { lastContactedAt: now },
       });
 
-      await sendSlackNotification({
-        type: "lead_updated",
+      await sendSlackAlertWithDedup({
+        type: "app_nudge",
         leadName: `${lead.firstName} ${lead.lastName}`,
         leadId: lead.id,
         details: "🚀 Call completed 24h ago, no app - Holly sending application link",
-      });
+      }, 24);
     } catch (error) {
       console.error(`[Automation] Error sending app start prompt to lead ${lead.id}:`, error);
     }
@@ -1482,12 +1485,15 @@ async function processNurturingTransitions() {
           },
         });
 
-        await sendSlackNotification({
-          type: "lead_rotting",
-          leadName: `${lead.firstName} ${lead.lastName}`,
-          leadId: lead.id,
-          details: "Moved to LOST after 90 days in NURTURING with zero engagement",
-        });
+        const hasBooking90 = await hasUpcomingAppointment(lead.id);
+        if (!hasBooking90) {
+          await sendSlackAlertWithDedup({
+            type: "lead_rotting",
+            leadName: `${lead.firstName} ${lead.lastName}`,
+            leadId: lead.id,
+            details: "Moved to LOST after 90 days in NURTURING with zero engagement",
+          }, 24);
+        }
 
         movedToLost++;
         console.log(`[Automation] Moved lead ${lead.id} to LOST (90 days, no engagement)`);

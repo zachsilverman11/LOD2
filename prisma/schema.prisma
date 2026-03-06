@@ -492,6 +492,9 @@ model Report {
   mortgageAmount         Float
   scenario               Int       @default(1) // 1, 2, or 3
   includeDebtConsolidation Boolean @default(false)
+  includeCashBack        Boolean   @default(false)
+  applicationLink        String    @default("https://stressfree.mtg-app.com/signup")
+  partnerName            String?
   extractedData          Json?     // AI-extracted mortgage data from notes
   pdfUrl                 String?   // If we store the PDF
   sentToEmail            String?   // Email it was sent to

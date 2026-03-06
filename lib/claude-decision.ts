@@ -893,7 +893,7 @@ You KNOW these times are available RIGHT NOW. Use them confidently when leads sh
 
   try {
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5-20250929',
+      model: 'claude-sonnet-4-6',
       max_tokens: 1536, // Increased for extended thinking
       messages: [{ role: 'user', content: prompt }],
     });

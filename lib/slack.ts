@@ -5,7 +5,7 @@ const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL || "";
 const DASHBOARD_URL = "https://lod2.vercel.app";
 
 interface SlackNotification {
-  type: "new_lead" | "no_response" | "lead_rotting" | "hot_lead_going_cold" | "call_booked" | "call_missed" | "converted" | "lead_escalated";
+  type: "new_lead" | "no_response" | "lead_rotting" | "hot_lead_going_cold" | "call_booked" | "call_missed" | "converted" | "lead_escalated" | "app_nudge" | "lead_updated";
   leadName: string;
   leadId: string;
   details?: string;
@@ -391,7 +391,7 @@ async function logFailedSlackAlert(data: {
 /**
  * Slack alert types that should be deduplicated per lead
  */
-type DeduplicatedAlertType = "no_response" | "lead_rotting" | "hot_lead_going_cold";
+type DeduplicatedAlertType = "no_response" | "lead_rotting" | "hot_lead_going_cold" | "app_nudge";
 
 /**
  * Send Slack notification with deduplication
