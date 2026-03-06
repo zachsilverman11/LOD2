@@ -243,9 +243,18 @@ async function handleBookingCreated(payload: any) {
 
   if (recentCommunications.length === 0) {
     try {
-      // Holly is enabled and has context about the appointment
-      // Send booking confirmation message
-      const decision = await handleConversation(lead.id);
+      // Holly sends a booking confirmation — pass specialContext so she doesn't treat this as first contact
+      const bookingTime = new Date(payload.startTime || payload.start).toLocaleString("en-US", {
+        weekday: "long",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      });
+      const advisorName = payload.organizer?.name || "Greg";
+      const bookingContext = `The lead just booked a discovery call! Appointment details:\n- Time: ${bookingTime}\n- Advisor: ${advisorName}\n\nSend a SHORT, warm booking confirmation SMS. Do NOT re-introduce yourself if you've already been in conversation with this lead. Just confirm the booking, tell them what to expect, and build excitement. Keep it under 160 chars.\n\nUse the send_sms tool.`;
+      const decision = await handleConversation(lead.id, undefined, bookingContext);
       await executeDecision(lead.id, decision);
     } catch (error) {
       console.error("Failed to send appointment confirmation via Holly:", error);

@@ -990,8 +990,17 @@ export async function handleConversation(
       role: "user",
       content: specialContext,
     });
+  } else if (context.conversationHistory && context.conversationHistory.length > 0) {
+    // EXISTING CONVERSATION — this lead has prior communications. DO NOT treat as first contact.
+    const hasAppointment = existingAppointment
+      ? `\n\n⚠️ CRITICAL: This lead ALREADY HAS A CALL SCHEDULED for ${(existingAppointment.scheduledFor || existingAppointment.scheduledAt).toLocaleString()}. DO NOT try to book them again.`
+      : '';
+    messages.push({
+      role: "user",
+      content: `This lead has an existing conversation with ${context.conversationHistory.length} prior messages. Review the conversation history in the system prompt and continue the conversation naturally.\n\n🚨 CRITICAL: Do NOT re-introduce yourself. Do NOT say "It's Holly from Inspired Mortgage" — they already know who you are. Continue from where the conversation left off.${hasAppointment}\n\nDecide the best next action based on the conversation so far. Use one of the available tools to respond.`,
+    });
   } else {
-    // Initial contact
+    // FIRST CONTACT — genuinely new lead with zero prior communications
     messages.push({
       role: "user",
       content: `This is a brand new lead who just submitted a form. ${existingAppointment ? `\n\n⚠️ CRITICAL: This lead ALREADY BOOKED A CALL when they submitted the form! Scheduled for ${(existingAppointment.scheduledFor || existingAppointment.scheduledAt).toLocaleString()}.\n\nYour message should:\n- Confirm their call is booked\n- Welcome them and introduce yourself\n- Let them know what to expect on the call\n- Build excitement and prepare them\n- Ensure they show up\n\nDO NOT try to book them - they're already booked!` : `\n\n🚨 CRITICAL FIRST MESSAGE STRATEGY (Sterling Wong's Guidance):
@@ -1407,6 +1416,51 @@ export async function executeDecision(
     });
 
     return; // EXIT - don't send duplicate
+  }
+
+  // 🛡️ COLD INTRO GUARDRAIL: Block Holly from re-introducing herself to leads with existing conversations
+  if (decision.message) {
+    const coldIntroPatterns = [
+      /it'?s holly from inspired/i,
+      /this is holly from inspired/i,
+      /hey.*it'?s holly.*inspired/i,
+      /hi.*it'?s holly.*from/i,
+    ];
+    const isColdIntro = coldIntroPatterns.some(p => p.test(decision.message!));
+
+    if (isColdIntro) {
+      // Check if lead has prior communications
+      const priorComms = await prisma.communication.count({
+        where: { leadId },
+      });
+
+      if (priorComms > 0) {
+        console.error(
+          `[Execute Decision] 🚨 BLOCKED: Cold intro attempted for lead ${leadId} (${lead.firstName} ${lead.lastName}) ` +
+          `who already has ${priorComms} prior communications. Message: "${decision.message.substring(0, 100)}..."`
+        );
+
+        await prisma.leadActivity.create({
+          data: {
+            leadId,
+            type: "NOTE_ADDED",
+            channel: "SYSTEM",
+            subject: "🚨 Cold Intro Blocked — Lead Has Existing Conversation",
+            content: `Holly attempted to re-introduce herself to a lead with ${priorComms} existing messages. This was blocked to prevent the Samuel Jud / Bharat bug.\n\nBlocked message: "${decision.message.substring(0, 200)}"\nAction: ${decision.action}\nReasoning: ${decision.reasoning}`,
+            metadata: { blockedDecision: decision, priorComms },
+          },
+        });
+
+        await sendSlackNotification({
+          type: "lead_escalated",
+          leadName: `${lead.firstName || ""} ${lead.lastName || ""}`.trim(),
+          leadId,
+          details: `🚨 Holly tried to re-introduce herself to a lead with ${priorComms} existing messages. Cold intro was BLOCKED. Check the conversation — Holly may have lost context.`,
+        });
+
+        return; // EXIT - don't send cold intro to existing lead
+      }
+    }
   }
 
   console.log(`[AI Decision] ${decision.action}: ${decision.reasoning}`);

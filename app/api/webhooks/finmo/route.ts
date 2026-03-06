@@ -224,9 +224,10 @@ async function handleApplicationStarted(leadId: string, payload: any) {
       });
     }
 
-    // Holly sends encouragement message
+    // Holly sends encouragement message — pass context so she doesn't cold-intro
     try {
-      const decision = await handleConversation(leadId);
+      const appStartedContext = `The lead just STARTED their mortgage application via Finmo! This is great progress. Send a SHORT, encouraging SMS congratulating them on starting and letting them know you're here if they need help. Do NOT re-introduce yourself. Keep it warm and brief.\n\nUse the send_sms tool.`;
+      const decision = await handleConversation(leadId, undefined, appStartedContext);
       await executeDecision(leadId, decision);
     } catch (error) {
       console.error("[Finmo Webhook] Error sending Holly message:", error);
@@ -293,9 +294,10 @@ async function handleApplicationCompleted(leadId: string, payload: any) {
       console.error("[Finmo Webhook] Error creating Pipedrive deal:", error);
     }
 
-    // Holly sends congratulations message
+    // Holly sends congratulations message — pass context so she doesn't cold-intro
     try {
-      const decision = await handleConversation(leadId);
+      const appCompletedContext = `The lead just COMPLETED their mortgage application via Finmo! This is a huge milestone. Send a SHORT congratulations SMS. Let them know their application is being reviewed and their advisor will be in touch with options. Do NOT re-introduce yourself. Keep it celebratory and brief.\n\nUse the send_sms tool.`;
+      const decision = await handleConversation(leadId, undefined, appCompletedContext);
       await executeDecision(leadId, decision);
     } catch (error) {
       console.error("[Finmo Webhook] Error sending Holly message:", error);
