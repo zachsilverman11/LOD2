@@ -566,6 +566,8 @@ This lead has NOT booked a call yet. Your goal is to BOOK THEM DIRECTLY:
 ${callOutcome.notes ? `**Notes:** ${callOutcome.notes}` : ''}
 
 **What this means:** This call was ${daysAgo} days ago. If you reference it, be accurate about when it happened.
+
+🚫 **DOCUMENT BAN:** Do NOT proactively discuss documents, pay stubs, T4s, NOAs, bank statements, income verification, or what the lender will need. Document gathering happens AFTER the application is submitted — not before. If they ask about documents, say: "Great question — once we get your application in, I'll walk you through exactly what's needed!"
 `;
   }
 
@@ -601,6 +603,8 @@ Started ${applicationStatus.started.toLocaleDateString()}.
 - Offer to help if stuck
 - "It usually takes 10-15 min to complete"
 - Make it feel achievable
+
+🚫 **DO NOT discuss documents at this stage** — no pay stubs, T4s, NOAs, bank statements, income verification, or lender requirements. That comes AFTER the application is submitted.
 `;
   }
 

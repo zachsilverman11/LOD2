@@ -119,14 +119,20 @@ export function getStageEnforcementRules(stage: ConversationStage): StageRules {
           'Asking discovery questions (call already happened)',
           'Sending booking links (call already happened)',
           'Rehashing conversation topics from the call',
+          'Discussing document gathering or checklists (too early — save for AFTER application)',
+          'Listing what the lender will need (pay stubs, T4s, NOAs, bank statements, etc.)',
+          'Explaining underwriting process details',
+          'Mentioning income verification requirements',
+          'Proactively bringing up documents unless the lead asks first',
         ],
         allowed: [
           'Following up on action items from the call',
           'Sending application link if appropriate',
           'Answering questions about next steps',
           'Providing encouragement to complete application',
+          'If lead asks about documents: briefly acknowledge and redirect to application ("Great question — once we get your application in, I\'ll walk you through exactly what\'s needed")',
         ],
-        contextMessage: 'Focus on moving them toward application completion.',
+        contextMessage: 'Focus on moving them toward application completion. Do NOT discuss documents or lender requirements — that comes AFTER the application is submitted.',
       };
 
     case 'CUSTOMER_SUPPORT':
@@ -143,8 +149,11 @@ export function getStageEnforcementRules(stage: ConversationStage): StageRules {
           'Providing status updates',
           'Reassuring them about the process',
           'Escalating complex questions to advisors',
+          'Discussing document requirements (pay stubs, T4s, NOAs, bank statements, etc.)',
+          'Walking them through what the lender needs',
+          'Helping with document gathering and checklists',
         ],
-        contextMessage: 'You are in support mode, NOT sales mode.',
+        contextMessage: 'You are in support mode, NOT sales mode. You CAN now discuss documents and lender requirements.',
       };
 
     case 'ACTIVE_NURTURING':
@@ -220,6 +229,12 @@ CRITICAL: ${firstName} has ALREADY HAD their discovery call.
 
 FORBIDDEN (your message will be rejected):
 ${rules.forbidden.map(f => `❌ ${f}`).join('\n')}
+
+🚫 **DOCUMENT DISCUSSION IS BANNED AT THIS STAGE:**
+Do NOT mention pay stubs, T4s, NOAs, bank statements, income verification, document checklists, or what the lender will need. This information is ONLY appropriate AFTER the application is submitted (CUSTOMER_SUPPORT stage). Bringing it up now overwhelms the lead and stalls the application.
+
+If ${firstName} asks about documents, briefly acknowledge and redirect:
+"Great question — once we get your application in, I'll walk you through exactly what's needed!"
 
 ALLOWED:
 ${rules.allowed.map(a => `✅ ${a}`).join('\n')}

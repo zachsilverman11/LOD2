@@ -213,6 +213,33 @@ export function validateDecision(
         'Focus on next steps like sending the application link or following up on action items.'
       );
     }
+
+    // === DOCUMENT GATHERING BAN (pre-application stages) ===
+    // These patterns target document-gathering INSTRUCTIONS, not incidental keyword usage.
+    // E.g. "bank statement" is blocked, but "which bank are you with?" is fine.
+    const documentPatterns = [
+      /pay\s*stubs?/i,                          // "pay stub" / "pay stubs"
+      /\bT4s?\b/,                               // "T4" / "T4s" (case-sensitive — avoids "t4" in URLs etc.)
+      /\bNOAs?\b/,                              // "NOA" / "NOAs" (case-sensitive)
+      /notice of assessment/i,                   // full phrase
+      /bank\s*statements?/i,                     // "bank statement(s)" as a phrase
+      /income\s*verif/i,                         // "income verification" as a phrase
+      /documents?\s*(gathering|checklist|you('ll| will) need|needed|required)/i, // doc-gathering instructions
+      /lender\s*(will\s*)?needs?/i,              // "lender will need" / "lender needs"
+      /\bwhat\s*(you('ll|.will)|we('ll|.will))\s*need\s*to\s*(provide|gather|submit|prepare)/i, // "what you'll need to provide/gather"
+      /have\s*(your|the)\s*(recent\s*)?(pay\s*stubs?|T4|NOA|bank\s*statements?|tax\s*returns?)\s*(ready|handy|prepared)/i, // "have your pay stubs ready"
+      /gather\s*(your|the)\s*(documents?|papers?|records?)/i, // "gather your documents"
+    ];
+
+    // Only flag if Holly is PROACTIVELY raising documents (not responding to lead's question)
+    const isProactiveDocumentMention = documentPatterns.some(p => p.test(decision.message!));
+    if (isProactiveDocumentMention) {
+      errors.push(
+        'DOCUMENT BAN: Cannot discuss documents, pay stubs, T4s, NOAs, bank statements, or lender requirements at this stage. ' +
+        'Document gathering is ONLY appropriate in the CUSTOMER_SUPPORT stage (after application is submitted). ' +
+        'Focus on getting them to complete the application first.'
+      );
+    }
   }
 
   // === HARD RULE: Don't send booking/application links to CONVERTED leads ===
