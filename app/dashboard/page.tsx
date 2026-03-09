@@ -70,6 +70,10 @@ function DashboardContent() {
         return;
       }
 
+      setSelectedLead((currentLead) =>
+        currentLead?.id === selectedLeadId ? currentLead : null
+      );
+
       try {
         const res = await fetch(`/api/leads/${selectedLeadId}`);
         if (!res.ok) {
@@ -103,6 +107,7 @@ function DashboardContent() {
   };
 
   const handleLeadCardClick = (lead: LeadWithRelations) => {
+    setSelectedLead(lead);
     updateDashboardQuery(lead.id);
   };
 
@@ -172,7 +177,7 @@ function DashboardContent() {
       <main className="px-4 py-4 sm:px-6 sm:py-6">
         <KanbanBoard
           onLeadClick={handleLeadCardClick}
-          selectedLeadId={selectedLead?.id}
+          selectedLeadId={selectedLeadId}
         />
       </main>
 
@@ -183,7 +188,7 @@ function DashboardContent() {
           onClose={handleClosePanel}
         />
       ) : (
-        selectedLead && (
+        selectedLeadId && (
           <div
             className="fixed inset-0 bg-black/50 z-50 flex justify-end"
             onClick={handleClosePanel}
@@ -193,7 +198,7 @@ function DashboardContent() {
               onClick={(e) => e.stopPropagation()}
             >
               <LeadDetailPanel
-                leadId={selectedLead.id}
+                leadId={selectedLeadId}
                 initialTab={selectedTab}
                 onTabChange={handlePanelTabChange}
                 onClose={handleClosePanel}
