@@ -43,3 +43,5 @@ prisma/migrations
 .env.vercel.*
 .env.production.local
 test-output/
+mailchimp-export.csv
+test-pdfs/
