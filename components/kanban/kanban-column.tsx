@@ -32,7 +32,7 @@ export function KanbanColumn({
   });
 
   return (
-    <div className="flex-1 min-w-[260px] max-w-[300px] flex-shrink-0">
+    <div className="w-[85vw] min-w-[85vw] max-w-[85vw] flex-shrink-0 snap-start sm:flex-1 sm:min-w-[260px] sm:max-w-[300px]">
       {/* Column Header */}
       <div
         className={`${headerBg} ${textColor} px-4 py-3 rounded-t-xl flex justify-between items-center transition-all border-b ${borderColor} ${
@@ -48,7 +48,7 @@ export function KanbanColumn({
       {/* Column Body - fixed height with internal scrolling */}
       <div
         ref={setNodeRef}
-        className={`bg-white dark:bg-gray-800 rounded-b-xl min-h-[200px] max-h-[calc(100vh-220px)] overflow-y-auto p-3 space-y-3 border border-t-0 transition-all scrollbar-thin scrollbar-thumb-[#E5E0D8] dark:scrollbar-thumb-gray-600 scrollbar-track-transparent ${
+        className={`bg-white dark:bg-gray-800 rounded-b-xl min-h-[240px] max-h-[calc(100dvh-250px)] overflow-y-auto p-3 pr-2 space-y-3 border border-t-0 transition-all scroll-touch touch-pan-y overscroll-y-contain scrollbar-thin scrollbar-thumb-[#E5E0D8] dark:scrollbar-thumb-gray-600 scrollbar-track-transparent sm:min-h-[200px] sm:max-h-[calc(100vh-220px)] ${
           isOver
             ? "border-[#625FFF] bg-[#625FFF]/5 dark:bg-[#625FFF]/10 shadow-md"
             : "border-[#E5E0D8] dark:border-gray-700 shadow-sm"

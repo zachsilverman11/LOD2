@@ -19,12 +19,29 @@ function useTabsContext() {
 
 type TabsProps = {
   defaultTab: string;
+  activeTab?: string;
+  onTabChange?: (tab: string) => void;
   children: ReactNode;
   className?: string;
 };
 
-export function Tabs({ defaultTab, children, className = "" }: TabsProps) {
-  const [activeTab, setActiveTab] = useState(defaultTab);
+export function Tabs({
+  defaultTab,
+  activeTab: controlledActiveTab,
+  onTabChange,
+  children,
+  className = "",
+}: TabsProps) {
+  const [internalActiveTab, setInternalActiveTab] = useState(defaultTab);
+  const activeTab = controlledActiveTab ?? internalActiveTab;
+
+  const setActiveTab = (tab: string) => {
+    if (controlledActiveTab === undefined) {
+      setInternalActiveTab(tab);
+    }
+
+    onTabChange?.(tab);
+  };
 
   return (
     <TabsContext.Provider value={{ activeTab, setActiveTab }}>
@@ -41,7 +58,7 @@ type TabListProps = {
 export function TabList({ children, className = "" }: TabListProps) {
   return (
     <div
-      className={`flex gap-6 border-b border-[#E5E0D8] dark:border-gray-700 ${className}`}
+      className={`flex gap-2 overflow-x-auto border-b border-[#E5E0D8] dark:border-gray-700 scrollbar-thin scrollbar-thumb-[#E5E0D8] dark:scrollbar-thumb-gray-700 scrollbar-track-transparent ${className}`}
       role="tablist"
     >
       {children}
@@ -65,8 +82,8 @@ export function Tab({ value, children, className = "" }: TabProps) {
       aria-selected={isActive}
       onClick={() => setActiveTab(value)}
       className={`
-        relative px-1 py-3 text-sm transition-all duration-200
-        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B1AFFF] focus-visible:ring-offset-2 rounded-sm
+        relative min-h-11 flex-shrink-0 whitespace-nowrap rounded-lg px-3 py-2.5 text-sm transition-all duration-200
+        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B1AFFF] focus-visible:ring-offset-2
         ${isActive
           ? "text-[#1C1B1A] dark:text-gray-100 font-medium"
           : "text-[#8E8983] dark:text-gray-500 hover:text-[#55514D] dark:hover:text-gray-300"

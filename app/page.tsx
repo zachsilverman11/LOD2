@@ -4,6 +4,10 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { DashboardHeader } from "@/components/layout/dashboard-header";
+import {
+  buildLeadDetailHref,
+  getLeadDetailTabForActivityType,
+} from "@/lib/lead-detail-routing";
 
 interface QuickStats {
   activeLeads: number;
@@ -322,7 +326,10 @@ export default function HomePage() {
                 activities.map((activity) => (
                   <Link
                     key={activity.id}
-                    href={`/dashboard?lead=${activity.leadId}`}
+                    href={buildLeadDetailHref(
+                      activity.leadId,
+                      getLeadDetailTabForActivityType(activity.type)
+                    )}
                     className="flex items-start gap-3 px-5 py-3 hover:bg-[#FAFAF9] transition-colors"
                   >
                     {getActivityIcon(activity.type)}

@@ -6,7 +6,8 @@ import {
   DragEndEvent,
   DragOverlay,
   DragStartEvent,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
@@ -26,13 +27,20 @@ export function KanbanBoard({ onLeadClick, selectedLeadId }: KanbanBoardProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const scrollFrameRef = useRef<number | null>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, {
+    useSensor(MouseSensor, {
       activationConstraint: {
         distance: 8,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 180,
+        tolerance: 8,
       },
     })
   );
@@ -62,26 +70,38 @@ export function KanbanBoard({ onLeadClick, selectedLeadId }: KanbanBoardProps) {
       );
     };
 
-    // Enable horizontal scroll with Shift + mouse wheel (for non-Magic Mouse users)
+    const scheduleScrollCheck = () => {
+      if (scrollFrameRef.current !== null) {
+        cancelAnimationFrame(scrollFrameRef.current);
+      }
+
+      scrollFrameRef.current = requestAnimationFrame(checkScroll);
+    };
+
+    // Enable horizontal scroll with Shift + mouse wheel without fighting native trackpad scrolling.
     const handleWheel = (e: WheelEvent) => {
-      // If shift is held or it's a horizontal scroll, scroll horizontally
-      if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+      if (e.shiftKey) {
         e.preventDefault();
-        container.scrollLeft += e.shiftKey ? e.deltaY : e.deltaX;
+        container.scrollBy({ left: e.deltaY, behavior: "auto" });
+        scheduleScrollCheck();
       }
     };
 
     checkScroll();
-    container.addEventListener("scroll", checkScroll);
+    container.addEventListener("scroll", scheduleScrollCheck, { passive: true });
     container.addEventListener("wheel", handleWheel, { passive: false });
-    window.addEventListener("resize", checkScroll);
+    window.addEventListener("resize", scheduleScrollCheck);
 
     return () => {
-      container.removeEventListener("scroll", checkScroll);
+      if (scrollFrameRef.current !== null) {
+        cancelAnimationFrame(scrollFrameRef.current);
+      }
+
+      container.removeEventListener("scroll", scheduleScrollCheck);
       container.removeEventListener("wheel", handleWheel);
-      window.removeEventListener("resize", checkScroll);
+      window.removeEventListener("resize", scheduleScrollCheck);
     };
-  }, [leads]);
+  }, [leads.length]);
 
   const fetchLeads = async () => {
     try {
@@ -249,7 +269,7 @@ export function KanbanBoard({ onLeadClick, selectedLeadId }: KanbanBoardProps) {
         {/* Left scroll button - always visible when scrollable */}
         <button
           onClick={() => scrollByColumn('left')}
-          className={`absolute left-0 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white dark:bg-gray-800 border border-[#E5E0D8] dark:border-gray-600 shadow-lg flex items-center justify-center hover:bg-[#FAFAF9] dark:hover:bg-gray-700 hover:border-[#625FFF] transition-all ${
+          className={`absolute left-0 top-1/2 -translate-y-1/2 z-20 hidden h-10 w-10 rounded-full bg-white dark:bg-gray-800 border border-[#E5E0D8] dark:border-gray-600 shadow-lg sm:flex items-center justify-center hover:bg-[#FAFAF9] dark:hover:bg-gray-700 hover:border-[#625FFF] transition-all ${
             canScrollLeft ? "opacity-100" : "opacity-0 pointer-events-none"
           }`}
           aria-label="Scroll left"
@@ -262,7 +282,7 @@ export function KanbanBoard({ onLeadClick, selectedLeadId }: KanbanBoardProps) {
         {/* Right scroll button - always visible when scrollable */}
         <button
           onClick={() => scrollByColumn('right')}
-          className={`absolute right-0 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white dark:bg-gray-800 border border-[#E5E0D8] dark:border-gray-600 shadow-lg flex items-center justify-center hover:bg-[#FAFAF9] dark:hover:bg-gray-700 hover:border-[#625FFF] transition-all ${
+          className={`absolute right-0 top-1/2 -translate-y-1/2 z-20 hidden h-10 w-10 rounded-full bg-white dark:bg-gray-800 border border-[#E5E0D8] dark:border-gray-600 shadow-lg sm:flex items-center justify-center hover:bg-[#FAFAF9] dark:hover:bg-gray-700 hover:border-[#625FFF] transition-all ${
             canScrollRight ? "opacity-100" : "opacity-0 pointer-events-none"
           }`}
           aria-label="Scroll right"
@@ -274,21 +294,21 @@ export function KanbanBoard({ onLeadClick, selectedLeadId }: KanbanBoardProps) {
 
         {/* Left scroll shadow */}
         <div
-          className={`absolute left-0 top-0 bottom-4 w-12 bg-gradient-to-r from-[#FAFAF9] dark:from-gray-900 to-transparent pointer-events-none z-10 transition-opacity duration-200 ${
+          className={`absolute left-0 top-0 bottom-4 hidden sm:block w-12 bg-gradient-to-r from-[#FAFAF9] dark:from-gray-900 to-transparent pointer-events-none z-10 transition-opacity duration-200 ${
             canScrollLeft ? "opacity-100" : "opacity-0"
           }`}
         />
 
         {/* Right scroll shadow */}
         <div
-          className={`absolute right-0 top-0 bottom-4 w-12 bg-gradient-to-l from-[#FAFAF9] dark:from-gray-900 to-transparent pointer-events-none z-10 transition-opacity duration-200 ${
+          className={`absolute right-0 top-0 bottom-4 hidden sm:block w-12 bg-gradient-to-l from-[#FAFAF9] dark:from-gray-900 to-transparent pointer-events-none z-10 transition-opacity duration-200 ${
             canScrollRight ? "opacity-100" : "opacity-0"
           }`}
         />
 
         <div
           ref={scrollContainerRef}
-          className="flex gap-4 overflow-x-auto pb-4 scroll-smooth scrollbar-thin scrollbar-thumb-[#E5E0D8] scrollbar-track-transparent"
+          className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-4 scroll-smooth scroll-touch touch-pan-x overscroll-x-contain scrollbar-thin scrollbar-thumb-[#E5E0D8] scrollbar-track-transparent sm:mx-0 sm:gap-4 sm:px-0"
         >
           {PIPELINE_STAGES.map((stage) => (
             <KanbanColumn

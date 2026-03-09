@@ -99,10 +99,10 @@ export default function CallSummaryModal({
       }}
     >
       <div
-        className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+        className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[100dvh] overflow-y-auto sm:max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="p-6">
+        <div className="p-4 sm:p-6">
           {/* Header */}
           <div className="flex justify-between items-start mb-6">
             <div>
@@ -126,7 +126,7 @@ export default function CallSummaryModal({
               <label className="block text-sm font-medium text-[#1C1B1A] mb-3">
                 Who called?
               </label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <SelectButton
                   selected={formData.advisorName === "Greg Williamson"}
                   onClick={() => setFormData({ ...formData, advisorName: "Greg Williamson" })}
@@ -147,7 +147,7 @@ export default function CallSummaryModal({
               <label className="block text-sm font-medium text-[#1C1B1A] mb-3">
                 Did you speak with the lead?
               </label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <SelectButton
                   selected={formData.reached === true}
                   onClick={() => setFormData({ ...formData, reached: true })}
@@ -234,7 +234,7 @@ export default function CallSummaryModal({
                 <label className="block text-sm font-medium text-[#1C1B1A] mb-3">
                   Lead Quality <span className="text-[#8E8983] font-normal">(optional)</span>
                 </label>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <SelectButton
                     selected={formData.leadQuality === "hot"}
                     onClick={() => setFormData({ ...formData, leadQuality: "hot" })}
@@ -270,7 +270,7 @@ export default function CallSummaryModal({
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 placeholder="E.g., Discussed No Penalty Program, interested in refinancing in 3 months..."
                 rows={4}
-                className="w-full px-4 py-3 text-sm border border-[#E5E0D8] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#B1AFFF] focus:border-[#625FFF] text-[#1C1B1A] resize-none"
+                className="w-full rounded-xl border border-[#E5E0D8] px-4 py-3 text-base text-[#1C1B1A] focus:outline-none focus:ring-2 focus:ring-[#B1AFFF] focus:border-[#625FFF] resize-none sm:text-sm"
               />
               <p className="text-xs text-[#8E8983] mt-2">
                 These notes give Holly context for follow-up messages
@@ -278,7 +278,7 @@ export default function CallSummaryModal({
             </div>
 
             {/* Buttons */}
-            <div className="flex gap-3 pt-4 border-t border-[#E5E0D8]">
+            <div className="flex flex-col gap-3 pt-4 border-t border-[#E5E0D8] sm:flex-row">
               <Button
                 type="button"
                 variant="secondary"

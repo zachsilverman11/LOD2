@@ -3,6 +3,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { DashboardHeader } from "@/components/layout/dashboard-header";
 import Link from "next/link";
+import {
+  buildLeadDetailHref,
+  getLeadDetailTabForActivityType,
+} from "@/lib/lead-detail-routing";
 
 interface Activity {
   id: string;
@@ -265,7 +269,7 @@ export default function ActivityPage() {
     <div className="min-h-screen bg-[#FAFAF9]">
       <DashboardHeader subtitle="Activity Feed" />
 
-      <main className="max-w-4xl mx-auto px-6 py-8">
+      <main className="max-w-4xl mx-auto px-4 py-6 sm:px-6 sm:py-8">
         {/* Page Header */}
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-[#1C1B1A]">Activity Feed</h1>
@@ -332,7 +336,10 @@ export default function ActivityPage() {
                       {activity.content || activity.subject || getActivityLabel(activity.type)}
                     </p>
                     <Link
-                      href={`/dashboard?lead=${activity.leadId}`}
+                      href={buildLeadDetailHref(
+                        activity.leadId,
+                        getLeadDetailTabForActivityType(activity.type)
+                      )}
                       className="inline-flex items-center gap-1 text-xs font-medium text-[#625FFF] hover:text-[#524DD9] transition-colors"
                     >
                       {activity.leadName}

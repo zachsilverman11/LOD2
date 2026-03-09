@@ -304,7 +304,7 @@ export function OverviewTab({ lead, onRefresh, onLogCallOutcome }: OverviewTabPr
   const isHollyActive = !lead.hollyDisabled;
 
   return (
-    <div className="p-5 space-y-4">
+    <div className="p-4 space-y-4 sm:p-5">
       {/* Contact Information */}
       <section>
         <SectionLabel>Contact Information</SectionLabel>
@@ -322,7 +322,7 @@ export function OverviewTab({ lead, onRefresh, onLogCallOutcome }: OverviewTabPr
         <SectionLabel>Lead Details</SectionLabel>
         <Card>
           <CardContent>
-            <div className="grid grid-cols-2 gap-x-8 gap-y-3">
+            <div className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
               <div>
                 <p className="text-sm text-[#8E8983] mb-0.5">Location</p>
                 <p className="text-sm font-medium text-[#1C1B1A]">
@@ -378,7 +378,7 @@ export function OverviewTab({ lead, onRefresh, onLogCallOutcome }: OverviewTabPr
             <CardContent>
               <div className="space-y-3">
                 {lead.applicationStartedAt && (
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-[#F59E0B]" />
                       <span className="text-sm text-[#8E8983]">Application Started</span>
@@ -389,7 +389,7 @@ export function OverviewTab({ lead, onRefresh, onLogCallOutcome }: OverviewTabPr
                   </div>
                 )}
                 {lead.applicationCompletedAt ? (
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-[#76C63E]" />
                       <span className="text-sm text-[#8E8983]">Application Completed</span>
@@ -459,7 +459,7 @@ export function OverviewTab({ lead, onRefresh, onLogCallOutcome }: OverviewTabPr
             <SectionLabel>Additional Details</SectionLabel>
             <Card>
               <CardContent>
-                <div className="grid grid-cols-2 gap-x-8 gap-y-3">
+                <div className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
                   {additionalFields.map(([key, value]) => (
                     <div key={key}>
                       <p className="text-sm text-[#8E8983] mb-0.5">{formatFieldName(key)}</p>
@@ -513,7 +513,7 @@ export function OverviewTab({ lead, onRefresh, onLogCallOutcome }: OverviewTabPr
         <SectionLabel>Holly AI Assistant</SectionLabel>
         <Card>
           <CardContent>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isHollyActive ? "bg-[#76C63E]/10" : "bg-[#FBF3E7]"}`}>
                   <div className={`w-3 h-3 rounded-full ${isHollyActive ? "bg-[#76C63E]" : "bg-[#8E8983]"}`} />
@@ -548,7 +548,7 @@ export function OverviewTab({ lead, onRefresh, onLogCallOutcome }: OverviewTabPr
           <SectionLabel>Upcoming Appointment</SectionLabel>
           <Card>
             <CardContent>
-              <div className="flex items-start justify-between mb-4">
+              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="text-sm font-medium text-[#1C1B1A]">
                     {format(new Date(upcomingAppointment.scheduledAt), "EEEE, MMMM d, yyyy")}
@@ -562,7 +562,7 @@ export function OverviewTab({ lead, onRefresh, onLogCallOutcome }: OverviewTabPr
                     </p>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <Badge variant={getBookingSourceDisplay(upcomingAppointment.bookingSource).variant}>
                     {getBookingSourceDisplay(upcomingAppointment.bookingSource).label}
                   </Badge>
@@ -580,11 +580,12 @@ export function OverviewTab({ lead, onRefresh, onLogCallOutcome }: OverviewTabPr
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-2 pt-3 border-t border-[#E5E0D8]/50">
+              <div className="flex flex-col gap-2 pt-3 border-t border-[#E5E0D8]/50 sm:flex-row sm:flex-wrap">
                 <Button
                   size="sm"
                   variant="primary"
                   onClick={() => onLogCallOutcome?.(upcomingAppointment.id)}
+                  className="w-full sm:w-auto"
                 >
                   Log Call Outcome
                 </Button>
@@ -594,7 +595,7 @@ export function OverviewTab({ lead, onRefresh, onLogCallOutcome }: OverviewTabPr
                   variant={upcomingAppointment.bookingSource === "MANUAL" ? "secondary" : "secondary"}
                   onClick={() => handleToggleBookingSource(upcomingAppointment.id, upcomingAppointment.bookingSource)}
                   disabled={isTogglingBookingSource}
-                  className={upcomingAppointment.bookingSource === "MANUAL" ? "border-[#625FFF] text-[#625FFF]" : ""}
+                  className={`w-full sm:w-auto ${upcomingAppointment.bookingSource === "MANUAL" ? "border-[#625FFF] text-[#625FFF]" : ""}`}
                 >
                   {isTogglingBookingSource ? "..." : upcomingAppointment.bookingSource === "MANUAL" ? "Unmark Manual" : "Mark as Manual"}
                 </Button>
@@ -604,6 +605,7 @@ export function OverviewTab({ lead, onRefresh, onLogCallOutcome }: OverviewTabPr
                     size="sm"
                     variant="danger"
                     onClick={() => handleMarkNoShow(upcomingAppointment.id)}
+                    className="w-full sm:w-auto"
                   >
                     Mark as No-Show
                   </Button>
@@ -614,7 +616,7 @@ export function OverviewTab({ lead, onRefresh, onLogCallOutcome }: OverviewTabPr
                     href={upcomingAppointment.meetingUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#625FFF] hover:bg-[#625FFF]/5 rounded-lg transition-all duration-150"
+                    className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-[#625FFF] hover:bg-[#625FFF]/5 transition-all duration-150 sm:min-h-0 sm:justify-start"
                   >
                     Join Meeting
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -639,7 +641,7 @@ export function OverviewTab({ lead, onRefresh, onLogCallOutcome }: OverviewTabPr
                 .map((appt) => (
                   <div
                     key={appt.id}
-                    className="flex items-center justify-between py-3 first:pt-0 last:pb-0"
+                    className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div>
                       <p className="text-sm font-medium text-[#1C1B1A]">

@@ -103,7 +103,7 @@ export function CommunicationTab({ lead, onRefresh, onLogCallOutcome }: Communic
   };
 
   return (
-    <div className="p-5 space-y-5">
+    <div className="p-4 space-y-5 sm:p-5">
       {/* SMS Conversation */}
       <section>
         <SectionLabel>SMS Conversation</SectionLabel>
@@ -112,7 +112,7 @@ export function CommunicationTab({ lead, onRefresh, onLogCallOutcome }: Communic
             {/* SMS Messages */}
             <div
               ref={smsConversationRef}
-              className="p-4 space-y-3 max-h-80 overflow-y-auto bg-[#FAFAF9]"
+              className="space-y-3 max-h-[45vh] overflow-y-auto bg-[#F4F4F8] p-4 scroll-touch sm:max-h-80"
             >
               {smsCommunications.length === 0 ? (
                 <div className="text-center py-8">
@@ -151,8 +151,8 @@ export function CommunicationTab({ lead, onRefresh, onLogCallOutcome }: Communic
                               isOutbound
                                 ? isManual
                                   ? "bg-[#D9F36E] text-[#1C1B1A] rounded-2xl rounded-br-md"
-                                  : "bg-[#625FFF] text-white rounded-2xl rounded-br-md"
-                                : "bg-white border border-[#E5E0D8] text-[#1C1B1A] rounded-2xl rounded-bl-md"
+                                  : "bg-[#625FFF] text-white rounded-3xl rounded-br-md"
+                                : "bg-white border border-[#E5E0D8] text-[#1C1B1A] rounded-3xl rounded-bl-md shadow-sm"
                             }`}
                           >
                             <p className="text-sm whitespace-pre-wrap">{comm.content}</p>
@@ -170,7 +170,7 @@ export function CommunicationTab({ lead, onRefresh, onLogCallOutcome }: Communic
             </div>
 
             {/* Send SMS Section */}
-            <div className="p-4 border-t border-[#E5E0D8]">
+            <div className="border-t border-[#E5E0D8] bg-white p-4">
               {!lead.consentSms && (
                 <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg mb-3">
                   <svg className="w-4 h-4 text-[#DC2626]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -182,8 +182,8 @@ export function CommunicationTab({ lead, onRefresh, onLogCallOutcome }: Communic
 
               {!showManualSms ? (
                 <Button
-                  variant="secondary"
-                  size="sm"
+                  variant="primary"
+                  size="md"
                   onClick={() => setShowManualSms(true)}
                   disabled={!lead.consentSms}
                   className="w-full"
@@ -207,7 +207,7 @@ export function CommunicationTab({ lead, onRefresh, onLogCallOutcome }: Communic
                     <select
                       value={smsAuthor}
                       onChange={(e) => setSmsAuthor(e.target.value as TeamMember)}
-                      className="w-full px-3 py-2 text-sm border border-[#E5E0D8] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B1AFFF] focus:border-[#625FFF] text-[#1C1B1A] bg-white"
+                      className="w-full rounded-lg border border-[#E5E0D8] bg-white px-3 py-2 text-base text-[#1C1B1A] focus:outline-none focus:ring-2 focus:ring-[#B1AFFF] focus:border-[#625FFF] sm:text-sm"
                     >
                       {TEAM_MEMBERS.map((member) => (
                         <option key={member} value={member}>{member}</option>
@@ -226,7 +226,7 @@ export function CommunicationTab({ lead, onRefresh, onLogCallOutcome }: Communic
                       rows={4}
                       maxLength={1600}
                       placeholder="Type your message..."
-                      className="w-full px-3 py-2 text-sm border border-[#E5E0D8] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B1AFFF] focus:border-[#625FFF] text-[#1C1B1A] resize-none"
+                      className="w-full rounded-lg border border-[#E5E0D8] px-3 py-3 text-base text-[#1C1B1A] focus:outline-none focus:ring-2 focus:ring-[#B1AFFF] focus:border-[#625FFF] resize-none sm:text-sm"
                     />
                     <div className="flex items-center justify-between mt-1">
                       <span className="text-xs text-[#8E8983]">
@@ -239,10 +239,10 @@ export function CommunicationTab({ lead, onRefresh, onLogCallOutcome }: Communic
                   </div>
 
                   {/* Action buttons */}
-                  <div className="flex gap-2">
+                  <div className="flex flex-col gap-2 sm:flex-row">
                     <Button
                       variant="primary"
-                      size="sm"
+                      size="md"
                       onClick={handleSendManualSms}
                       disabled={isSendingSms || !manualSmsText.trim()}
                       className="flex-1"
@@ -251,7 +251,7 @@ export function CommunicationTab({ lead, onRefresh, onLogCallOutcome }: Communic
                     </Button>
                     <Button
                       variant="ghost"
-                      size="sm"
+                      size="md"
                       onClick={() => {
                         setShowManualSms(false);
                         setManualSmsText("");
@@ -296,7 +296,7 @@ export function CommunicationTab({ lead, onRefresh, onLogCallOutcome }: Communic
                       <div key={comm.id}>
                         <button
                           onClick={() => toggleEmail(comm.id)}
-                          className="w-full p-4 text-left hover:bg-[#FAFAF9] transition-colors"
+                          className="w-full min-h-11 p-4 text-left hover:bg-[#FAFAF9] transition-colors"
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex-1 min-w-0">
@@ -351,12 +351,13 @@ export function CommunicationTab({ lead, onRefresh, onLogCallOutcome }: Communic
 
       {/* Call History */}
       <section>
-        <div className="flex items-center justify-between mb-3">
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <SectionLabel className="mb-0">Call History</SectionLabel>
           <Button
             variant="primary"
-            size="sm"
+            size="md"
             onClick={() => onLogCallOutcome?.()}
+            className="w-full sm:w-auto"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />

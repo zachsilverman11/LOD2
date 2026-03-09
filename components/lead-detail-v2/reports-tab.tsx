@@ -570,7 +570,7 @@ export function ReportsTab({ lead }: ReportsTabProps) {
   };
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-4 space-y-4 sm:p-5">
       {/* Report Generator Card */}
       <Card>
         <CardContent className="pt-5">
@@ -845,7 +845,7 @@ export function ReportsTab({ lead }: ReportsTabProps) {
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   {/* Common Fields */}
                   <div>
                     <label className="text-xs text-[#8E8983]">Mortgage Amount</label>
@@ -959,7 +959,7 @@ export function ReportsTab({ lead }: ReportsTabProps) {
                 {scenario === 1 && extractedData && (
                   <div className="mt-4 p-3 bg-white rounded-lg">
                     <p className="text-xs text-[#8E8983] mb-2">Calculated Values</p>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
                       <div>
                         <span className="text-[#8E8983]">Old Payment:</span>{" "}
                         <span className="font-medium">{extractedData.oldPayment ? formatCurrency(extractedData.oldPayment) : "N/A"}</span>
@@ -993,7 +993,7 @@ export function ReportsTab({ lead }: ReportsTabProps) {
             )}
 
             {/* Action Buttons */}
-            <div className="flex gap-3 mt-6">
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <Button
                 variant="secondary"
                 onClick={handleRegenerate}

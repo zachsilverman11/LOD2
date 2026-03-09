@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { DashboardHeader } from "@/components/layout/dashboard-header";
 
 interface KeyMetrics {
@@ -93,11 +93,7 @@ export default function AnalyticsPage() {
   const [selectedCohort, setSelectedCohort] = useState<string>("all");
   const [availableCohorts, setAvailableCohorts] = useState<string[]>([]);
 
-  useEffect(() => {
-    fetchAnalytics();
-  }, [selectedCohort]);
-
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = useCallback(async () => {
     setLoading(true);
     try {
       const cohortParam = selectedCohort !== "all" ? `?cohort=${selectedCohort}` : "";
@@ -133,7 +129,11 @@ export default function AnalyticsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedCohort]);
+
+  useEffect(() => {
+    fetchAnalytics();
+  }, [fetchAnalytics]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("en-CA", {
@@ -177,13 +177,13 @@ export default function AnalyticsPage() {
 
       {/* Secondary Toolbar - Cohort Filter */}
       <div className="bg-white border-b border-[#E5E0D8]">
-        <div className="max-w-full mx-auto px-6 lg:px-8 py-3">
-          <div className="flex items-center gap-3">
+        <div className="max-w-full mx-auto px-4 py-3 sm:px-6 lg:px-8">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
             <label className="text-sm font-medium text-[#55514D]">Filter by Cohort:</label>
             <select
               value={selectedCohort}
               onChange={(e) => setSelectedCohort(e.target.value)}
-              className="px-3 py-1.5 text-sm border border-[#E5E0D8] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#625FFF]/20 focus:border-[#625FFF]"
+              className="min-h-11 rounded-lg border border-[#E5E0D8] bg-white px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[#625FFF]/20 focus:border-[#625FFF] sm:text-sm"
             >
               <option value="all">All Cohorts</option>
               {availableCohorts.map((cohort) => (
@@ -196,12 +196,12 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      <main className="max-w-full mx-auto px-6 lg:px-8 py-6">
+      <main className="max-w-full mx-auto px-4 py-6 sm:px-6 lg:px-8">
         {/* Cohort Filter Indicator */}
         {selectedCohort !== "all" && (
           <div className="mb-6 bg-[#625FFF]/10 border border-[#625FFF] rounded-lg p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
                 <span className="text-sm font-semibold text-[#625FFF]">
                   Viewing: {selectedCohort}
                 </span>
@@ -221,12 +221,12 @@ export default function AnalyticsPage() {
 
         {/* Section 1: Key Numbers (4 cards) */}
         <div className="mb-8">
-          <h2 className="text-2xl font-bold text-[#1C1B1A] mb-4">Key Numbers</h2>
+          <h2 className="mb-4 text-xl font-bold text-[#1C1B1A] sm:text-2xl">Key Numbers</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {/* Total Leads */}
             <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-6">
               <div className="text-sm text-[#55514D] font-medium mb-2">Total Leads</div>
-              <div className="text-4xl font-bold text-[#1C1B1A]">{overview?.totalLeads || 0}</div>
+              <div className="text-3xl font-bold text-[#1C1B1A] sm:text-4xl">{overview?.totalLeads || 0}</div>
               <div className="text-xs text-[#55514D] mt-2">
                 {keyMetrics.leadsBooked} booked • {keyMetrics.dealsWon} won
               </div>
@@ -235,7 +235,7 @@ export default function AnalyticsPage() {
             {/* Active Pipeline Value */}
             <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-6">
               <div className="text-sm text-[#55514D] font-medium mb-2">Active Pipeline Value</div>
-              <div className="text-4xl font-bold text-[#625FFF]">
+              <div className="text-3xl font-bold text-[#625FFF] sm:text-4xl">
                 {formatCurrency(overview?.activePipelineValue || 0)}
               </div>
               <div className="text-xs text-[#55514D] mt-2">
@@ -246,7 +246,7 @@ export default function AnalyticsPage() {
             {/* Lead → Call Booked Rate */}
             <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-6">
               <div className="text-sm text-[#55514D] font-medium mb-2">Lead → Call Booked</div>
-              <div className="text-4xl font-bold text-[#625FFF]">
+              <div className="text-3xl font-bold text-[#625FFF] sm:text-4xl">
                 {formatPercent(keyMetrics.leadToCallBookedRate)}
               </div>
               <div className="text-xs text-[#55514D] mt-2">
@@ -257,7 +257,7 @@ export default function AnalyticsPage() {
             {/* Lead → Deals Won Rate (TRUE conversion) */}
             <div className="bg-green-50 backdrop-blur-sm rounded-xl shadow-sm border-2 border-green-200 p-6">
               <div className="text-sm text-green-700 font-medium mb-2">Lead → Deals Won</div>
-              <div className="text-4xl font-bold text-green-700">
+              <div className="text-3xl font-bold text-green-700 sm:text-4xl">
                 {formatPercent(keyMetrics.leadToDealsWonRate)}
               </div>
               <div className="text-xs text-green-600 mt-2">
@@ -269,9 +269,9 @@ export default function AnalyticsPage() {
 
         {/* Section 2: Conversion Funnel Rates (4 key rates) */}
         <div className="mb-8">
-          <h2 className="text-2xl font-bold text-[#1C1B1A] mb-4">Conversion Funnel</h2>
+          <h2 className="mb-4 text-xl font-bold text-[#1C1B1A] sm:text-2xl">Conversion Funnel</h2>
           <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] p-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 sm:gap-6">
               {/* Lead → Call Booked */}
               <div className="text-center p-4 bg-[#625FFF]/5 rounded-lg">
                 <div className="text-sm text-[#55514D] mb-2">Lead → Call Booked</div>
@@ -318,8 +318,8 @@ export default function AnalyticsPage() {
             </div>
 
             {/* Visual Funnel */}
-            <div className="mt-8 pt-6 border-t border-[#E4DDD3]">
-              <div className="flex items-center justify-between gap-4">
+            <div className="mt-8 border-t border-[#E4DDD3] pt-6">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
                 {/* Total Leads */}
                 <div className="flex-1">
                   <div className="bg-[#625FFF] text-white rounded-lg p-4 text-center">
@@ -327,7 +327,7 @@ export default function AnalyticsPage() {
                     <div className="text-xs opacity-80">Total Leads</div>
                   </div>
                 </div>
-                <div className="text-[#55514D]">→</div>
+                <div className="text-center text-[#55514D] lg:text-left">→</div>
                 {/* Booked */}
                 <div className="flex-1">
                   <div className="bg-[#8B88FF] text-white rounded-lg p-4 text-center">
@@ -335,7 +335,7 @@ export default function AnalyticsPage() {
                     <div className="text-xs opacity-80">Call Booked</div>
                   </div>
                 </div>
-                <div className="text-[#55514D]">→</div>
+                <div className="text-center text-[#55514D] lg:text-left">→</div>
                 {/* App Submitted */}
                 <div className="flex-1">
                   <div className="bg-[#B8E986] text-[#1C1B1A] rounded-lg p-4 text-center">
@@ -343,7 +343,7 @@ export default function AnalyticsPage() {
                     <div className="text-xs opacity-80">App Submitted</div>
                   </div>
                 </div>
-                <div className="text-[#55514D]">→</div>
+                <div className="text-center text-[#55514D] lg:text-left">→</div>
                 {/* Deals Won */}
                 <div className="flex-1">
                   <div className="bg-green-600 text-white rounded-lg p-4 text-center">
@@ -358,10 +358,83 @@ export default function AnalyticsPage() {
 
         {/* Section 3: Cohort Performance Table */}
         <div className="mb-8">
-          <h2 className="text-2xl font-bold text-[#1C1B1A] mb-4">Cohort Performance</h2>
-          <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
+          <h2 className="mb-4 text-xl font-bold text-[#1C1B1A] sm:text-2xl">Cohort Performance</h2>
+          <div className="space-y-3 md:hidden">
+            {cohortData?.cohorts.map((cohort) => (
+              <div
+                key={cohort.cohort}
+                className="rounded-xl border border-[#E4DDD3] bg-white/90 p-4 shadow-sm"
+              >
+                <div className="mb-3 flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-base font-semibold text-[#625FFF]">{cohort.cohort}</p>
+                    <p className="text-xs text-[#8E8983]">
+                      {cohort.startDate
+                        ? new Date(cohort.startDate).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })
+                        : "No start date"}
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700">
+                    {formatPercent(cohort.leadToDealsWonRate)}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <p className="text-[#8E8983]">Total Leads</p>
+                    <p className="font-semibold text-[#1C1B1A]">{cohort.totalLeads}</p>
+                  </div>
+                  <div>
+                    <p className="text-[#8E8983]">Booked</p>
+                    <p className="font-semibold text-[#1C1B1A]">
+                      {cohort.booked} ({formatPercent(cohort.leadToCallRate)})
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[#8E8983]">Apps</p>
+                    <p className="font-semibold text-[#1C1B1A]">
+                      {cohort.appsSubmitted} ({formatPercent(cohort.callToAppRate)})
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[#8E8983]">Deals Won</p>
+                    <p className="font-semibold text-green-700">
+                      {cohort.dealsWon} ({formatPercent(cohort.appToDealsWonRate)})
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {cohortData?.totals && (
+              <div className="rounded-xl bg-[#1C1B1A] p-4 text-white shadow-sm">
+                <p className="text-sm font-semibold">Totals</p>
+                <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <p className="text-white/60">Leads</p>
+                    <p className="font-semibold">{cohortData.totals.totalLeads}</p>
+                  </div>
+                  <div>
+                    <p className="text-white/60">Booked</p>
+                    <p className="font-semibold">{cohortData.totals.booked}</p>
+                  </div>
+                  <div>
+                    <p className="text-white/60">Apps</p>
+                    <p className="font-semibold">{cohortData.totals.appsSubmitted}</p>
+                  </div>
+                  <div>
+                    <p className="text-white/60">Won</p>
+                    <p className="font-semibold text-green-300">{cohortData.totals.dealsWon}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="hidden overflow-hidden rounded-xl border border-[#E4DDD3] bg-white/90 shadow-sm backdrop-blur-sm md:block">
+            <div className="overflow-x-auto scroll-touch">
+              <table className="w-full min-w-[980px]">
                 <thead className="bg-[#FBF3E7]">
                   <tr>
                     <th className="text-left py-4 px-4 text-sm font-bold text-[#1C1B1A]">Cohort</th>
@@ -450,10 +523,68 @@ export default function AnalyticsPage() {
         {/* Section 4: Loan Type Performance */}
         {loanTypeData && loanTypeData.loanTypes.length > 0 && (
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-[#1C1B1A] mb-4">Performance by Loan Type</h2>
-            <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
+            <h2 className="mb-4 text-xl font-bold text-[#1C1B1A] sm:text-2xl">Performance by Loan Type</h2>
+            <div className="space-y-3 md:hidden">
+              {loanTypeData.loanTypes.map((lt) => (
+                <div
+                  key={lt.loanType}
+                  className="rounded-xl border border-[#E4DDD3] bg-white/90 p-4 shadow-sm"
+                >
+                  <div className="mb-3 flex items-start justify-between gap-3">
+                    <p className="text-base font-semibold text-[#625FFF]">{lt.displayName}</p>
+                    <span className="rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700">
+                      {formatPercent(lt.leadToDealsWonRate)}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-[#8E8983]">Total Leads</p>
+                      <p className="font-semibold text-[#1C1B1A]">{lt.totalLeads}</p>
+                    </div>
+                    <div>
+                      <p className="text-[#8E8983]">Booked</p>
+                      <p className="font-semibold text-[#1C1B1A]">
+                        {lt.booked} ({formatPercent(lt.leadToCallRate)})
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[#8E8983]">Apps</p>
+                      <p className="font-semibold text-[#1C1B1A]">{lt.appsSubmitted}</p>
+                    </div>
+                    <div>
+                      <p className="text-[#8E8983]">Deals Won</p>
+                      <p className="font-semibold text-green-700">
+                        {lt.dealsWon} ({formatPercent(lt.appToDealsWonRate)})
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <div className="rounded-xl bg-[#1C1B1A] p-4 text-white shadow-sm">
+                <p className="text-sm font-semibold">All Types</p>
+                <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <p className="text-white/60">Leads</p>
+                    <p className="font-semibold">{loanTypeData.totals.totalLeads}</p>
+                  </div>
+                  <div>
+                    <p className="text-white/60">Booked</p>
+                    <p className="font-semibold">{loanTypeData.totals.booked}</p>
+                  </div>
+                  <div>
+                    <p className="text-white/60">Apps</p>
+                    <p className="font-semibold">{loanTypeData.totals.appsSubmitted}</p>
+                  </div>
+                  <div>
+                    <p className="text-white/60">Won</p>
+                    <p className="font-semibold text-green-300">{loanTypeData.totals.dealsWon}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="hidden overflow-hidden rounded-xl border border-[#E4DDD3] bg-white/90 shadow-sm backdrop-blur-sm md:block">
+              <div className="overflow-x-auto scroll-touch">
+                <table className="w-full min-w-[860px]">
                   <thead className="bg-[#FBF3E7]">
                     <tr>
                       <th className="text-left py-4 px-4 text-sm font-bold text-[#1C1B1A]">Loan Type</th>
@@ -523,10 +654,10 @@ export default function AnalyticsPage() {
         {/* Section 5: Appointments by Booking Source */}
         {bookingSourceData && bookingSourceData.sources.some(s => s.total > 0) && (
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-[#1C1B1A] mb-4">Appointments by Booking Source</h2>
+            <h2 className="mb-4 text-xl font-bold text-[#1C1B1A] sm:text-2xl">Appointments by Booking Source</h2>
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
               {bookingSourceData.sources.map((source) => (
                 <div
                   key={source.source}
@@ -569,9 +700,50 @@ export default function AnalyticsPage() {
             </div>
 
             {/* Detailed Table */}
-            <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[#E4DDD3] overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
+            <div className="space-y-3 md:hidden">
+              {bookingSourceData.sources.map((source) => (
+                <div
+                  key={source.source}
+                  className="rounded-xl border border-[#E4DDD3] bg-white/90 p-4 shadow-sm"
+                >
+                  <div className="mb-3 flex items-start justify-between gap-3">
+                    <p className="text-base font-semibold text-[#1C1B1A]">{source.displayName}</p>
+                    <span className="rounded-full bg-[#625FFF]/10 px-2.5 py-1 text-xs font-semibold text-[#625FFF]">
+                      {formatPercent(source.showUpRate)}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-[#8E8983]">Total</p>
+                      <p className="font-semibold text-[#1C1B1A]">{source.total}</p>
+                    </div>
+                    <div>
+                      <p className="text-[#8E8983]">Scheduled</p>
+                      <p className="font-semibold text-[#1C1B1A]">{source.scheduled}</p>
+                    </div>
+                    <div>
+                      <p className="text-[#8E8983]">Completed</p>
+                      <p className="font-semibold text-[#1C1B1A]">{source.completed}</p>
+                    </div>
+                    <div>
+                      <p className="text-[#8E8983]">No Show</p>
+                      <p className="font-semibold text-[#1C1B1A]">{source.noShow}</p>
+                    </div>
+                    <div>
+                      <p className="text-[#8E8983]">Show-up Rate</p>
+                      <p className="font-semibold text-[#625FFF]">{formatPercent(source.showUpRate)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[#8E8983]">Conversion</p>
+                      <p className="font-semibold text-green-700">{formatPercent(source.conversionRate)}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="hidden overflow-hidden rounded-xl border border-[#E4DDD3] bg-white/90 shadow-sm backdrop-blur-sm md:block">
+              <div className="overflow-x-auto scroll-touch">
+                <table className="w-full min-w-[760px]">
                   <thead className="bg-[#FBF3E7]">
                     <tr>
                       <th className="text-left py-4 px-4 text-sm font-bold text-[#1C1B1A]">Source</th>

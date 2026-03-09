@@ -6,6 +6,10 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { useTheme } from "@/components/providers/theme-provider";
+import {
+  buildLeadDetailHref,
+  getLeadDetailTabForActivityType,
+} from "@/lib/lead-detail-routing";
 
 interface DashboardHeaderProps {
   subtitle?: string;
@@ -26,6 +30,7 @@ export function DashboardHeader({ subtitle }: DashboardHeaderProps) {
   const session = sessionResult?.data;
   const pathname = usePathname();
   const { resolvedTheme, setTheme } = useTheme();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -33,6 +38,7 @@ export function DashboardHeader({ subtitle }: DashboardHeaderProps) {
   const [activityCount, setActivityCount] = useState(0);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const activityRef = useRef<HTMLDivElement>(null);
+  const mobileNavRef = useRef<HTMLDivElement>(null);
 
   // Filter function for user-relevant activities
   const isUserRelevantActivity = useCallback((activity: Activity): boolean => {
@@ -142,6 +148,9 @@ export function DashboardHeader({ subtitle }: DashboardHeaderProps) {
   // Close menus when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
+      if (mobileNavRef.current && !mobileNavRef.current.contains(event.target as Node)) {
+        setMobileNavOpen(false);
+      }
       if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
         setUserMenuOpen(false);
       }
@@ -152,6 +161,10 @@ export function DashboardHeader({ subtitle }: DashboardHeaderProps) {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [pathname]);
 
   const getInitials = (name?: string | null, email?: string | null) => {
     if (name) {
@@ -258,12 +271,12 @@ export function DashboardHeader({ subtitle }: DashboardHeaderProps) {
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-b border-[#E5E0D8] dark:border-gray-700 shadow-sm">
-      <div className="max-w-full mx-auto px-6 lg:px-8">
+      <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-3 group">
+          <Link href="/" className="flex items-center gap-3 group min-w-0">
             <div className="flex flex-col">
-              <h1 className="text-2xl font-extrabold text-[#1C1B1A] dark:text-gray-100 tracking-tight">
+              <h1 className="text-xl sm:text-2xl font-extrabold text-[#1C1B1A] dark:text-gray-100 tracking-tight">
                 <span className="italic text-[#625FFF] group-hover:text-[#524DD9] transition-colors">
                   inspired
                 </span>{" "}
@@ -296,11 +309,57 @@ export function DashboardHeader({ subtitle }: DashboardHeaderProps) {
 
           {/* Right Section: Activity + User Menu */}
           <div className="flex items-center gap-2">
+            {/* Mobile Navigation */}
+            <div className="relative md:hidden" ref={mobileNavRef}>
+              <button
+                type="button"
+                onClick={() => setMobileNavOpen((open) => !open)}
+                aria-expanded={mobileNavOpen}
+                aria-label="Open navigation"
+                className={`flex h-11 w-11 items-center justify-center rounded-lg transition-colors duration-200 ${
+                  mobileNavOpen
+                    ? "bg-[#625FFF]/10 text-[#625FFF]"
+                    : "text-[#55514D] dark:text-gray-400 hover:text-[#1C1B1A] dark:hover:text-gray-100 hover:bg-[#F5F3F0] dark:hover:bg-gray-800"
+                }`}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={mobileNavOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} />
+                </svg>
+              </button>
+
+              {mobileNavOpen && (
+                <div className="absolute right-0 mt-2 w-[min(20rem,calc(100vw-1rem))] rounded-xl border border-[#E5E0D8] dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg overflow-hidden">
+                  <div className="border-b border-[#E5E0D8] dark:border-gray-700 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#8E8983] dark:text-gray-500">
+                      Navigation
+                    </p>
+                  </div>
+                  <nav className="p-2">
+                    {navLinks.map((link) => (
+                      <Link
+                        key={link.href}
+                        href={link.href}
+                        className={`flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                          isActive(link.href)
+                            ? "bg-[#625FFF]/10 text-[#625FFF]"
+                            : "text-[#55514D] dark:text-gray-400 hover:bg-[#F5F3F0] dark:hover:bg-gray-700/70 hover:text-[#1C1B1A] dark:hover:text-gray-100"
+                        }`}
+                      >
+                        {link.label}
+                      </Link>
+                    ))}
+                  </nav>
+                </div>
+              )}
+            </div>
+
             {/* Activity Bell */}
             <div className="relative" ref={activityRef}>
               <button
                 onClick={() => setActivityOpen(!activityOpen)}
-                className={`relative p-2 rounded-lg transition-colors duration-200 ${
+                aria-expanded={activityOpen}
+                aria-label="Open recent activity"
+                className={`relative flex h-11 w-11 items-center justify-center rounded-lg transition-colors duration-200 ${
                   activityOpen
                     ? "bg-[#625FFF]/10 text-[#625FFF]"
                     : "text-[#55514D] dark:text-gray-400 hover:text-[#1C1B1A] dark:hover:text-gray-100 hover:bg-[#F5F3F0] dark:hover:bg-gray-800"
@@ -319,7 +378,7 @@ export function DashboardHeader({ subtitle }: DashboardHeaderProps) {
 
               {/* Activity Dropdown */}
               {activityOpen && (
-                <div className="absolute right-0 mt-2 w-96 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-[#E5E0D8] dark:border-gray-700 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="absolute right-0 mt-2 w-[min(24rem,calc(100vw-1rem))] sm:w-96 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-[#E5E0D8] dark:border-gray-700 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                   {/* Header */}
                   <div className="px-4 py-3 border-b border-[#E5E0D8] dark:border-gray-700 bg-[#FAFAF9] dark:bg-gray-800/50">
                     <div className="flex items-center justify-between">
@@ -334,7 +393,7 @@ export function DashboardHeader({ subtitle }: DashboardHeaderProps) {
                   </div>
 
                   {/* Activity List */}
-                  <div className="max-h-[400px] overflow-y-auto">
+                  <div className="max-h-[min(70vh,400px)] overflow-y-auto">
                     {activityLoading ? (
                       <div className="px-4 py-8 text-center">
                         <div className="animate-spin w-6 h-6 border-2 border-[#625FFF] border-t-transparent rounded-full mx-auto"></div>
@@ -352,9 +411,12 @@ export function DashboardHeader({ subtitle }: DashboardHeaderProps) {
                         {filteredActivities.slice(0, 10).map((activity) => (
                           <Link
                             key={activity.id}
-                            href={`/dashboard?lead=${activity.leadId}`}
+                            href={buildLeadDetailHref(
+                              activity.leadId,
+                              getLeadDetailTabForActivityType(activity.type)
+                            )}
                             onClick={() => setActivityOpen(false)}
-                            className="flex items-start gap-3 px-4 py-3 hover:bg-[#FAFAF9] dark:hover:bg-gray-700/50 transition-colors"
+                            className="flex min-h-11 items-start gap-3 px-4 py-3 hover:bg-[#FAFAF9] dark:hover:bg-gray-700/50 transition-colors"
                           >
                             {getActivityIcon(activity.type)}
                             <div className="flex-1 min-w-0">
@@ -395,7 +457,7 @@ export function DashboardHeader({ subtitle }: DashboardHeaderProps) {
             {/* Theme Toggle */}
             <button
               onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
-              className="p-2 rounded-lg text-[#55514D] hover:text-[#1C1B1A] hover:bg-[#F5F3F0] dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-800 transition-colors duration-200"
+              className="flex h-11 w-11 items-center justify-center rounded-lg text-[#55514D] hover:text-[#1C1B1A] hover:bg-[#F5F3F0] dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-800 transition-colors duration-200"
               title={resolvedTheme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
             >
               {resolvedTheme === "dark" ? (
@@ -416,7 +478,8 @@ export function DashboardHeader({ subtitle }: DashboardHeaderProps) {
             <div className="relative" ref={userMenuRef}>
               <button
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="flex items-center gap-3 px-3 py-1.5 rounded-full hover:bg-[#F5F3F0] dark:hover:bg-gray-800 transition-colors duration-200 border border-transparent hover:border-[#E5E0D8] dark:hover:border-gray-700"
+                aria-expanded={userMenuOpen}
+                className="flex min-h-11 items-center gap-3 px-3 py-1.5 rounded-full hover:bg-[#F5F3F0] dark:hover:bg-gray-800 transition-colors duration-200 border border-transparent hover:border-[#E5E0D8] dark:hover:border-gray-700"
               >
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#625FFF] to-[#8B88FF] flex items-center justify-center shadow-sm">
                   <span className="text-xs font-semibold text-white">
@@ -440,7 +503,7 @@ export function DashboardHeader({ subtitle }: DashboardHeaderProps) {
 
               {/* User Dropdown Menu */}
               {userMenuOpen && (
-                <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-[#E5E0D8] dark:border-gray-700 py-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="absolute right-0 mt-2 w-[min(16rem,calc(100vw-1rem))] bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-[#E5E0D8] dark:border-gray-700 py-2 animate-in fade-in slide-in-from-top-2 duration-200">
                   <div className="px-4 py-3 border-b border-[#E5E0D8] dark:border-gray-700">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#625FFF] to-[#8B88FF] flex items-center justify-center shadow-sm">
@@ -490,7 +553,7 @@ export function DashboardHeader({ subtitle }: DashboardHeaderProps) {
                     <Link
                       href="/"
                       onClick={() => setUserMenuOpen(false)}
-                      className="flex items-center gap-3 px-4 py-2 text-sm text-[#55514D] dark:text-gray-400 hover:text-[#1C1B1A] dark:hover:text-gray-100 hover:bg-[#F5F3F0] dark:hover:bg-gray-700 transition-colors"
+                      className="flex min-h-11 items-center gap-3 px-4 py-2 text-sm text-[#55514D] dark:text-gray-400 hover:text-[#1C1B1A] dark:hover:text-gray-100 hover:bg-[#F5F3F0] dark:hover:bg-gray-700 transition-colors"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
@@ -500,7 +563,7 @@ export function DashboardHeader({ subtitle }: DashboardHeaderProps) {
                     <Link
                       href="/dashboard/activity"
                       onClick={() => setUserMenuOpen(false)}
-                      className="flex items-center gap-3 px-4 py-2 text-sm text-[#55514D] dark:text-gray-400 hover:text-[#1C1B1A] dark:hover:text-gray-100 hover:bg-[#F5F3F0] dark:hover:bg-gray-700 transition-colors"
+                      className="flex min-h-11 items-center gap-3 px-4 py-2 text-sm text-[#55514D] dark:text-gray-400 hover:text-[#1C1B1A] dark:hover:text-gray-100 hover:bg-[#F5F3F0] dark:hover:bg-gray-700 transition-colors"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -512,7 +575,7 @@ export function DashboardHeader({ subtitle }: DashboardHeaderProps) {
                   <div className="border-t border-[#E5E0D8] dark:border-gray-700 pt-1 mt-1">
                     <button
                       onClick={handleLogout}
-                      className="flex items-center gap-3 w-full px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                      className="flex min-h-11 w-full items-center gap-3 px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />

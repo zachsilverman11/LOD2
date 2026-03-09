@@ -184,15 +184,16 @@ export function ActivityTab({ lead, onRefresh }: ActivityTabProps) {
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   return (
-    <div className="p-5 space-y-5">
+    <div className="p-4 space-y-5 sm:p-5">
       {/* Notes Section */}
       <section>
-        <div className="flex items-center justify-between mb-3">
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <SectionLabel className="mb-0">Notes</SectionLabel>
           <Button
             variant="secondary"
-            size="sm"
+            size="md"
             onClick={() => setIsAddingNote(!isAddingNote)}
+            className="w-full sm:w-auto"
           >
             {isAddingNote ? "Cancel" : "Add Note"}
           </Button>
@@ -208,7 +209,7 @@ export function ActivityTab({ lead, onRefresh }: ActivityTabProps) {
                   <select
                     value={noteAuthor}
                     onChange={(e) => setNoteAuthor(e.target.value as TeamMember)}
-                    className="w-full px-3 py-2 text-sm border border-[#E5E0D8] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B1AFFF] focus:border-[#625FFF] text-[#1C1B1A] bg-white"
+                    className="w-full rounded-lg border border-[#E5E0D8] bg-white px-3 py-2 text-base text-[#1C1B1A] focus:outline-none focus:ring-2 focus:ring-[#B1AFFF] focus:border-[#625FFF] sm:text-sm"
                   >
                     {TEAM_MEMBERS.map((member) => (
                       <option key={member} value={member}>{member}</option>
@@ -220,12 +221,12 @@ export function ActivityTab({ lead, onRefresh }: ActivityTabProps) {
                   onChange={(e) => setNewNote(e.target.value)}
                   placeholder="Add a note about this lead..."
                   rows={3}
-                  className="w-full px-3 py-2 text-sm border border-[#E5E0D8] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B1AFFF] focus:border-[#625FFF] text-[#1C1B1A] resize-none"
+                  className="w-full rounded-lg border border-[#E5E0D8] px-3 py-3 text-base text-[#1C1B1A] focus:outline-none focus:ring-2 focus:ring-[#B1AFFF] focus:border-[#625FFF] resize-none sm:text-sm"
                 />
-                <div className="flex gap-2 mt-3">
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                   <Button
                     variant="primary"
-                    size="sm"
+                    size="md"
                     onClick={handleAddNote}
                     disabled={isSavingNote || !newNote.trim()}
                   >
@@ -233,7 +234,7 @@ export function ActivityTab({ lead, onRefresh }: ActivityTabProps) {
                   </Button>
                   <Button
                     variant="ghost"
-                    size="sm"
+                    size="md"
                     onClick={() => {
                       setIsAddingNote(false);
                       setNewNote("");
@@ -274,12 +275,13 @@ export function ActivityTab({ lead, onRefresh }: ActivityTabProps) {
 
       {/* Tasks Section */}
       <section>
-        <div className="flex items-center justify-between mb-3">
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <SectionLabel className="mb-0">Tasks</SectionLabel>
           <Button
             variant="secondary"
-            size="sm"
+            size="md"
             onClick={() => setIsAddingTask(!isAddingTask)}
+            className="w-full sm:w-auto"
           >
             {isAddingTask ? "Cancel" : "Add Task"}
           </Button>
@@ -297,7 +299,7 @@ export function ActivityTab({ lead, onRefresh }: ActivityTabProps) {
                     value={newTaskTitle}
                     onChange={(e) => setNewTaskTitle(e.target.value)}
                     placeholder="e.g., Follow up on documents"
-                    className="w-full px-3 py-2 text-sm border border-[#E5E0D8] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B1AFFF] focus:border-[#625FFF] text-[#1C1B1A]"
+                    className="w-full rounded-lg border border-[#E5E0D8] px-3 py-2 text-base text-[#1C1B1A] focus:outline-none focus:ring-2 focus:ring-[#B1AFFF] focus:border-[#625FFF] sm:text-sm"
                   />
                 </div>
                 <div className="mb-3">
@@ -307,16 +309,16 @@ export function ActivityTab({ lead, onRefresh }: ActivityTabProps) {
                     onChange={(e) => setNewTaskDescription(e.target.value)}
                     placeholder="Additional details..."
                     rows={2}
-                    className="w-full px-3 py-2 text-sm border border-[#E5E0D8] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B1AFFF] focus:border-[#625FFF] text-[#1C1B1A] resize-none"
+                    className="w-full rounded-lg border border-[#E5E0D8] px-3 py-3 text-base text-[#1C1B1A] focus:outline-none focus:ring-2 focus:ring-[#B1AFFF] focus:border-[#625FFF] resize-none sm:text-sm"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3 mb-3">
+                <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
                     <label className="block text-xs font-medium text-[#8E8983] mb-1">Assign To</label>
                     <select
                       value={taskAssignedTo}
                       onChange={(e) => setTaskAssignedTo(e.target.value as TeamMember)}
-                      className="w-full px-3 py-2 text-sm border border-[#E5E0D8] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B1AFFF] focus:border-[#625FFF] text-[#1C1B1A] bg-white"
+                      className="w-full rounded-lg border border-[#E5E0D8] bg-white px-3 py-2 text-base text-[#1C1B1A] focus:outline-none focus:ring-2 focus:ring-[#B1AFFF] focus:border-[#625FFF] sm:text-sm"
                     >
                       {TEAM_MEMBERS.map((member) => (
                         <option key={member} value={member}>{member}</option>
@@ -329,14 +331,14 @@ export function ActivityTab({ lead, onRefresh }: ActivityTabProps) {
                       type="date"
                       value={taskDueDate}
                       onChange={(e) => setTaskDueDate(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-[#E5E0D8] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B1AFFF] focus:border-[#625FFF] text-[#1C1B1A]"
+                      className="w-full rounded-lg border border-[#E5E0D8] px-3 py-2 text-base text-[#1C1B1A] focus:outline-none focus:ring-2 focus:ring-[#B1AFFF] focus:border-[#625FFF] sm:text-sm"
                     />
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row">
                   <Button
                     variant="primary"
-                    size="sm"
+                    size="md"
                     onClick={handleAddTask}
                     disabled={isSavingTask || !newTaskTitle.trim()}
                   >
@@ -344,7 +346,7 @@ export function ActivityTab({ lead, onRefresh }: ActivityTabProps) {
                   </Button>
                   <Button
                     variant="ghost"
-                    size="sm"
+                    size="md"
                     onClick={() => {
                       setIsAddingTask(false);
                       setNewTaskTitle("");
