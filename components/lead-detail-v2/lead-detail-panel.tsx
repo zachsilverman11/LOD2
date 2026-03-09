@@ -28,6 +28,8 @@ export function LeadDetailPanel({
   onTabChange,
   onClose,
 }: LeadDetailPanelProps) {
+  console.log(`Panel rendering for lead: ${leadId}`);
+
   const [lead, setLead] = useState<LeadWithRelations | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

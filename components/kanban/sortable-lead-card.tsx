@@ -31,8 +31,8 @@ export function SortableLeadCard({ lead, onClick, isSelected }: SortableLeadCard
     cursor: isDragging ? 'grabbing' : 'grab',
   };
 
-  // Track mouse down position to detect if it's a drag or click
-  const handleMouseDown = (e: React.MouseEvent) => {
+  // Track pointer start position in capture phase so DnD listeners can't override it.
+  const handlePointerDownCapture = (e: React.PointerEvent) => {
     dragStartPos.current = { x: e.clientX, y: e.clientY };
   };
 
@@ -44,6 +44,7 @@ export function SortableLeadCard({ lead, onClick, isSelected }: SortableLeadCard
 
       // If mouse moved less than 5px, it's a click, not a drag
       if (dx < 5 && dy < 5) {
+        console.log(`Card clicked, lead ID: ${lead.id}`);
         onClick();
       }
       dragStartPos.current = null;
@@ -55,7 +56,7 @@ export function SortableLeadCard({ lead, onClick, isSelected }: SortableLeadCard
       ref={setNodeRef}
       style={style}
       className={isDragging ? 'z-50 rotate-3 scale-105' : ''}
-      onMouseDown={handleMouseDown}
+      onPointerDownCapture={handlePointerDownCapture}
       {...attributes}
       {...listeners}
     >

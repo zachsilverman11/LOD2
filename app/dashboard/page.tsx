@@ -42,6 +42,10 @@ function DashboardContent() {
   const selectedLeadId = searchParams.get("lead");
   const selectedTab = normalizeLeadDetailTab(searchParams.get("tab"));
 
+  useEffect(() => {
+    console.log(`selectedLeadId set to: ${selectedLeadId}`);
+  }, [selectedLeadId]);
+
   const updateDashboardQuery = useCallback((leadId?: string | null, tab?: LeadDetailTab) => {
     const nextParams = new URLSearchParams(searchParams.toString());
 
