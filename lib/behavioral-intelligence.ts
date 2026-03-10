@@ -51,7 +51,7 @@ export const BEHAVIORAL_INTELLIGENCE: BehavioralIntelligence = {
       ],
       meaning: 'Lead is ready to book NOW - strike while iron is hot',
       recommendedAction: 'Send booking link immediately with specific availability',
-      exampleResponse: 'Perfect! Greg has openings today at 2pm and 4pm PT, or tomorrow morning. Here\'s his calendar: [link]. Takes 10-15 mins and he\'ll get you your rate.',
+      exampleResponse: 'Perfect! Greg or Jakub have openings today at 2pm and 4pm PT, or tomorrow morning. Here\'s our calendar: [link]. Takes 10-15 mins and they\'ll get you your rate.',
     },
 
     seekingInfo: {
@@ -66,7 +66,7 @@ export const BEHAVIORAL_INTELLIGENCE: BehavioralIntelligence = {
       ],
       meaning: 'Lead wants info before committing - educate briefly then redirect to call for specifics',
       recommendedAction: 'Answer briefly, explain why call is needed for exact answer, keep friction low',
-      exampleResponse: 'Great question! Rates depend on your credit/property type (range from 4.89-5.49% right now), but Greg can show you your EXACT rate in 10 mins. Free, no obligation. Worth a quick call?',
+      exampleResponse: 'Great question! Rates depend on your credit/property type (range from 4.89-5.49% right now), but Greg or Jakub can show you your EXACT rate in 10 mins. Free, no obligation. Worth a quick call?',
     },
 
     objectionAlreadyWorking: {
@@ -78,7 +78,7 @@ export const BEHAVIORAL_INTELLIGENCE: BehavioralIntelligence = {
       ],
       meaning: 'Objection: loyalty to existing relationship. Need to create unique value without bashing competitor.',
       recommendedAction: 'Acknowledge their relationship, position as "second opinion" or "rate check"',
-      exampleResponse: 'That\'s smart to work with someone you trust! Quick question: have they shown you rates from multiple lenders, or just one? Most clients use us as a second opinion to make sure they\'re getting the absolute best rate. Greg can do a 10-min rate comparison - no obligation.',
+      exampleResponse: 'That\'s smart to work with someone you trust! Quick question: have they shown you rates from multiple lenders, or just one? Most clients use us as a second opinion to make sure they\'re getting the absolute best rate. Greg or Jakub can do a 10-min rate comparison - no obligation.',
     },
 
     objectionAlreadyApproved: {
@@ -90,7 +90,7 @@ export const BEHAVIORAL_INTELLIGENCE: BehavioralIntelligence = {
       ],
       meaning: 'Objection: thinks they\'re done. Need to pivot to RATE comparison, not competing approval.',
       recommendedAction: 'Acknowledge approval, shift focus to rate optimization before they lock in',
-      exampleResponse: 'Got it! Since you\'re already pre-approved, the main thing is making sure you lock in the BEST rate before closing. Pre-approvals can vary by 0.20%+ in rate - that\'s $85/month on a $650K mortgage. Greg can do a quick rate check against what you have (10 mins). Worth it before you\'re locked in?',
+      exampleResponse: 'Got it! Since you\'re already pre-approved, the main thing is making sure you lock in the BEST rate before closing. Pre-approvals can vary by 0.20%+ in rate - that\'s $85/month on a $650K mortgage. Greg or Jakub can do a quick rate check against what you have (10 mins). Worth it before you\'re locked in?',
     },
 
     objectionTooBusy: {
@@ -103,7 +103,7 @@ export const BEHAVIORAL_INTELLIGENCE: BehavioralIntelligence = {
       ],
       meaning: 'Objection: perceives call as time-consuming. Reduce friction, offer specific short timeframe.',
       recommendedAction: 'Acknowledge busy schedule, emphasize brevity (10 mins), offer specific time',
-      exampleResponse: 'Totally get it - you\'re busy! That\'s why Greg keeps these quick (10-15 mins max). He can call you during your commute or lunch break. Does tomorrow at 12:30pm work, or is evening better?',
+      exampleResponse: 'Totally get it - you\'re busy! That\'s why we keep these quick (10-15 mins max). Greg or Jakub can call you during your commute or lunch break. Does tomorrow at 12:30pm work, or is evening better?',
     },
 
     objectionWhatRate: {
@@ -115,7 +115,7 @@ export const BEHAVIORAL_INTELLIGENCE: BehavioralIntelligence = {
       ],
       meaning: 'Lead wants instant quote. Explain why rate depends on their specifics, position call as fast way to get answer.',
       recommendedAction: 'Acknowledge desire for quick answer, explain why call is fastest way to get THEIR exact rate',
-      exampleResponse: 'I wish I could give you an exact number right now! But mortgage rates depend on your credit score, property type, and debt ratios. The FASTEST way to get your exact rate is a 10-min call with Greg - he pulls your credit and shows you real numbers from 30+ lenders. Way faster than back-and-forth texting. Worth it?',
+      exampleResponse: 'I wish I could give you an exact number right now! But mortgage rates depend on your credit score, property type, and debt ratios. The FASTEST way to get your exact rate is a 10-min call with Greg or Jakub - they pull your credit and show you real numbers from 30+ lenders. Way faster than back-and-forth texting. Worth it?',
     },
 
     engaged: {
@@ -130,7 +130,7 @@ export const BEHAVIORAL_INTELLIGENCE: BehavioralIntelligence = {
       ],
       meaning: 'Lead is engaged and listening - don\'t rush to booking, continue building value',
       recommendedAction: 'Ask diagnostic question, share another value point, build relationship before big ask',
-      exampleResponse: 'Quick question: are you actively looking right now, or planning for a few months out? Want to make sure Greg prioritizes you correctly.',
+      exampleResponse: 'Quick question: are you actively looking right now, or planning for a few months out? Want to make sure we prioritize you correctly.',
     },
 
     cooling: {

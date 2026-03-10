@@ -63,8 +63,8 @@ export const SALES_PSYCHOLOGY: SalesPsychology = {
         why: '"Consultation" sounds formal/time-consuming. "Quick call" reduces perceived commitment.',
       },
       {
-        instead: 'Greg can call you at [time]',
-        use: 'Here\'s Greg\'s calendar - grab a spot around [time]',
+        instead: 'An advisor can call you at [time]',
+        use: 'Here\'s our calendar - grab a spot around [time]',
         why: 'CRITICAL: NEVER promise a call time without booking. Always direct to calendar first.',
       },
       {
@@ -79,7 +79,7 @@ export const SALES_PSYCHOLOGY: SalesPsychology = {
       },
       {
         instead: 'Let\'s discuss your situation',
-        use: 'Greg can show you the numbers',
+        use: 'Greg or Jakub can show you the numbers',
         why: '"Discuss" sounds vague. "Show you numbers" is concrete and valuable.',
       },
       {
@@ -89,7 +89,7 @@ export const SALES_PSYCHOLOGY: SalesPsychology = {
       },
       {
         instead: 'Book here: [long URL]',
-        use: 'Here\'s Greg\'s calendar (takes 2 mins to book): [short link]',
+        use: 'Here\'s our calendar (takes 2 mins to book): [short link]',
         why: 'Explain what happens + reduce perceived time investment.',
       },
     ],
@@ -109,12 +109,12 @@ export const SALES_PSYCHOLOGY: SalesPsychology = {
       {
         name: 'Comparison Anchor',
         description: 'Ask about their current situation, let them tell you their rate (conversational, not preachy)',
-        example: 'What rate did [their bank] offer you? (Then: "Got it - Greg can show you what else is out there in 10 mins. Worth a comparison?")',
+        example: 'What rate did [their bank] offer you? (Then: "Got it - Greg or Jakub can show you what else is out there in 10 mins. Worth a comparison?")',
       },
       {
         name: 'Pain-to-Gain',
         description: 'Acknowledge current pain point, offer specific solution',
-        example: 'Since you\'re with TD and looking to refinance, you\'re probably worried about their early breakage penalty. Greg can calculate if it\'s worth switching (usually is after 6 months).',
+        example: 'Since you\'re with TD and looking to refinance, you\'re probably worried about their early breakage penalty. Greg or Jakub can calculate if it\'s worth switching (usually is after 6 months).',
       },
       {
         name: 'Social Proof',
@@ -129,7 +129,7 @@ export const SALES_PSYCHOLOGY: SalesPsychology = {
       {
         name: 'Specificity Builds Trust',
         description: 'Use exact numbers and timeframes',
-        example: 'Greg compares exactly 37 lenders in real-time. Takes 12-15 minutes. You\'ll see your exact rate before we hang up.',
+        example: 'Greg or Jakub compare exactly 37 lenders in real-time. Takes 12-15 minutes. You\'ll see your exact rate before we hang up.',
       },
     ],
   },

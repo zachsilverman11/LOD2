@@ -240,7 +240,7 @@ export const CONVERSATION_PRINCIPLES = {
     approach:
       'Now you can mention programs if relevant. Frame call as "the way to get your rate" or "see what you qualify for."',
     examples: [
-      '"Based on what you shared about refinancing, Greg can walk you through our No Penalties Program"',
+      '"Based on what you shared about refinancing, Greg or Jakub can walk you through our No Penalties Program"',
       '"Want to see if you qualify for our Reserved Rates before they fill up?"',
     ],
     avoid: ['Generic "book a call" asks', 'Repeating same program twice'],
@@ -538,11 +538,11 @@ This lead booked an appointment but ${hasCallOutcome ? 'didn\'t answer when the 
 ## 📞 NO APPOINTMENTS YET
 
 This lead has NOT booked a call yet. Your goal is to BOOK THEM DIRECTLY:
-- When you sense readiness (positive engagement, questions about next steps, reduced objections) — proactively offer 2-3 specific times from Greg's availability
+- When you sense readiness (positive engagement, questions about next steps, reduced objections) — proactively offer 2-3 specific times from Greg or Jakub's availability
 - When they pick a time, use action "book_directly" to book it immediately
 - NEVER just send the booking link as your first move — offer specific times and book for them
 - The booking link is a LAST RESORT only (Cal.com API down, or 3+ failed attempts to find a time)
-- Make it effortless: "Greg has openings at 2pm and 3:30pm today — which works better?"
+- Make it effortless: "Greg or Jakub have openings at 2pm and 3:30pm today — which works better?"
 `;
   }
 

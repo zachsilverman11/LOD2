@@ -4,8 +4,8 @@
 
 // Test messages that SHOULD be allowed (acknowledging existing bookings)
 const allowedMessages = [
-  "Amazing Barbara Ann! Just saw your 2pm booking come through - Greg's excited to run those numbers for you.",
-  "Hi Barbara Ann! We don't have a physical office in Kelowna, but Greg serves clients throughout the Okanagan remotely.",
+  "Amazing Barbara Ann! Just saw your 2pm booking come through - we're excited to run those numbers for you.",
+  "Hi Barbara Ann! We don't have a physical office in Kelowna, but Greg or Jakub serve clients throughout the Okanagan remotely.",
   "Great! Your booking is confirmed for tomorrow at 3pm.",
   "I see you already booked - perfect!",
   "Just confirmed you booked for 2pm today.",

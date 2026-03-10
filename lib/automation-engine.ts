@@ -566,7 +566,8 @@ async function processAppointmentReminders() {
         timeZone: 'America/Vancouver'
       });
 
-      const reminderMessage = `Hey ${lead.firstName || "there"}! Just a friendly reminder - your mortgage discovery call is tomorrow at ${appointmentTime} PT. Looking forward to it!`;
+      const advisorPhrase = appointment.advisorName ? ` with ${appointment.advisorName}` : "";
+      const reminderMessage = `Hey ${lead.firstName || "there"}! Just a friendly reminder - your mortgage discovery call${advisorPhrase} is tomorrow at ${appointmentTime} PT. Looking forward to it!`;
 
       await sendSms({
         to: lead.phone || '',
@@ -629,7 +630,8 @@ async function processAppointmentReminders() {
                 : 'in about 1 hour'
             : `in ${minutesUntil} minutes`;
 
-      const reminderMessage = `Quick reminder - your mortgage discovery call is ${timePhrase} at ${appointmentTime} PT. See you soon!`;
+      const advisorPhrase = appointment.advisorName ? ` with ${appointment.advisorName}` : "";
+      const reminderMessage = `Quick reminder - your mortgage discovery call${advisorPhrase} is ${timePhrase} at ${appointmentTime} PT. See you soon!`;
 
       await sendSms({
         to: lead.phone || '',

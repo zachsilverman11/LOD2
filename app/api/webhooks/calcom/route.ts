@@ -280,8 +280,8 @@ async function handleBookingCreated(payload: any) {
         minute: "2-digit",
         hour12: true,
       });
-      const advisorName = payload.organizer?.name || "Greg";
-      const bookingContext = `The lead just booked a discovery call! Appointment details:\n- Time: ${bookingTime}\n- Advisor: ${advisorName}\n\nSend a SHORT, warm booking confirmation SMS. Do NOT re-introduce yourself if you've already been in conversation with this lead. Just confirm the booking, tell them what to expect, and build excitement. Keep it under 160 chars.\n\nUse the send_sms tool.`;
+      const advisorName = payload.organizer?.name || "your advisor";
+      const bookingContext = `The lead just booked a discovery call! Appointment details:\n- Time: ${bookingTime}\n- Advisor: ${advisorName}\n\nSend a SHORT, warm booking confirmation SMS. Do NOT re-introduce yourself if you've already been in conversation with this lead. Just confirm the booking, tell them what to expect, and build excitement. Keep it under 160 chars.\n\nIMPORTANT: Use the advisor name above ONLY when it's a specific person (e.g. Greg, Jakub). If Advisor is "your advisor", do NOT guess a name - just say "your call" or "your discovery call".\n\nUse the send_sms tool.`;
       const decision = await handleConversation(lead.id, undefined, bookingContext);
       await executeDecision(lead.id, decision);
     } catch (error) {

@@ -116,7 +116,7 @@ export const TRAINING_EXAMPLES: TrainingExample[] = [
       touchNumber: 2,
     },
     goodApproach: {
-      message: `Got it! Since you're already pre-approved, the main thing is making sure you lock in the BEST rate before closing. Pre-approvals can vary by 0.20%+ in rate between lenders - on a $650K mortgage, that's $85/month or $30K+ over 5 years. Greg can do a quick rate check against what you have (10 mins, free). Worth it before you're locked in?`,
+      message: `Got it! Since you're already pre-approved, the main thing is making sure you lock in the BEST rate before closing. Pre-approvals can vary by 0.20%+ in rate between lenders - on a $650K mortgage, that's $85/month or $30K+ over 5 years. Greg or Jakub can do a quick rate check against what you have (10 mins, free). Worth it before you're locked in?`,
       reasoning: 'Acknowledge objection, pivot to rate comparison (not competing approval), quantify value',
       whyItWorks: [
         'Acknowledges her pre-approval (doesn\'t ignore objection)',
@@ -150,7 +150,7 @@ export const TRAINING_EXAMPLES: TrainingExample[] = [
       touchNumber: 2,
     },
     goodApproach: {
-      message: `Totally get it - you're swamped! That's exactly why Greg keeps these quick (10-12 mins, not an hour-long thing). He can call you during your commute or lunch break. Does tomorrow at 12:30pm work, or would evening (like 6pm) be easier?`,
+      message: `Totally get it - you're swamped! That's exactly why we keep these quick (10-12 mins, not an hour-long thing). Greg or Jakub can call you during your commute or lunch break. Does tomorrow at 12:30pm work, or would evening (like 6pm) be easier?`,
       reasoning: 'Acknowledge busy schedule, reduce time friction, offer specific times',
       whyItWorks: [
         'Empathizes with being busy',
@@ -183,7 +183,7 @@ export const TRAINING_EXAMPLES: TrainingExample[] = [
       touchNumber: 2,
     },
     goodApproach: {
-      message: `Great question! Wish I could give you an exact number right now, but mortgage rates depend on your credit score and property details. Here's the thing: the FASTEST way to get YOUR exact rate is a 10-min call with Greg. He pulls your credit and shows you real numbers from 30+ lenders. Way faster than back-and-forth texts. Want him to call you this afternoon?`,
+      message: `Great question! Wish I could give you an exact number right now, but mortgage rates depend on your credit score and property details. Here's the thing: the FASTEST way to get YOUR exact rate is a 10-min call with Greg or Jakub. They pull your credit and show you real numbers from 30+ lenders. Way faster than back-and-forth texts. Want them to call you this afternoon?`,
       reasoning: 'Acknowledge desire for instant answer, explain why call is fastest, make it easy',
       whyItWorks: [
         'Validates her question',
@@ -217,7 +217,7 @@ export const TRAINING_EXAMPLES: TrainingExample[] = [
       touchNumber: 2,
     },
     goodApproach: {
-      message: `Great question! The process is actually pretty simple: (1) Greg does a quick call to understand your situation and pull your credit, (2) He shops 30+ lenders in real-time to find your best rate, (3) You get a pre-approval same day that locks your rate for 120 days. Whole thing takes about 2 weeks from start to closing. Are you looking to refinance soon, or planning for a few months out?`,
+      message: `Great question! The process is actually pretty simple: (1) Greg or Jakub do a quick call to understand your situation and pull your credit, (2) They shop 30+ lenders in real-time to find your best rate, (3) You get a pre-approval same day that locks your rate for 120 days. Whole thing takes about 2 weeks from start to closing. Are you looking to refinance soon, or planning for a few months out?`,
       reasoning: 'Answer question clearly, continue conversation, ask diagnostic question',
       whyItWorks: [
         'Answers his question thoroughly but concisely',
@@ -283,7 +283,7 @@ export const TRAINING_EXAMPLES: TrainingExample[] = [
       touchNumber: 3,
     },
     goodApproach: {
-      message: `Hey Chris! Just wanted to share something: saw rates dropped 0.15% this week (first time in 3 months). If you're still looking for a mortgage on that Vancouver property, now's actually a great time to lock in. Greg has a few spots open this week if you want to grab one of our Reserved Rates before the pool fills. No pressure though!`,
+      message: `Hey Chris! Just wanted to share something: saw rates dropped 0.15% this week (first time in 3 months). If you're still looking for a mortgage on that Vancouver property, now's actually a great time to lock in. Greg or Jakub have a few spots open this week if you want to grab one of our Reserved Rates before the pool fills. No pressure though!`,
       reasoning: 'Different angle (market update), create real urgency, soft touch',
       whyItWorks: [
         'New angle (not repeating previous messages)',
@@ -345,11 +345,11 @@ export const TRAINING_EXAMPLES: TrainingExample[] = [
     leadContext: {
       name: 'Emma',
       type: 'purchase',
-      engagement: 'When can Greg call me?',
+      engagement: 'When can we talk?',
       touchNumber: 2,
     },
     goodApproach: {
-      message: `Perfect! Greg has openings today at 2pm and 4:30pm PT, or tomorrow morning at 9am and 11am. Here's his calendar - takes 2 mins to book, and the call is 10-15 mins: [link]. He'll get you your exact rate and can lock in a pre-approval same day. Which time works best?`,
+      message: `Perfect! Greg or Jakub have openings today at 2pm and 4:30pm PT, or tomorrow morning at 9am and 11am. Here's our calendar - takes 2 mins to book, and the call is 10-15 mins: [link]. They'll get you your exact rate and can lock in a pre-approval same day. Which time works best?`,
       reasoning: 'Strike while hot - give specific times, send link, make it easy',
       whyItWorks: [
         'Immediate response to high intent',
@@ -485,7 +485,7 @@ export const TRAINING_EXAMPLES: TrainingExample[] = [
       touchNumber: 3,
     },
     goodApproach: {
-      message: `Hey Sarah! Looking forward to your call with Greg on Wednesday at 2pm. Quick tip - have your current mortgage statement handy so we can pull the best numbers for your February renewal. See you then!`,
+      message: `Hey Sarah! Looking forward to your call on Wednesday at 2pm. Quick tip - have your current mortgage statement handy so we can pull the best numbers for your February renewal. See you then!`,
       reasoning: 'Confirms appointment, provides value through preparation tip, shows organization',
       whyItWorks: [
         'Acknowledges their existing appointment (shows awareness)',
@@ -497,7 +497,7 @@ export const TRAINING_EXAMPLES: TrainingExample[] = [
       ],
     },
     badApproach: {
-      message: `Hey Sarah! Did you get a chance to grab a time with Greg? Let me know if you need the booking link!`,
+      message: `Hey Sarah! Did you get a chance to grab a time? Let me know if you need the booking link!`,
       whyItFails: [
         'She already booked - makes you look disorganized!',
         'Asking if she booked damages credibility',
@@ -520,7 +520,7 @@ export const TRAINING_EXAMPLES: TrainingExample[] = [
       touchNumber: 4,
     },
     goodApproach: {
-      message: `Hey Mike! Looks like we missed each other on Tuesday. No worries - life gets busy! Want to grab another time with Greg this week? I can send you the link if that helps!`,
+      message: `Hey Mike! Looks like we missed each other on Tuesday. No worries - life gets busy! Want to grab another time this week? I can send you the link if that helps!`,
       reasoning: 'Tactfully acknowledges missed appointment, stays casual and understanding, makes rescheduling easy',
       whyItWorks: [
         'Acknowledges what happened without being judgmental',
@@ -532,7 +532,7 @@ export const TRAINING_EXAMPLES: TrainingExample[] = [
       ],
     },
     badApproach: {
-      message: `Hey Mike! Did you get a chance to book a time with Greg yet?`,
+      message: `Hey Mike! Did you get a chance to book a time yet?`,
       whyItFails: [
         'He already booked and no-showed - completely unaware!',
         'Doesn\'t acknowledge the missed appointment',
@@ -555,7 +555,7 @@ export const TRAINING_EXAMPLES: TrainingExample[] = [
       touchNumber: 2,
     },
     goodApproach: {
-      message: `Great question, Jennifer! The rate hold locks in the rate for 120 days, so you're protected even if rates go up before you close. We'll cover all the details on your call with Greg tomorrow at 10am. Anything else you're wondering about before then?`,
+      message: `Great question, Jennifer! The rate hold locks in the rate for 120 days, so you're protected even if rates go up before you close. We'll cover all the details on your call tomorrow at 10am. Anything else you're wondering about before then?`,
       reasoning: 'Answers their question, references upcoming appointment naturally, stays helpful',
       whyItWorks: [
         'Directly answers their question (helpful)',
@@ -567,7 +567,7 @@ export const TRAINING_EXAMPLES: TrainingExample[] = [
       ],
     },
     badApproach: {
-      message: `Good question! Did you grab a time on the calendar yet? Greg can explain everything in detail when you book.`,
+      message: `Good question! Did you grab a time on the calendar yet? Greg or Jakub can explain everything in detail when you book.`,
       whyItFails: [
         'She already booked - shows you\'re not paying attention!',
         'Deflects her question instead of answering',

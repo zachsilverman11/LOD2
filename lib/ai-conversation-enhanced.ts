@@ -500,7 +500,7 @@ ${context.pipelineStatus.outboundCount <= 2 ? `
 - NOW you can position the call
 - Frame it as "the way to get your rate"
 - Reference what you learned from questions
-- "Based on what you shared, Greg can walk you through what you'd qualify for"
+- "Based on what you shared, Greg or Jakub can walk you through what you'd qualify for"
 
 **Touch #2-3 Strategy (if they DIDN'T reply to touch #1):**
 - Try a different angle or question
@@ -635,7 +635,7 @@ ${context.pipelineStatus.outboundCount <= 2 ? `
 
 **Step 3: Position the call as THE WAY to get their rate**
 - "Based on what you shared, I can see a few options"
-- "Greg can walk you through exact rates in 10 mins - he knows BC lenders inside out"
+- "Greg or Jakub can walk you through exact rates in 10 mins - they know BC lenders inside out"
 - Frame it as: Call = Getting their rate (not "call to discuss")
 
 **Example Flow (REFINANCE - using their form data):**
@@ -648,7 +648,7 @@ You: "Makes sense. What rate are you at with RBC right now?"
 
 Lead: "5.2%"
 
-You: "Got it. Yeah, we're definitely seeing better options for Vancouver right now, especially for your loan-to-value. Greg can walk you through exactly what you'd qualify for - takes about 10 mins. When's better - today 3pm or Monday morning?"
+You: "Got it. Yeah, we're definitely seeing better options for Vancouver right now, especially for your loan-to-value. Greg or Jakub can walk you through exactly what you'd qualify for - takes about 10 mins. When's better - today 3pm or Monday morning?"
 
 **Example Flow (PURCHASE - using their form data):**
 
@@ -660,7 +660,7 @@ You: "Got it - so we're on a tight timeline. Have you been pre-approved anywhere
 
 Lead: "No, not yet"
 
-You: "Perfect. Greg can get you a Guaranteed Approvals Certificate - makes your offer way stronger. Takes 15 mins. When works - today 4pm or tomorrow 9am?"
+You: "Perfect. Greg or Jakub can get you a Guaranteed Approvals Certificate - makes your offer way stronger. Takes 15 mins. When works - today 4pm or tomorrow 9am?"
 
 **Why these work:**
 - You've referenced SPECIFIC details from their form (shows you read it)
@@ -851,14 +851,14 @@ data.motivation_level === "I plan on making an offer soon" ?
 **✅ WINNING RESPONSE (be honest + position call as solution):**
 "Great question! Rates vary based on a few factors - credit score, down payment, property type, etc.
 
-That's why Greg does a quick 10-min call - he'll pull exactly what you qualify for based on your situation. Way more accurate than generic online rates.
+That's why Greg or Jakub do a quick 10-min call - they'll pull exactly what you qualify for based on your situation. Way more accurate than generic online rates.
 
 When works better - today or tomorrow?"
 
 **Alternative approach (if they push back):**
 "Totally get it. Here's the thing - I could send you a generic rate range (like 4.5-6%), but it wouldn't be YOUR rate.
 
-Greg knows BC lenders inside out and can tell you exactly what you'd get. Takes 10 mins. Sound good?"
+Greg or Jakub know BC lenders inside out and can tell you exactly what you'd get. Takes 10 mins. Sound good?"
 
 **Why this works:**
 - Acknowledges their request (validates their expectation)
@@ -879,7 +879,7 @@ Greg knows BC lenders inside out and can tell you exactly what you'd get. Takes 
 4. DO NOT send further automated messages
 
 **Example message:**
-"No worries at all! If you change your mind and want to chat, here's Greg's calendar: ${process.env.CAL_COM_BOOKING_URL || "https://cal.com/inspired-mortgage"}
+"No worries at all! If you change your mind and want to chat, here's our calendar: ${process.env.CAL_COM_BOOKING_URL || "https://cal.com/inspired-mortgage"}
 
 Otherwise, I'll leave you be. Good luck with everything! 👍"
 
@@ -1297,7 +1297,7 @@ Remember: The goal of message #1 is NOT to book them. It's to demonstrate you re
             properties: {
               message: {
                 type: "string",
-                description: "Message to accompany the booking link. Write naturally - the Cal.com URL will be automatically appended after your message. Example: 'Greg can walk you through your options in 10 mins. When works better for you?'",
+                description: "Message to accompany the booking link. Write naturally - the Cal.com URL will be automatically appended after your message. Example: 'Greg or Jakub can walk you through your options in 10 mins. When works better for you?'",
               },
               reasoning: {
                 type: "string",
@@ -1911,7 +1911,7 @@ export async function executeDecision(
           try {
             const bookingUrl = process.env.CAL_COM_BOOKING_URL || "https://cal.com/your-link";
             const fallbackMessage = decision.message.includes("booked")
-              ? `Hey ${lead.firstName || "there"}! I'm having a bit of trouble locking that time in on my end. Here's Greg's calendar so you can grab it directly — should only take a sec!\n\n${bookingUrl}`
+              ? `Hey ${lead.firstName || "there"}! I'm having a bit of trouble locking that time in on my end. Here's our calendar so you can grab it directly — should only take a sec!\n\n${bookingUrl}`
               : `${decision.message}\n\n${bookingUrl}`;
 
             await sendSms({ to: lead.phone, body: fallbackMessage });

@@ -185,7 +185,7 @@ function analyzeSingleScenario(scenarioName: string, outcomes: any[]): LearnedPa
   if (worstMessage.includes('When\'s') || worstMessage.includes('What time')) {
     worstWhyItFailed.push('Asked for time instead of directing to calendar');
   }
-  if (worstMessage.includes('Greg can call you')) {
+  if (worstMessage.includes('can call you') && (worstMessage.includes('at ') || worstMessage.includes('tomorrow') || worstMessage.includes('today'))) {
     worstWhyItFailed.push('Promised call without booking (broken promise pattern)');
   }
   if (!worstMessage.match(/\$\d+/) && bestMessage.match(/\$\d+/)) {
@@ -223,7 +223,7 @@ function groupByMessagePattern(outcomes: any[]): Record<string, any[]> {
     // Create pattern key based on message structure
     let pattern = '';
 
-    if (message.includes('Greg can call you')) {
+    if (message.includes('can call you') && (message.includes('at ') || message.includes('tomorrow') || message.includes('today'))) {
       pattern = 'promise_call_time';
     } else if (message.includes('Here\'s') && message.includes('calendar')) {
       pattern = 'direct_to_calendar';

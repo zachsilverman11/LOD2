@@ -312,7 +312,7 @@ const TEST_SCENARIOS: TestScenario[] = [
       conversationHistory: [
         { role: "assistant", content: "Hi Jennifer! It's Holly from Inspired Mortgage. Saw you made an offer on a $600K property in Surrey. When do you need financing confirmed by?" },
         { role: "user", content: "Subject removal is next Friday" },
-        { role: "assistant", content: "Got it — tight timeline! Greg can get you a Guaranteed Approvals Certificate. Takes 15 mins. Interested?" },
+        { role: "assistant", content: "Got it — tight timeline! Greg or Jakub can get you a Guaranteed Approvals Certificate. Takes 15 mins. Interested?" },
         { role: "user", content: "Yes can I talk to someone?" },
       ],
       hasAppointment: false,
@@ -328,7 +328,7 @@ const TEST_SCENARIOS: TestScenario[] = [
         return { pass: true, detail: "Direct booking — excellent!" };
       }
       if (name === "send_sms") {
-        const mentionsTimes = msg.includes("am") || msg.includes("pm") || msg.includes("today") || msg.includes("tomorrow") || msg.includes("greg");
+        const mentionsTimes = msg.includes("am") || msg.includes("pm") || msg.includes("today") || msg.includes("tomorrow") || msg.includes("greg") || msg.includes("jakub");
         return { pass: mentionsTimes, detail: mentionsTimes ? "Offers specific times via SMS" : "SMS but doesn't offer booking times" };
       }
       return { pass: false, detail: `Unexpected action: ${name}` };
@@ -356,7 +356,7 @@ const TEST_SCENARIOS: TestScenario[] = [
       conversationHistory: [
         { role: "assistant", content: "Hi Jennifer! It's Holly from Inspired Mortgage." },
         { role: "user", content: "Subject removal is next Friday" },
-        { role: "assistant", content: "Greg has openings at 10am, 2pm, and 3:30pm today. Which works for you?" },
+        { role: "assistant", content: "Greg or Jakub have openings at 10am, 2pm, and 3:30pm today. Which works for you?" },
         { role: "user", content: "3:30 works" },
       ],
       hasAppointment: false,
@@ -683,7 +683,7 @@ Greg Williamson has a weekly YouTube show: ${youtubeLink}
 Share it ONCE per conversation as a trust builder.
 
 # 🗓️ DIRECT BOOKING
-**Greg's Live Availability (next 7 days):**
+**Greg or Jakub's Live Availability (next 7 days):**
 ${MOCK_AVAILABILITY}
 
 When leads want to book:
