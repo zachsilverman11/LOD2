@@ -67,7 +67,7 @@ export function analyzeDealHealth(lead: LeadWithRelations): DealSignals {
   if (rawData?.motivation_level === 'I have made an offer to purchase') {
     contextualUrgency = 'URGENT: Accepted offer - subject removal deadline likely soon';
   } else if (
-    lead.status === 'CALL_COMPLETED' &&
+    lead.status === 'WAITING_FOR_APPLICATION' &&
     lead.callOutcomes?.[0]?.outcome === 'READY_FOR_APP'
   ) {
     contextualUrgency = 'HOT: Advisor marked ready for application after call';

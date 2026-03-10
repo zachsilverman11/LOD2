@@ -2,6 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
+function normalizeScenario(scenario: unknown): 0 | 1 | 2 | 3 {
+  if (scenario === null || scenario === undefined || scenario === "") {
+    return 0;
+  }
+
+  const parsedScenario = Number(scenario);
+
+  if ([0, 1, 2, 3].includes(parsedScenario)) {
+    return parsedScenario as 0 | 1 | 2 | 3;
+  }
+
+  throw new Error("Scenario must be 0, 1, 2, or 3");
+}
+
 // POST - Create a new report
 export async function POST(request: NextRequest) {
   try {
@@ -34,10 +48,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate scenario is exactly 1, 2, or 3
-    if (scenario !== undefined && ![1, 2, 3].includes(scenario)) {
+    let normalizedScenario: 0 | 1 | 2 | 3;
+    try {
+      normalizedScenario = normalizeScenario(scenario);
+    } catch {
       return NextResponse.json(
-        { error: "Scenario must be 1, 2, or 3" },
+        { error: "Scenario must be 0, 1, 2, or 3" },
         { status: 400 }
       );
     }
@@ -59,7 +75,7 @@ export async function POST(request: NextRequest) {
         consultantName,
         bullets: bullets as string[],
         mortgageAmount: parseFloat(String(mortgageAmount)),
-        scenario: scenario || 1,
+        scenario: normalizedScenario,
         includeDebtConsolidation: includeDebtConsolidation || false,
         includeCashBack: includeCashBack || false,
         applicationLink: applicationLink || "https://stressfree.mtg-app.com/signup",

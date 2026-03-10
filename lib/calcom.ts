@@ -74,6 +74,7 @@ export interface DirectBookingParams {
 }
 
 export interface BookingConfirmation {
+  id?: number;
   uid: string;
   title: string;
   startTime: string;
@@ -81,6 +82,7 @@ export interface BookingConfirmation {
   attendeeName: string;
   attendeeEmail: string;
   status: string;
+  meetingUrl?: string;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -305,9 +307,17 @@ export async function createDirectBooking(
     throw new Error(`Cal.com booking error (${response.status}): ${errorText}`);
   }
 
-  const booking = await response.json();
+  const responseBody = await response.json();
+  const booking = responseBody?.data || responseBody?.booking || responseBody;
+  const bookingId =
+    typeof booking?.id === "number"
+      ? booking.id
+      : typeof booking?.id === "string"
+      ? parseInt(booking.id, 10)
+      : undefined;
 
   return {
+    id: Number.isFinite(bookingId) ? bookingId : undefined,
     uid: booking?.uid || booking?.id?.toString() || "unknown",
     title: booking?.title || "Mortgage Discovery Call",
     startTime: booking?.startTime || booking?.start || params.start,
@@ -315,6 +325,11 @@ export async function createDirectBooking(
     attendeeName: params.attendee.name,
     attendeeEmail: params.attendee.email,
     status: booking?.status || "ACCEPTED",
+    meetingUrl:
+      booking?.meetingUrl ||
+      booking?.location ||
+      booking?.references?.meetingUrl ||
+      undefined,
   };
 }
 
@@ -356,12 +371,11 @@ export async function cancelCalComBooking(
   const apiKey = getApiKey();
 
   const response = await fetch(
-    `${CALCOM_API_V1_URL}/bookings/${bookingId}/cancel`,
+    `${CALCOM_API_V1_URL}/bookings/${bookingId}/cancel?apiKey=${encodeURIComponent(apiKey)}`,
     {
       method: "DELETE",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({ reason }),
     }

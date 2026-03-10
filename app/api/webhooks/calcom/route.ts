@@ -166,27 +166,48 @@ async function handleBookingCreated(payload: any) {
     return; // Don't create appointment or change status
   }
 
-  // Create appointment record
+  // Create or reconcile appointment record.
+  // Direct bookings can already exist in our DB before the webhook arrives.
+  const existingAppointment = await prisma.appointment.findUnique({
+    where: { calComBookingUid: uid },
+  });
+
   // For phone meetings, Cal.com provides location as phone number
   // For video meetings, there's a meetingUrl field
   const meetingUrl = payload.meetingUrl || `https://cal.com/booking/${uid}`;
+  const appointmentData = {
+    leadId: lead.id,
+    calComEventId: id?.toString(),
+    calComBookingUid: uid,
+    scheduledAt: new Date(startTime),
+    scheduledFor: new Date(startTime),
+    duration: Math.round(
+      (new Date(endTime).getTime() - new Date(startTime).getTime()) / 60000
+    ),
+    status: "scheduled",
+    meetingUrl,
+    advisorName: organizer?.name || null,
+    advisorEmail: organizer?.email || null,
+    bookingSource: "HOLLY" as const,
+    notes: payload.location
+      ? `Meeting location: ${
+          typeof payload.location === "string"
+            ? payload.location
+            : JSON.stringify(payload.location)
+        }`
+      : undefined,
+  };
 
-  await prisma.appointment.create({
-    data: {
-      leadId: lead.id,
-      calComEventId: id?.toString(),
-      calComBookingUid: uid,
-      scheduledAt: new Date(startTime),
-      scheduledFor: new Date(startTime),
-      duration: Math.round((new Date(endTime).getTime() - new Date(startTime).getTime()) / 60000),
-      status: "scheduled",
-      meetingUrl: meetingUrl,
-      advisorName: organizer?.name || null,
-      advisorEmail: organizer?.email || null,
-      bookingSource: "HOLLY",
-      notes: payload.location ? `Meeting location: ${typeof payload.location === 'string' ? payload.location : JSON.stringify(payload.location)}` : undefined,
-    },
-  });
+  if (existingAppointment) {
+    await prisma.appointment.update({
+      where: { id: existingAppointment.id },
+      data: appointmentData,
+    });
+  } else {
+    await prisma.appointment.create({
+      data: appointmentData,
+    });
+  }
 
   // Update lead status - Holly stays enabled with appointment context
   // She knows about the scheduled appointment and won't try to book again
@@ -201,6 +222,13 @@ async function handleBookingCreated(payload: any) {
       // 3. POST-CALL CONTEXT provides call outcome details after call
     },
   });
+
+  if (existingAppointment) {
+    console.log(
+      `[Cal.com] Reconciled existing appointment for booking UID ${uid}; skipping duplicate confirmation flow`
+    );
+    return;
+  }
 
   // Log activity
   await prisma.leadActivity.create({
@@ -219,13 +247,13 @@ async function handleBookingCreated(payload: any) {
     type: "call_booked",
     leadName: `${lead.firstName} ${lead.lastName}`,
     leadId: lead.id,
-    details: `Scheduled for ${new Date(startTime).toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
+    details: `Scheduled for ${new Date(startTime).toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
       hour12: true,
-      timeZone: 'America/Vancouver'
+      timeZone: "America/Vancouver",
     })} PT`,
   });
 

@@ -8,6 +8,7 @@ import { askHollyToDecide } from "@/lib/claude-decision";
 import { analyzeDealHealth } from "@/lib/deal-intelligence";
 import { validateDecision, HollyDecision } from "@/lib/safety-guardrails";
 import { sendSlackNotification, sendErrorAlert, sendSlackAlertWithDedup, hasUpcomingAppointment } from "@/lib/slack";
+import { ACTIVE_APPOINTMENT_STATUSES } from "@/lib/appointment-status";
 
 /**
  * Automation rule trigger types
@@ -526,7 +527,7 @@ async function processAppointmentReminders() {
   // Use scheduledFor if available, otherwise fall back to scheduledAt
   const allAppointments = await prisma.appointment.findMany({
     where: {
-      status: { in: ["SCHEDULED", "CONFIRMED"] },
+      status: { in: [...ACTIVE_APPOINTMENT_STATUSES] },
     },
     include: {
       lead: true,
@@ -565,7 +566,7 @@ async function processAppointmentReminders() {
         timeZone: 'America/Vancouver'
       });
 
-      const reminderMessage = `Hey ${lead.name?.split(' ')[0] || 'there'}! Just a friendly reminder - your mortgage discovery call is tomorrow at ${appointmentTime} PT. Looking forward to it! 📅`;
+      const reminderMessage = `Hey ${lead.firstName || "there"}! Just a friendly reminder - your mortgage discovery call is tomorrow at ${appointmentTime} PT. Looking forward to it!`;
 
       await sendSms({
         to: lead.phone || '',
@@ -612,7 +613,7 @@ async function processAppointmentReminders() {
         timeZone: 'America/Vancouver'
       });
 
-      const reminderMessage = `Quick reminder - your mortgage discovery call is in 1 hour at ${appointmentTime} PT. See you soon! 🎯`;
+      const reminderMessage = `Quick reminder - your mortgage discovery call is in 1 hour at ${appointmentTime} PT. See you soon!`;
 
       await sendSms({
         to: lead.phone || '',
@@ -685,7 +686,7 @@ async function processSmartFollowUps() {
       },
       appointments: {
         where: {
-          status: { in: ["SCHEDULED", "CONFIRMED"] },
+          status: { in: [...ACTIVE_APPOINTMENT_STATUSES] },
           OR: [
             { scheduledFor: { gte: now } },
             { scheduledAt: { gte: now } }
@@ -990,7 +991,7 @@ async function processPostCallConfirmations() {
   // Use scheduledFor if available (from Cal.com), otherwise fall back to scheduledAt
   const appointments = await prisma.appointment.findMany({
     where: {
-      status: "scheduled",
+      status: { in: [...ACTIVE_APPOINTMENT_STATUSES] },
       OR: [
         { scheduledFor: { lte: oneHourAgo } },
         {

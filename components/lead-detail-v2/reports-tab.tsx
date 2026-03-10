@@ -542,6 +542,10 @@ export function ReportsTab({ lead }: ReportsTabProps) {
 
   // Get scenario label for display
   const getScenarioLabel = (scenarioNum: number) => {
+    if (scenarioNum === 0) {
+      return "No scenario";
+    }
+
     const option = SCENARIO_OPTIONS.find((o) => o.value === scenarioNum);
     return option ? `Scenario ${scenarioNum}` : `Scenario ${scenarioNum}`;
   };

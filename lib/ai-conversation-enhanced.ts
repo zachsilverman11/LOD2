@@ -4,7 +4,13 @@ import { sendSms } from "./sms";
 import { sendEmail } from "./email";
 import { sendErrorAlert, sendSlackNotification } from "./slack";
 import { quickDelay } from "./human-delay";
-import { createDirectBooking } from "./calcom";
+import {
+  getAvailableSlots,
+  getTimezoneForProvince,
+  type TimeSlot,
+} from "./calcom";
+import { ACTIVE_APPOINTMENT_STATUSES } from "./appointment-status";
+import { bookLeadAppointmentDirectly } from "./direct-booking";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || "placeholder-for-build",
@@ -52,6 +58,12 @@ interface AIDecision {
   bookingLeadName?: string;
   bookingLeadEmail?: string;
   bookingLeadTimezone?: string;
+}
+
+interface BookingAvailabilityContext {
+  timeZone: string;
+  slots: TimeSlot[];
+  promptBlock: string;
 }
 
 /**
@@ -126,7 +138,102 @@ export async function buildLeadContext(leadId: string): Promise<LeadContext> {
 /**
  * Generate enhanced system prompt with Inspired Mortgage training
  */
-function generateSystemPrompt(context: LeadContext, existingAppointment?: any): string {
+function buildRepresentativeSlotList(slots: TimeSlot[]): TimeSlot[] {
+  const representativeSlots: TimeSlot[] = [];
+  const slotsPerDay = new Map<string, number>();
+
+  for (const slot of slots) {
+    const dayKey = slot.time.slice(0, 10);
+    const dayCount = slotsPerDay.get(dayKey) || 0;
+
+    if (dayCount >= 2) continue;
+
+    representativeSlots.push(slot);
+    slotsPerDay.set(dayKey, dayCount + 1);
+
+    if (representativeSlots.length >= 14) {
+      break;
+    }
+  }
+
+  return representativeSlots;
+}
+
+function buildAvailabilityPromptBlock(timeZone: string, slots: TimeSlot[]): string {
+  if (slots.length === 0) {
+    return `# LIVE CALENDAR AVAILABILITY
+Availability data is unavailable right now.
+
+If the lead is ready to book, use \`send_booking_link\` as the fallback.`;
+  }
+
+  const representativeSlots = buildRepresentativeSlotList(slots);
+  const slotLines = representativeSlots
+    .map(
+      (slot, index) =>
+        `${index + 1}. ${slot.displayTime} (${timeZone}) | ${slot.time}`
+    )
+    .join("\n");
+
+  return `# LIVE CALENDAR AVAILABILITY
+These are REAL live Cal.com slots for the next 7 days.
+
+Use this timezone when speaking to the lead: ${timeZone}
+
+🚨 DIRECT BOOKING RULES:
+- Your default booking behavior is to OFFER 2-3 specific times from this list and book the lead directly
+- When the lead clearly chooses one of these times, use \`book_appointment_directly\`
+- \`bookingStartTime\` MUST be one exact ISO time from the list below
+- Only use \`send_booking_link\` as a fallback when:
+  1. availability is unavailable
+  2. they want a time outside this 7-day window
+  3. you have already offered multiple options and none work
+
+LIVE SLOT LIST:
+${slotLines}`;
+}
+
+async function getBookingAvailabilityContext(
+  context: LeadContext,
+  existingAppointment?: any
+): Promise<BookingAvailabilityContext | null> {
+  if (existingAppointment) {
+    return null;
+  }
+
+  const province =
+    context.leadData?.province ||
+    (context.lead.rawData as { province?: string } | null)?.province;
+  const timeZone = getTimezoneForProvince(province);
+
+  try {
+    const startDate = new Date().toISOString();
+    const endDate = new Date(
+      Date.now() + 7 * 24 * 60 * 60 * 1000
+    ).toISOString();
+    const slots = await getAvailableSlots(startDate, endDate, timeZone);
+
+    return {
+      timeZone,
+      slots,
+      promptBlock: buildAvailabilityPromptBlock(timeZone, slots),
+    };
+  } catch (error) {
+    console.error("[Cal.com] Failed to load booking availability:", error);
+
+    return {
+      timeZone,
+      slots: [],
+      promptBlock: buildAvailabilityPromptBlock(timeZone, []),
+    };
+  }
+}
+
+function generateSystemPrompt(
+  context: LeadContext,
+  existingAppointment?: any,
+  bookingAvailability?: BookingAvailabilityContext | null
+): string {
   const data = context.leadData;
   const daysInStage = context.pipelineStatus.daysInStage;
 
@@ -233,6 +340,9 @@ This call is where they'll:
 
 Your job: Get them curious enough to book the call. Don't try to answer everything via SMS.
 `}
+
+${!existingAppointment ? `${bookingAvailability?.promptBlock || buildAvailabilityPromptBlock("America/Vancouver", [])}
+` : ""}
 
 # 📊 LEAD PROFILE
 Name: ${data.name || "Unknown"}
@@ -780,11 +890,12 @@ Otherwise, I'll leave you be. Good luck with everything! 👍"
 2. **send_email**: Send professional email with detailed information
 3. **send_both**: Send coordinated SMS + Email together for maximum impact
 4. **schedule_followup**: Schedule follow-up (specify hours to wait)
-5. **send_booking_link**: Send Cal.com link when ready to book discovery call
-6. **send_application_link**: Send mortgage application link when ready to start app
-7. **move_stage**: Progress lead through pipeline
-8. **escalate**: Flag for human intervention
-9. **do_nothing**: No action needed
+5. **book_appointment_directly**: Book a REAL live Cal.com slot for the lead
+6. **send_booking_link**: Send Cal.com link only as a fallback when direct booking isn't practical
+7. **send_application_link**: Send mortgage application link when lead is ready to start app
+8. **move_stage**: Progress lead through pipeline
+9. **escalate**: Flag for human intervention
+10. **do_nothing**: No action needed
 
 🚨 **CRITICAL LINK SENDING RULES - READ THIS CAREFULLY:**
 
@@ -796,11 +907,13 @@ Otherwise, I'll leave you be. Good luck with everything! 👍"
 - Choosing send_sms with message: "Check your email for the link" without using send_email/send_both
 
 ✅ **CORRECT EXAMPLES:**
-- Lead ready to book call: Use **send_booking_link** tool (auto-appends Cal.com URL)
+- Lead picks a live time you offered: Use **book_appointment_directly**
+- Lead ready to book but no live time fits: Use **send_booking_link** tool (auto-appends Cal.com URL)
 - Lead ready for application: Use **send_application_link** tool (auto-appends app URL)
 - Want to send via email too: Use **send_both** tool with actual HTML link in email body
 
 **Rule of thumb:**
+- If you confirm a specific appointment time, you MUST use book_appointment_directly
 - If you mention sending a link, you MUST use send_booking_link or send_application_link
 - If you mention emailing, you MUST use send_email or send_both
 - Your actions must ALWAYS match your words!
@@ -818,7 +931,7 @@ Otherwise, I'll leave you be. Good luck with everything! 👍"
 - When lead is actively responding to SMS
 - Simple questions or confirmations
 - Time-sensitive updates
-- Sending booking links (SMS gets 98% open rate in 3 minutes!)
+- Offering live times and booking confirmations
 
 **Example scenarios:**
 - Touch 1-3: Initial contact, quick follow-ups
@@ -847,7 +960,7 @@ Otherwise, I'll leave you be. Good luck with everything! 👍"
 **Use send_both tool when:**
 - Lead explicitly asks "Can you email me that?" → Use send_both to cover both channels
 - Lead says "I prefer email communication" → Use send_both to ensure they get it
-- Sending critical links (booking, application) → Use send_both for maximum delivery
+- Sending critical links (booking fallback, application) → Use send_both for maximum delivery
 - Post-appointment follow-up with documents
 
 🚨 **IMPORTANT:** When a lead requests email communication, use send_both tool, NOT just send_email. This ensures they get the SMS notification too and increases engagement.
@@ -862,7 +975,7 @@ Otherwise, I'll leave you be. Good luck with everything! 👍"
 1. **Did lead ask for email?** → No = Use SMS, Yes = Use email
 2. **Is this urgent?** → Yes = SMS (always)
 3. **Are they responding?** → Yes = keep using SMS, No after 5+ days = try one more SMS with different angle
-4. **Is this a booking moment?** → Yes = SMS with Cal.com link
+4. **Is this a booking moment?** → Yes = offer live times via SMS and book directly when they choose
 
 ## 🎨 CONTENT GUIDELINES BY CHANNEL
 
@@ -891,9 +1004,9 @@ Otherwise, I'll leave you be. Good luck with everything! 👍"
 1. **Never duplicate content** - If using Both, SMS should tease/alert, Email should deliver full content
 2. **Match their preference** - If lead only replies to email, use email more
 3. **Don't spam both channels** - Both is for special moments, not every message
-4. **First touch default** - Start with SMS only (or SMS+Email if sending booking link immediately)
+4. **First touch default** - Start with SMS only (or SMS+Email if sending a fallback booking link immediately)
 5. **Email rescue** - If 5+ days of no SMS response, try email as a channel switch
-6. **Booking moments = Both** - When ready to send Cal.com link, use Both for maximum visibility
+6. **Booking fallback = Both** - When you truly need to send the Cal.com link, use Both for maximum visibility
 7. **CROSS-CHANNEL ACKNOWLEDGMENT** - If lead sends EMAIL and you respond via SMS, ALWAYS acknowledge: "Thanks for your email!" or "Got your email!". If lead sends SMS and you respond via EMAIL, acknowledge: "Thanks for your text!"
 
 # 💭 CONVERSATION HISTORY
@@ -957,7 +1070,7 @@ export async function handleConversation(
   const existingAppointment = await prisma.appointment.findFirst({
     where: {
       leadId,
-      status: { in: ["SCHEDULED", "CONFIRMED"] },
+      status: { in: [...ACTIVE_APPOINTMENT_STATUSES] },
       OR: [
         { scheduledFor: { gte: new Date() } },
         {
@@ -971,7 +1084,15 @@ export async function handleConversation(
     orderBy: { scheduledAt: "asc" },
   });
 
-  const systemPrompt = generateSystemPrompt(context, existingAppointment);
+  const bookingAvailability = await getBookingAvailabilityContext(
+    context,
+    existingAppointment
+  );
+  const systemPrompt = generateSystemPrompt(
+    context,
+    existingAppointment,
+    bookingAvailability
+  );
 
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
 
@@ -1124,6 +1245,45 @@ Remember: The goal of message #1 is NOT to book them. It's to demonstrate you re
               },
             },
             required: ["hours", "message", "reasoning"],
+          },
+        },
+      },
+      {
+        type: "function",
+        function: {
+          name: "book_appointment_directly",
+          description:
+            "Book a specific live Cal.com slot directly for the lead. Use this when the lead chooses one of the live availability options in the prompt.",
+          parameters: {
+            type: "object",
+            properties: {
+              bookingStartTime: {
+                type: "string",
+                description:
+                  "Exact ISO 8601 start time from the LIVE CALENDAR AVAILABILITY list in the prompt",
+              },
+              message: {
+                type: "string",
+                description:
+                  "Short confirmation SMS to send after the booking is successfully created",
+              },
+              reasoning: {
+                type: "string",
+                description:
+                  "Why this lead is ready and why this specific slot should be booked now",
+              },
+              bookingLeadName: {
+                type: "string",
+                description:
+                  "Optional override for attendee name. Usually omit this and use the lead's existing name.",
+              },
+              bookingLeadEmail: {
+                type: "string",
+                description:
+                  "Optional override for attendee email. Usually omit this and use the lead's existing email.",
+              },
+            },
+            required: ["bookingStartTime", "message", "reasoning"],
           },
         },
       },
@@ -1316,6 +1476,13 @@ Remember: The goal of message #1 is NOT to book them. It's to demonstrate you re
       break;
     case "send_booking_link":
       decision.message = functionArgs.message;
+      break;
+    case "book_appointment_directly":
+      decision.message = functionArgs.message;
+      decision.bookingStartTime = functionArgs.bookingStartTime;
+      decision.bookingLeadName = functionArgs.bookingLeadName;
+      decision.bookingLeadEmail = functionArgs.bookingLeadEmail;
+      decision.bookingLeadTimezone = functionArgs.bookingLeadTimezone;
       break;
     case "send_application_link":
       decision.message = functionArgs.message;
@@ -1668,12 +1835,7 @@ export async function executeDecision(
     case "book_appointment_directly":
       if (decision.bookingStartTime && decision.message) {
         try {
-          const eventTypeId = parseInt(process.env.CALCOM_EVENT_TYPE_ID || "3298267", 10);
-          const attendeeName = decision.bookingLeadName || `${lead.firstName || ""} ${lead.lastName || ""}`.trim() || "Lead";
-          const attendeeEmail = decision.bookingLeadEmail || lead.email || "";
-          const attendeeTimezone = decision.bookingLeadTimezone || "America/Vancouver";
-
-          if (!attendeeEmail) {
+          if (!(decision.bookingLeadEmail || lead.email)) {
             console.error(`[Direct Booking] No email for lead ${leadId} — falling back to booking link`);
             // Fall through to send_booking_link behavior
             const bookingUrl = process.env.CAL_COM_BOOKING_URL || "https://cal.com/your-link";
@@ -1693,86 +1855,55 @@ export async function executeDecision(
             break;
           }
 
-          // Create the booking via Cal.com API
-          const booking = await createDirectBooking({
-            eventTypeId,
-            start: decision.bookingStartTime,
-            attendee: {
-              name: attendeeName,
-              email: attendeeEmail,
-              timeZone: attendeeTimezone,
+          const { booking, startTime } = await bookLeadAppointmentDirectly(
+            leadId,
+            {
+              bookingStartTime: decision.bookingStartTime,
+              bookingLeadName: decision.bookingLeadName,
+              bookingLeadEmail: decision.bookingLeadEmail,
+              bookingLeadTimezone:
+                decision.bookingLeadTimezone ||
+                getTimezoneForProvince(
+                  (lead.rawData as { province?: string } | null)?.province
+                ),
+              message: decision.message,
+              reasoning: decision.reasoning,
             },
-            metadata: { source: "holly-direct-booking", leadId },
-          });
+            {
+              sendConfirmationSms: true,
+              sendSlackNotification: true,
+            }
+          );
 
-          console.log(`[Direct Booking] ✅ Booked for lead ${leadId}: ${booking.uid} at ${booking.startTime}`);
+          console.log(
+            `[Direct Booking] ✅ Booked for lead ${leadId}: ${booking.uid} at ${booking.startTime}`
+          );
 
-          // Create the appointment in our database
-          const startTime = new Date(booking.startTime);
-          const endTime = booking.endTime ? new Date(booking.endTime) : new Date(startTime.getTime() + 15 * 60000);
-          await prisma.appointment.create({
-            data: {
-              leadId,
-              calComBookingUid: booking.uid,
-              scheduledAt: startTime,
-              scheduledFor: startTime,
-              duration: Math.round((endTime.getTime() - startTime.getTime()) / 60000),
-              status: "scheduled",
-              bookingSource: "HOLLY",
-              advisorName: "Greg Williamson",
-              advisorEmail: "greg@inspired.mortgage",
-              notes: "Booked directly by Holly via Cal.com API",
-            },
-          });
-
-          // Update lead status to CALL_SCHEDULED
-          await prisma.lead.update({
-            where: { id: leadId },
-            data: {
-              status: "CALL_SCHEDULED",
-              lastContactedAt: new Date(),
-            },
-          });
-
-          // Send confirmation SMS
-          await sendSms({ to: lead.phone, body: decision.message });
-
-          await prisma.communication.create({
-            data: {
-              leadId,
-              channel: "SMS",
-              direction: "OUTBOUND",
-              content: decision.message,
-              intent: "booking_confirmed",
-              metadata: {
-                aiReasoning: decision.reasoning,
-                bookingUid: booking.uid,
-                bookedAt: booking.startTime,
-                directBooking: true,
-              },
-            },
-          });
-
-          // Log activity
           await prisma.leadActivity.create({
             data: {
               leadId,
               type: "APPOINTMENT_BOOKED",
               channel: "SMS",
               subject: "Holly booked appointment directly",
-              content: `Holly booked a discovery call for ${startTime.toLocaleString("en-US", { timeZone: attendeeTimezone, weekday: "long", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true })}`,
+              content: `Holly booked a discovery call for ${startTime.toLocaleString(
+                "en-US",
+                {
+                  timeZone:
+                    decision.bookingLeadTimezone ||
+                    getTimezoneForProvince(
+                      (lead.rawData as { province?: string } | null)?.province
+                    ),
+                  weekday: "long",
+                  month: "short",
+                  day: "numeric",
+                  hour: "numeric",
+                  minute: "2-digit",
+                  hour12: true,
+                }
+              )}`,
               metadata: { bookingUid: booking.uid, directBooking: true },
             },
           });
-
-          // Slack notification
-          await sendSlackNotification({
-            type: "call_booked",
-            leadName: attendeeName,
-            leadId,
-            details: `🤖 Holly booked directly! ${startTime.toLocaleString("en-US", { timeZone: attendeeTimezone, weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true })}`,
-          });
-
         } catch (error) {
           console.error(`[Direct Booking] ❌ Failed for lead ${leadId}:`, error);
 

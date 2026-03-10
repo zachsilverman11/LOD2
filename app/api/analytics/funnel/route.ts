@@ -9,7 +9,7 @@ import {
 
 /**
  * Analytics Funnel API
- * Returns conversion funnel data: NEW -> CONTACTED -> ENGAGED -> CALL_SCHEDULED -> CONVERTED
+ * Returns conversion funnel data using the current pipeline stages.
  * Supports cohort and date range filtering via query params
  */
 export async function GET(request: NextRequest) {
@@ -78,9 +78,9 @@ export async function GET(request: NextRequest) {
         color: "#D9F36E",
       },
       {
-        stage: "CALL_COMPLETED",
-        label: "Call Completed",
-        count: statusMap.get("CALL_COMPLETED") || 0,
+        stage: "WAITING_FOR_APPLICATION",
+        label: "Awaiting Application",
+        count: statusMap.get("WAITING_FOR_APPLICATION") || 0,
         color: "#B8E986",
       },
       {

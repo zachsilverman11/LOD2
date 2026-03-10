@@ -8,6 +8,10 @@ import { buildReportDeliveryEmail } from "@/lib/email-templates/post-call-sequen
 import { buildReportNotificationSms } from "@/lib/sms-templates/post-call-sequence";
 import { sendSms } from "@/lib/sms";
 
+function normalizeScenario(scenario: number): 0 | 1 | 2 | 3 {
+  return [1, 2, 3].includes(scenario) ? (scenario as 1 | 2 | 3) : 0;
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ reportId: string }> }
@@ -86,7 +90,7 @@ export async function POST(
       },
       bullets: report.bullets as string[],
       mortgageAmount: String(report.mortgageAmount),
-      scenario: (report.scenario as 1 | 2 | 3) || 1,
+      scenario: normalizeScenario(report.scenario),
       includeDebtConsolidation: report.includeDebtConsolidation || false,
       applicationLink: report.applicationLink || "https://stressfree.mtg-app.com/signup",
       includeCashBack: report.includeCashBack || false,

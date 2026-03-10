@@ -818,7 +818,7 @@ export default function AnalyticsPage() {
                 ?.filter((s) => !["NURTURING"].includes(s.status)) // Hide less important statuses
                 .sort((a, b) => {
                   // Sort by funnel order
-                  const order = ["NEW", "CONTACTED", "ENGAGED", "CALL_SCHEDULED", "CALL_COMPLETED", "WAITING_FOR_APPLICATION", "APPLICATION_STARTED", "CONVERTED", "DEALS_WON", "LOST"];
+                  const order = ["NEW", "CONTACTED", "ENGAGED", "CALL_SCHEDULED", "WAITING_FOR_APPLICATION", "APPLICATION_STARTED", "CONVERTED", "DEALS_WON", "LOST"];
                   return order.indexOf(a.status) - order.indexOf(b.status);
                 })
                 .map((status) => (

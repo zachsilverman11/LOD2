@@ -14,6 +14,7 @@ import { getTimezoneForProvince } from './calcom';
 import { sendSlackNotification } from './slack';
 import { trackConversationOutcome } from './conversation-outcome-tracker';
 import { getNext8AM, getLocalTimeString } from './timezone-utils';
+import { ACTIVE_APPOINTMENT_STATUSES } from './appointment-status';
 
 // Environment variables for safe rollout
 const ENABLE_AUTONOMOUS_AGENT = process.env.ENABLE_AUTONOMOUS_AGENT === 'true';
@@ -88,7 +89,7 @@ export async function processLeadWithAutonomousAgent(
           take: 20,
         },
         appointments: {
-          where: { status: { in: ['SCHEDULED', 'CONFIRMED'] } },
+          where: { status: { in: [...ACTIVE_APPOINTMENT_STATUSES] } },
         },
         callOutcomes: {
           orderBy: { createdAt: 'desc' },
@@ -110,7 +111,8 @@ export async function processLeadWithAutonomousAgent(
     }
 
     // 🚨 CRITICAL SAFETY CHECK #2: Upcoming Appointments
-    // Prevents Holly from contacting leads who have scheduled calls
+    // Prevents proactive outreach to leads who already have scheduled calls,
+    // but still allows reactive responses when they text in with questions.
     if (lead.appointments && lead.appointments.length > 0) {
       const now = new Date();
       const upcomingAppointment = lead.appointments.find(apt => {
@@ -125,8 +127,13 @@ export async function processLeadWithAutonomousAgent(
           dateStyle: 'medium',
           timeStyle: 'short'
         });
-        console.log(`[Holly Agent] ⏸️  Skipping ${lead.firstName} ${lead.lastName} - has upcoming appointment scheduled for ${appointmentDate}`);
-        return { success: false, reason: `Lead has scheduled appointment at ${appointmentTime.toISOString()}` };
+
+        if (triggerSource === 'cron') {
+          console.log(`[Holly Agent] ⏸️  Skipping ${lead.firstName} ${lead.lastName} - has upcoming appointment scheduled for ${appointmentDate}`);
+          return { success: false, reason: `Lead has scheduled appointment at ${appointmentTime.toISOString()}` };
+        }
+
+        console.log(`[Holly Agent] 💬 ${lead.firstName} ${lead.lastName} has an upcoming appointment, but reactive SMS support is allowed`);
       }
     }
 
@@ -575,7 +582,7 @@ export async function runHollyAgentLoop() {
           take: 20,
         },
         appointments: {
-          where: { status: { in: ['SCHEDULED', 'CONFIRMED'] } },
+          where: { status: { in: [...ACTIVE_APPOINTMENT_STATUSES] } },
         },
         callOutcomes: {
           orderBy: { createdAt: 'desc' },

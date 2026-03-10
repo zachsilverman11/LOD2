@@ -60,19 +60,24 @@ export function validateDecision(
     errors.push('Lead opted out of SMS - cannot send messages');
   }
 
-  // === HARD RULE: Advisor/Finmo Handoff - Do NOT contact leads after handoff ===
-  // Once a lead reaches CALL_SCHEDULED, APPLICATION_STARTED, CONVERTED, or DEALS_WON, Holly is disabled
-  // - CALL_SCHEDULED: Advisor owns the relationship until call happens
-  // - APPLICATION_STARTED: Finmo system owns communication
-  // - CONVERTED: Journey complete, no more Holly
-  // - DEALS_WON: Journey complete, no more Holly
-  if (['CALL_SCHEDULED', 'APPLICATION_STARTED', 'CONVERTED', 'DEALS_WON'].includes(context.lead.status)) {
+  // === HARD RULE: Finmo Handoff - Do NOT contact leads after application handoff ===
+  // Once a lead reaches APPLICATION_STARTED, CONVERTED, or DEALS_WON, Holly is disabled.
+  // Booked leads are a special case: reactive pre-call support is allowed,
+  // but Holly must not rebook, move stages, or push applications before the call.
+  if (['APPLICATION_STARTED', 'CONVERTED', 'DEALS_WON'].includes(context.lead.status)) {
     errors.push(
       `Lead status is ${context.lead.status} - Holly is disabled. ${
-        context.lead.status === 'CALL_SCHEDULED'
-          ? 'Advisor owns this lead until their scheduled call.'
-          : 'Finmo system is handling communication. Holly should NEVER contact these leads.'
+        'Finmo system is handling communication. Holly should NEVER contact these leads.'
       }`
+    );
+  }
+
+  if (
+    context.lead.status === 'CALL_SCHEDULED' &&
+    ['send_booking_link', 'send_application_link', 'book_directly', 'move_stage'].includes(decision.action)
+  ) {
+    errors.push(
+      'Lead already has a scheduled call - Holly may only provide pre-call support via send_sms, wait, or escalate.'
     );
   }
 

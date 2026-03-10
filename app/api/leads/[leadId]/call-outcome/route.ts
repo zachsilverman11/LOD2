@@ -267,41 +267,41 @@ DO NOT mention "Finmo" or any technical platform names - customers don't need to
         break;
 
       case "BOOK_DISCOVERY":
-        // Keep current status, Holly will send Cal.com link immediately
-        actionTaken = "Holly sending Cal.com booking link now...";
+        // Keep current status, Holly will offer live times and book directly when they reply
+        actionTaken = "Holly offering live booking times now...";
 
-        // 📅 SEND CAL.COM LINK IMMEDIATELY via SMS + EMAIL
+        // 📅 OFFER LIVE TIMES IMMEDIATELY via Holly
         try {
-          console.log(`[Call Outcome] Triggering immediate Cal.com link for lead ${leadId}`);
+          console.log(`[Call Outcome] Triggering direct-booking-first follow-up for lead ${leadId}`);
 
           const calContext = `The advisor ${advisorName} just spoke with this lead and they want to book a discovery call.
 
-Your job is to send them the Cal.com booking link RIGHT NOW with a brief, friendly message.
+Your job is to send a SHORT, friendly follow-up RIGHT NOW that offers 2-3 specific live times and makes it easy for Holly to book the appointment directly when they reply.
 
 The message should:
 - Acknowledge the conversation with ${advisorName}
-- Include the Cal.com booking link: ${process.env.CAL_COM_BOOKING_URL || "https://cal.com/inspired-mortgage"}
-- Make it easy for them to pick a time
+- Offer 2-3 specific times from the live availability already loaded in your system prompt
+- Ask them to reply with the one that works best
 - Be SHORT and action-oriented (under 160 chars for SMS)
 
-🚨 CRITICAL: Use the send_both tool to send via SMS + Email for maximum delivery!
+🚨 CRITICAL RULES:
+1. DEFAULT TO DIRECT BOOKING FIRST. Do NOT send the Cal.com link unless direct booking is not practical.
+2. Use send_sms for the initial follow-up that offers times.
+3. If they reply with one of the offered times, use book_appointment_directly.
+4. Only use send_booking_link as a fallback if no live slot fits or they want to self-serve.`;
 
-SMS: Keep it brief (under 160 chars)
-Email Subject: Something like "Book Your Discovery Call - Link Inside"
-Email Body: More detailed with HTML formatting, include the link prominently`;
-
-          // Generate AI message with Cal.com link
+          // Generate AI message with direct-booking-first follow-up
           const decision = await handleConversation(leadId, undefined, calContext);
 
           // Send immediately
           await executeDecision(leadId, decision);
 
-          actionTaken = "Holly sent Cal.com booking link! ✅";
+          actionTaken = "Holly sent live booking options! ✅";
 
-          console.log(`[Call.com] ✅ Cal.com link sent successfully to lead ${leadId}`);
+          console.log(`[Call.com] ✅ Direct-booking-first follow-up sent successfully to lead ${leadId}`);
         } catch (error) {
-          console.error(`[Call Outcome] Error sending Cal.com link:`, error);
-          actionTaken = "Holly will send Cal.com link on next automation run.";
+          console.error(`[Call Outcome] Error sending direct-booking-first follow-up:`, error);
+          actionTaken = "Holly will send booking options on next automation run.";
         }
         break;
 
@@ -380,31 +380,30 @@ Email Body: More detailed with HTML formatting, include the link prominently`;
 
 Your job is to:
 1. Tactfully acknowledge the missed appointment (don't be judgmental)
-2. Offer to reschedule
-3. Make it easy with the booking link
+2. Offer 2-3 specific live times for a reschedule
+3. Make it easy for Holly to book it directly when they reply
 
 **IMPORTANT CONTEXT:**
 - Lead name: ${lead.firstName}
 - Advisor who tried calling: ${advisorName}
 - Missed appointment was on: ${appointmentDetails.scheduledFor?.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
-- Cal.com booking URL: ${process.env.CAL_COM_BOOKING_URL || "https://cal.com/inspired-mortgage"}
 
 The message should:
 - Acknowledge the missed call casually (no guilt-tripping!)
 - Be understanding ("life gets busy", "no worries", etc.)
-- Offer to reschedule with the booking link
+- Offer 2-3 specific live times from the availability in your prompt
 - Sound warm and human, NOT robotic
 
 🚨 CRITICAL RULES:
 1. DO NOT say "did you grab a time?" - they already booked once and no-showed!
 2. DO acknowledge what happened briefly
-3. DO make it easy to reschedule
+3. DO make it easy to reschedule by offering concrete times
 4. BE casual and understanding, not formal
+5. If they pick one of the live times, use book_appointment_directly
+6. Only use send_booking_link if no live option works and they need the self-serve fallback
 
 EXAMPLE GOOD MESSAGE:
-"Hey ${lead.firstName}! Looks like we missed each other on ${appointmentDetails.scheduledFor?.toLocaleDateString('en-US', { weekday: 'long' })}. No worries - life gets busy! Want to grab another time with ${advisorName}? I can send you the link!"
-
-Use the send_booking_link tool to include the Cal.com link automatically.`;
+"Hey ${lead.firstName}! Looks like we missed each other on ${appointmentDetails.scheduledFor?.toLocaleDateString('en-US', { weekday: 'long' })}. No worries - life gets busy. I can do Tuesday at 2:20pm, 2:40pm, or Wednesday at 10am with ${advisorName} - which works best?"`;
 
             // Generate AI message with rescheduling offer
             const decision = await handleConversation(leadId, undefined, rescheduleContext);

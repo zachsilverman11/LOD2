@@ -4,6 +4,20 @@ import { generateReportHTML, type ReportHTMLProps } from "@/lib/generate-report-
 import { generatePDFFromHTML } from "@/lib/generate-report-puppeteer";
 import { getAdvisorPhone } from "@/lib/report-copy";
 
+function normalizeScenario(scenario: unknown): 0 | 1 | 2 | 3 {
+  if (scenario === null || scenario === undefined || scenario === "") {
+    return 0;
+  }
+
+  const parsedScenario = Number(scenario);
+
+  if ([0, 1, 2, 3].includes(parsedScenario)) {
+    return parsedScenario as 0 | 1 | 2 | 3;
+  }
+
+  throw new Error("Scenario must be 0, 1, 2, or 3");
+}
+
 /**
  * POST /api/reports/generate-pdf
  *
@@ -27,6 +41,7 @@ export async function POST(request: NextRequest) {
       mortgageAmount,
       scenario,
       includeDebtConsolidation,
+      includeCashBack,
       applicationLink,
       extractedData,
     } = body;
@@ -47,11 +62,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate scenario
-    const validatedScenario = scenario || 1;
-    if (![1, 2, 3].includes(validatedScenario)) {
+    let validatedScenario: 0 | 1 | 2 | 3;
+    try {
+      validatedScenario = normalizeScenario(scenario);
+    } catch {
       return NextResponse.json(
-        { error: "Scenario must be 1, 2, or 3" },
+        { error: "Scenario must be 0, 1, 2, or 3" },
         { status: 400 }
       );
     }
@@ -68,10 +84,10 @@ export async function POST(request: NextRequest) {
       },
       bullets: bullets as string[],
       mortgageAmount: String(mortgageAmount),
-      scenario: validatedScenario as 0 | 1 | 2 | 3,
+      scenario: validatedScenario,
       includeDebtConsolidation: includeDebtConsolidation || false,
-      includeCashBack: false,
-      applicationLink: applicationLink || "https://www.inspired.mortgage/start-here",
+      includeCashBack: includeCashBack || false,
+      applicationLink: applicationLink || "https://stressfree.mtg-app.com/signup",
       extractedData: extractedData || {},
     };
 
