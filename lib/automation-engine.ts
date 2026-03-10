@@ -606,14 +606,30 @@ async function processAppointmentReminders() {
   for (const appointment of appointments1h) {
     try {
       const lead = appointment.lead;
-      const appointmentTime = (appointment.scheduledFor || appointment.scheduledAt).toLocaleString('en-US', {
+      const aptDate = appointment.scheduledFor || appointment.scheduledAt;
+      const appointmentTime = aptDate.toLocaleString('en-US', {
         hour: 'numeric',
         minute: '2-digit',
         hour12: true,
         timeZone: 'America/Vancouver'
       });
 
-      const reminderMessage = `Quick reminder - your mortgage discovery call is in 1 hour at ${appointmentTime} PT. See you soon!`;
+      // Calculate actual time until call (trigger window is 1-2h, so "in 1 hour" can be wrong)
+      const minutesUntil = Math.round((aptDate.getTime() - now.getTime()) / 60000);
+      const hoursUntil = Math.floor(minutesUntil / 60);
+      const minsRemainder = minutesUntil % 60;
+      const timePhrase =
+        hoursUntil >= 2
+          ? 'in about 2 hours'
+          : hoursUntil >= 1
+            ? minsRemainder >= 45
+              ? 'in about 2 hours'
+              : minsRemainder >= 15
+                ? 'in about 1.5 hours'
+                : 'in about 1 hour'
+            : `in ${minutesUntil} minutes`;
+
+      const reminderMessage = `Quick reminder - your mortgage discovery call is ${timePhrase} at ${appointmentTime} PT. See you soon!`;
 
       await sendSms({
         to: lead.phone || '',
