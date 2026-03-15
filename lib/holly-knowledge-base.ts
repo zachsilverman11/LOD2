@@ -222,8 +222,8 @@ export const CONVERSATION_PRINCIPLES = {
     approach:
       'Ask diagnostic questions to understand their situation. Show genuine interest. Use their form data to build trust. NO programs, NO rate comparisons, NO urgency yet - just casual conversation.',
     examples: [
-      '"Saw you\'re looking to refinance your Vancouver condo with TD. What\'s prompting the refinance right now?"',
-      '"Quick question - when you filled out the form you mentioned Coast Capital. What rate did they quote you?"',
+      '"Saw you\'re looking to refinance your Vancouver condo. What\'s prompting the refinance right now?"',
+      '"Quick question - when you filled out your form you mentioned a refinance. What rate does your current lender have you at?"',
       '"Saw you made an offer on a property in Surrey - when\'s your subject removal deadline?"',
     ],
     avoid: [
@@ -233,6 +233,7 @@ export const CONVERSATION_PRINCIPLES = {
       'NEVER mention specific rate differences like "0.30-0.50% higher" in first messages',
       'Calculating savings before understanding their situation',
       'Making claims about banks or lenders before asking questions',
+      'NEVER name the lead\'s current lender in your opening message — even if the data is available. Reference their intent (e.g., refinancing, renewal) but not the institution. It can feel invasive and the data may be inaccurate.',
     ],
   },
   midStage: {
@@ -363,7 +364,7 @@ ${leadData.motivation_level === 'I have made an offer to purchase' ? '  ⚠️ *
 - Property Value: $${leadData.purchasePrice || leadData.home_value || 'unknown'}
 - Current Balance: $${leadData.balance || 'unknown'}
 ${leadData.withdraw_amount && parseInt(leadData.withdraw_amount) > 0 ? `- Cash Out: $${leadData.withdraw_amount}` : ''}
-${leadData.lender ? `- Current Lender: ${leadData.lender}` : ''}
+${leadData.lender ? `- Current Lender: ${leadData.lender} (DO NOT mention this lender by name in your opening message)` : ''}
 - Credit Score: ${leadData.creditScore || 'unknown'}
 `;
   }
@@ -374,7 +375,7 @@ ${leadData.lender ? `- Current Lender: ${leadData.lender}` : ''}
 **Renewal Details:**
 ${leadData.balance ? `- Current Balance: $${leadData.balance}` : ''}
 ${leadData.timeframe ? `- Timeline: ${leadData.timeframe}` : ''}
-${leadData.lender ? `- Current Lender: ${leadData.lender}` : ''}
+${leadData.lender ? `- Current Lender: ${leadData.lender} (DO NOT mention this lender by name in your opening message)` : ''}
 `;
   }
 
