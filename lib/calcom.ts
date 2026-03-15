@@ -12,7 +12,11 @@
  */
 
 const CALCOM_API_V2_URL = "https://api.cal.com/v2";
-const CALCOM_API_VERSION = process.env.CALCOM_API_VERSION || "2024-09-04";
+// Different Cal.com v2 API versions are required per endpoint:
+// - Slots endpoint works with 2024-09-04
+// - Bookings endpoint requires 2024-08-13
+const CALCOM_API_VERSION_SLOTS = "2024-09-04";
+const CALCOM_API_VERSION_BOOKINGS = "2024-08-13";
 
 // ─── Public booking endpoint (same as cal.com booking page — no auth needed) ───
 const CALCOM_PUBLIC_BOOKING_URL = "https://app.cal.com/api/book/event";
@@ -108,7 +112,7 @@ function v2Headers(apiKey: string): Record<string, string> {
   return {
     "Content-Type": "application/json",
     Authorization: `Bearer ${apiKey}`,
-    "cal-api-version": CALCOM_API_VERSION,
+    "cal-api-version": CALCOM_API_VERSION_BOOKINGS,
   };
 }
 
@@ -189,7 +193,7 @@ export async function getAvailableSlots(
 
   const response = await fetch(`${CALCOM_API_V2_URL}/slots?${params}`, {
     headers: {
-      "cal-api-version": CALCOM_API_VERSION,
+      "cal-api-version": CALCOM_API_VERSION_SLOTS,
     },
   });
 
@@ -274,29 +278,34 @@ export async function getAvailableSlotsForDay(
 export async function createDirectBooking(
   params: DirectBookingParams
 ): Promise<BookingConfirmation> {
-  // Use the public booking endpoint (same as cal.com booking page — no API key needed)
+  // Use the authenticated v2 API endpoint so the booking goes to the team's
+  // round-robin hosts (not Zach's personal calendar). The old unauthenticated
+  // public endpoint (app.cal.com/api/book/event) falls back to the team admin's
+  // personal event type when given a team ROUND_ROBIN event type ID.
+  const apiKey = getApiKey();
   const eventTypeId = params.eventTypeId || parseInt(process.env.CALCOM_EVENT_TYPE_ID || "") || DEFAULT_EVENT_TYPE_ID;
 
   const body = {
     eventTypeId,
     start: params.start,
-    responses: {
+    attendee: {
       name: params.attendee.name,
       email: params.attendee.email,
-      notes: params.metadata?.notes as string || "",
+      timeZone: params.attendee.timeZone,
+      language: "en",
     },
-    timeZone: params.attendee.timeZone,
-    language: "en",
     metadata: {
       source: "holly-direct-booking",
       ...(params.metadata || {}),
     },
   };
 
-  const response = await fetch(CALCOM_PUBLIC_BOOKING_URL, {
+  const response = await fetch(`${CALCOM_API_V2_URL}/bookings`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+      "cal-api-version": CALCOM_API_VERSION_BOOKINGS,
     },
     body: JSON.stringify(body),
   });

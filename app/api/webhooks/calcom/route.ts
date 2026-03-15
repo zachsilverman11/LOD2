@@ -80,10 +80,10 @@ async function handleBookingCreated(payload: any) {
     return;
   }
 
-  // Try to find lead by email first
+  // Try to find lead by email first (case-insensitive to handle mismatched casing)
   let lead = attendeeEmail
-    ? await prisma.lead.findUnique({
-        where: { email: attendeeEmail.toLowerCase() },
+    ? await prisma.lead.findFirst({
+        where: { email: { equals: attendeeEmail, mode: "insensitive" } },
       })
     : null;
 
@@ -100,6 +100,24 @@ async function handleBookingCreated(payload: any) {
           },
         },
       });
+    }
+  }
+
+  // If not found by email or phone, try matching by attendee name
+  if (!lead && attendees[0]?.name) {
+    const nameParts = attendees[0].name.trim().split(/\s+/);
+    if (nameParts.length >= 2) {
+      const firstName = nameParts[0];
+      const lastName = nameParts.slice(1).join(" ");
+      lead = await prisma.lead.findFirst({
+        where: {
+          firstName: { equals: firstName, mode: "insensitive" },
+          lastName: { equals: lastName, mode: "insensitive" },
+        },
+      });
+      if (lead) {
+        console.log(`[Cal.com] Matched lead by name fallback: ${firstName} ${lastName} -> ${lead.id}`);
+      }
     }
   }
 
