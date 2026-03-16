@@ -14,6 +14,7 @@ import { bookLeadAppointmentDirectly } from "../direct-booking";
 import {
   buildHollyBriefing,
   selectBookingHook,
+  fetchYouTubeLinkForBriefing,
   ADVISOR_TEAM_PROFILE,
   CASH_BACK_PROGRAM,
   REPORT_PRESELL_FRAMINGS,
@@ -1099,11 +1100,26 @@ export async function handleConversation(
     context,
     existingAppointment
   );
-  const systemPrompt = generateSystemPrompt(
+  let systemPrompt = generateSystemPrompt(
     context,
     existingAppointment,
     bookingAvailability
   );
+
+  // Fetch YouTube link and append to prompt (cached 24h, no perf concern)
+  const youtubeLink = await fetchYouTubeLinkForBriefing();
+  if (youtubeLink) {
+    const conversationText = context.conversationHistory
+      .map((msg) => msg.content)
+      .join(" ");
+    const youtubeSharedInConversation = conversationText.includes("youtube.com");
+
+    if (youtubeSharedInConversation) {
+      systemPrompt += `\n\n## 🎬 GREG'S YOUTUBE SHOW\n\n⚠️ **ALREADY SHARED** — You already mentioned the YouTube show in this conversation. Do NOT mention it again.`;
+    } else {
+      systemPrompt += `\n\n## 🎬 GREG'S YOUTUBE SHOW (Trust Builder — Use Once Per Conversation)\n\n📺 **THE YOUTUBE SHOW** — Use this ONCE per conversation as a trust-building value-add.\n\n**When to use:** Messages 2-4, when rapport is building. NOT in your first message. NOT as a booking pitch.\n\n**How to use it naturally:**\n"By the way — our co-founder Greg Williamson has a weekly show where he breaks down what's actually happening in the mortgage market and gives you the straight goods on your best options. No fluff, no sales pitch — just a few minutes of real talk. Since you're looking at a mortgage, this week's episode is worth a watch: ${youtubeLink}"\n\n**Rules:**\n- Drop it naturally mid-conversation, not as a sales pitch\n- Use it as a credibility/trust builder ("this guy knows his stuff")\n- Do NOT follow up asking if they watched it\n- Do NOT use it in the first message\n- Once you've shared it, move on — don't dwell on it`;
+    }
+  }
 
   const messages: Array<{ role: string; content: string }> = [];
 
