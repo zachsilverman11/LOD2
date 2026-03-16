@@ -1,5 +1,5 @@
 import { PrismaClient } from "./app/generated/prisma";
-import { handleConversation, executeDecision } from "./lib/ai-conversation-enhanced";
+import { handleConversation, executeDecision } from "./lib/holly/conversation-handler";
 import { sendSlackNotification } from "./lib/slack";
 
 const prisma = new PrismaClient({

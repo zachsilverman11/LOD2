@@ -3,7 +3,7 @@
  * Analyzes lead health and engagement to inform Holly's decision-making
  */
 
-import { Lead, Communication, Appointment, CallOutcome } from '@prisma/client';
+import { Lead, Communication, Appointment, CallOutcome } from '@/app/generated/prisma';
 
 export interface DealSignals {
   temperature: 'hot' | 'warm' | 'cooling' | 'cold' | 'dead';

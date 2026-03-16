@@ -3,18 +3,18 @@
  * Smart scheduling loop that reviews leads and makes autonomous decisions
  */
 
-import { prisma } from './db';
+import { prisma } from '../db';
 import { LeadStatus } from '@/app/generated/prisma';
-import { analyzeDealHealth } from './deal-intelligence';
-import { askHollyToDecide } from './claude-decision';
-import { validateDecision, detectMessageRepetition } from './safety-guardrails';
-import { detectConversationStage } from './conversation-stage';
-import { executeDecision } from './ai-conversation-enhanced';
-import { getTimezoneForProvince } from './calcom';
-import { sendSlackNotification } from './slack';
-import { trackConversationOutcome } from './conversation-outcome-tracker';
-import { getNext8AM, getLocalTimeString } from './timezone-utils';
-import { ACTIVE_APPOINTMENT_STATUSES } from './appointment-status';
+import { analyzeDealHealth } from '../deal-intelligence';
+import { askHollyToDecide } from './decision-engine';
+import { validateDecision, detectMessageRepetition } from './guardrails';
+import { detectConversationStage } from './stage';
+import { executeDecision } from './conversation-handler';
+import { getTimezoneForProvince } from '../calcom';
+import { sendSlackNotification } from '../slack';
+import { trackConversationOutcome } from '../conversation-outcome-tracker';
+import { getNext8AM, getLocalTimeString } from '../timezone-utils';
+import { ACTIVE_APPOINTMENT_STATUSES } from '../appointment-status';
 
 // Environment variables for safe rollout
 const ENABLE_AUTONOMOUS_AGENT = process.env.ENABLE_AUTONOMOUS_AGENT === 'true';
@@ -163,9 +163,9 @@ export async function processLeadWithAutonomousAgent(
         applicationStartedAt: lead.applicationStartedAt || null,
         applicationCompletedAt: lead.applicationCompletedAt || null,
       },
-      appointments: lead.appointments || [],
-      callOutcomes: lead.callOutcomes || [],
-      communications: lead.communications || [],
+      appointments: (lead.appointments || []) as any[],
+      callOutcomes: (lead.callOutcomes || []) as any[],
+      communications: (lead.communications || []) as any[],
     });
 
     console.log(`[Holly Agent] 🎭 ${lead.firstName}: Stage = ${conversationStage}`);
@@ -239,7 +239,11 @@ export async function processLeadWithAutonomousAgent(
 
     // === CHECK FOR REPETITION (if sending message) ===
     if (decision.message) {
-      const repetitionCheck = detectMessageRepetition(decision.message, lead.communications || []);
+      const recentMsgs = (lead.communications || []).map((c: any) => ({
+        role: c.direction === 'OUTBOUND' ? 'assistant' : 'user',
+        content: c.content,
+      }));
+      const repetitionCheck = detectMessageRepetition(decision.message, recentMsgs);
 
       if (repetitionCheck.isRepetitive) {
         console.log(
@@ -633,9 +637,9 @@ export async function runHollyAgentLoop() {
             applicationStartedAt: lead.applicationStartedAt || null,
             applicationCompletedAt: lead.applicationCompletedAt || null,
           },
-          appointments: lead.appointments || [],
-          callOutcomes: lead.callOutcomes || [],
-          communications: lead.communications || [],
+          appointments: (lead.appointments || []) as any[],
+          callOutcomes: (lead.callOutcomes || []) as any[],
+          communications: (lead.communications || []) as any[],
         });
 
         console.log(
@@ -670,7 +674,11 @@ export async function runHollyAgentLoop() {
 
         // === CHECK FOR REPETITION (if sending message) ===
         if (decision.message) {
-          const repetitionCheck = detectMessageRepetition(decision.message, lead.communications || []);
+          const recentMsgs = (lead.communications || []).map((c: any) => ({
+            role: c.direction === 'OUTBOUND' ? 'assistant' : 'user',
+            content: c.content,
+          }));
+          const repetitionCheck = detectMessageRepetition(decision.message, recentMsgs);
 
           if (repetitionCheck.isRepetitive) {
             console.log(

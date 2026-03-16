@@ -3,10 +3,10 @@ import { sendEmail, interpolateTemplate, EMAIL_TEMPLATES } from "@/lib/email";
 import { sendSms, SMS_TEMPLATES, normalizePhoneNumber } from "@/lib/sms";
 import { initiateCall } from "@/lib/voice-ai";
 import { LeadStatus, ActivityType, CommunicationChannel } from "@/app/generated/prisma";
-import { executeDecision } from "@/lib/ai-conversation-enhanced";
-import { askHollyToDecide } from "@/lib/claude-decision";
+import { executeDecision } from "@/lib/holly/conversation-handler";
+import { askHollyToDecide } from "@/lib/holly/decision-engine";
 import { analyzeDealHealth } from "@/lib/deal-intelligence";
-import { validateDecision, HollyDecision } from "@/lib/safety-guardrails";
+import { validateDecision, HollyDecision } from "@/lib/holly/guardrails";
 import { sendSlackNotification, sendErrorAlert, sendSlackAlertWithDedup, hasUpcomingAppointment } from "@/lib/slack";
 import { ACTIVE_APPOINTMENT_STATUSES } from "@/lib/appointment-status";
 
@@ -349,7 +349,7 @@ export async function processTimeBasedAutomations() {
     for (const rule of rules) {
       try {
         const condition = rule.triggerCondition as any;
-        const actions = rule.actions as AutomationAction[];
+        const actions = rule.actions as unknown as AutomationAction[];
 
         // Example: Find leads that match the time condition
         // e.g., "24 hours since creation with no contact"
@@ -959,7 +959,7 @@ async function processSmartFollowUps() {
 
         try {
           const decision = await getHollyDecision(lead.id);
-          await executeDecision(lead.id, decision);
+          await executeDecision(lead.id, decision as any);
 
           await prisma.lead.update({
             where: { id: lead.id },
@@ -1206,7 +1206,7 @@ async function processApplicationNudges() {
       console.log(`[Automation] Sending 24h app nudge to lead ${lead.id}`);
 
       const decision = await getHollyDecision(lead.id);
-      await executeDecision(lead.id, decision);
+      await executeDecision(lead.id, decision as any);
 
       await prisma.lead.update({
         where: { id: lead.id },
@@ -1232,7 +1232,7 @@ async function processApplicationNudges() {
       console.log(`[Automation] Sending 48h URGENT app nudge to lead ${lead.id}`);
 
       const decision = await getHollyDecision(lead.id);
-      await executeDecision(lead.id, decision);
+      await executeDecision(lead.id, decision as any);
 
       await prisma.lead.update({
         where: { id: lead.id },
@@ -1275,7 +1275,7 @@ async function processApplicationNudges() {
       console.log(`[Automation] Sending app start prompt to lead ${lead.id} (call completed 24h ago)`);
 
       const decision = await getHollyDecision(lead.id);
-      await executeDecision(lead.id, decision);
+      await executeDecision(lead.id, decision as any);
 
       await prisma.lead.update({
         where: { id: lead.id },

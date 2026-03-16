@@ -36,8 +36,8 @@ export async function GET(request: NextRequest) {
     }) as LeadWithRelations[];
 
     // Apply filters
-    let filteredLeads = filterByDateRange(allLeads, startDate, endDate);
-    filteredLeads = filterByCohort(filteredLeads, cohort);
+    let filteredLeads = filterByDateRange(allLeads, startDate, endDate) as LeadWithRelations[];
+    filteredLeads = filterByCohort(filteredLeads, cohort) as LeadWithRelations[];
 
     // Calculate funnel metrics using standardized helpers
     const funnelMetrics = calculateFunnelMetrics(filteredLeads);

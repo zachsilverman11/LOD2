@@ -39,8 +39,7 @@ Last verified: January 2025
 - ✅ `NEXTAUTH_URL` - NextAuth callback URL
 
 #### AI & ML
-- ✅ `ANTHROPIC_API_KEY` - Claude AI (Autonomous Holly)
-- ✅ `OPENAI_API_KEY` - OpenAI (legacy, may not be needed - see note below)
+- ✅ `ANTHROPIC_API_KEY` - Claude AI (Holly's sole AI backbone)
 
 #### Email (SendGrid)
 - ✅ `SENDGRID_API_KEY` - Email sending API key
@@ -97,12 +96,7 @@ Last verified: January 2025
 ### Potentially Unused Variables
 
 #### `OPENAI_API_KEY`
-- **Status:** Set in production but may not be needed
-- **Investigation needed:** Check if old AI system is still in use
-- **Files to check:**
-  - `lib/ai-conversation-enhanced.ts` - May use Claude instead
-  - Any files importing from `openai` package
-- **Action:** Run `grep -r "openai" lib/ app/` to find usage
+- **Status:** REMOVED (March 2026). All AI calls now use Claude via `ANTHROPIC_API_KEY`. The `openai` npm package has been removed. This key can be deleted from Vercel environment variables.
 
 ### Recently Fixed Issues
 

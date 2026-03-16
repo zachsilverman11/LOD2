@@ -46,9 +46,9 @@ async function getBrowser(): Promise<Browser> {
 
     return puppeteer.default.launch({
       args: chromium.default.args,
-      defaultViewport: chromium.default.defaultViewport,
+      defaultViewport: (chromium.default as any).defaultViewport,
       executablePath: await chromium.default.executablePath(),
-      headless: chromium.default.headless,
+      headless: (chromium.default as any).headless,
     });
   } else {
     // Local development - use regular puppeteer

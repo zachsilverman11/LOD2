@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
         consentEmail: leadData.consentEmail,
         consentSms: leadData.consentSms,
         consentCall: leadData.consentCall,
-        rawData: leadData.metadata,
+        rawData: leadData.metadata as any,
         managedByAutonomous: true, // Use Holly autonomous agent for all new leads
         cohort: cohortConfig?.currentCohortName || "COHORT_1", // Assign current cohort
         cohortStartDate: cohortConfig?.cohortStartDate || new Date(),

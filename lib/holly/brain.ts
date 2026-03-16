@@ -1,10 +1,20 @@
 /**
- * Holly's Knowledge Base
- * Contains ALL context about programs, strategies, and expertise
- * Presented as INFORMATION for Claude to use intelligently, not RULES to follow
+ * Holly's Brain — Single Source of Truth
+ *
+ * Merged from:
+ *   - holly-knowledge-base.ts (programs, hooks, knowledge, briefing)
+ *   - behavioral-intelligence.ts (reply pattern recognition)
+ *   - sales-psychology.ts (psychological frameworks)
+ *   - lead-journey-context.ts (customer journey context)
+ *
+ * This file is self-contained. All intelligence lives here.
  */
 
-import { getLatestYouTubeVideoUrl } from './youtube-utils';
+import { getLatestYouTubeVideoUrl } from '../youtube-utils';
+
+// ============================================================================
+// Section 1: Interfaces & Types
+// ============================================================================
 
 export interface ProgramInfo {
   name: string;
@@ -14,12 +24,6 @@ export interface ProgramInfo {
   whenToMention: string;
 }
 
-/**
- * Booking Hooks
- * These are Holly's persuasion angles for getting leads to book a call.
- * Each hook reframes the call around the REPORT (the deliverable), not "a consultation."
- * Hook selection is based on lead signals detected during conversation.
- */
 export interface BookingHook {
   id: string;
   name: string;
@@ -28,6 +32,90 @@ export interface BookingHook {
   hookMessage: string;
   followUpNudge: string;
 }
+
+export interface ConversationContext {
+  touchNumber: number; // How many times Holly has reached out
+  hasReplied: boolean; // Has lead ever responded
+  daysInPipeline: number; // Days since first contact
+  messageHistory: string; // Recent conversation
+  lastMessageFrom: 'holly' | 'lead' | 'none';
+}
+
+export interface BehavioralPattern {
+  signals: string[];
+  meaning: string;
+  recommendedAction: string;
+  exampleResponse?: string;
+}
+
+export interface BehavioralIntelligence {
+  replyPatterns: {
+    highIntent: BehavioralPattern;
+    seekingInfo: BehavioralPattern;
+    objectionAlreadyWorking: BehavioralPattern;
+    objectionAlreadyApproved: BehavioralPattern;
+    objectionTooBusy: BehavioralPattern;
+    objectionWhatRate: BehavioralPattern;
+    engaged: BehavioralPattern;
+    cooling: BehavioralPattern;
+    corrections: BehavioralPattern;
+  };
+  timingSignals: {
+    immediateBooking: string[];
+    warmNurture: string[];
+    giveSpace: string[];
+  };
+  engagementLevels: {
+    hot: string[];
+    warm: string[];
+    cool: string[];
+    cold: string[];
+  };
+}
+
+export interface SalesPsychology {
+  trustBuilding: {
+    principles: string[];
+    examples: { bad: string; good: string; why: string }[];
+  };
+  frictionReduction: {
+    replacements: { instead: string; use: string; why: string }[];
+  };
+  valueCreation: {
+    principles: string[];
+    frameworks: { name: string; description: string; example: string }[];
+  };
+  conversationFlow: {
+    touch1: { goal: string; approach: string; avoid: string[] };
+    touch2: { goal: string; approach: string; avoid: string[] };
+    touch3: { goal: string; approach: string; avoid: string[] };
+    touch4PlusEngaged: { goal: string; approach: string; avoid: string[] };
+    touch4PlusZeroEngagement: { goal: string; approach: string; avoid: string[] };
+  };
+}
+
+export interface LeadJourneyContext {
+  howTheyFoundUs: {
+    searchIntent: string[];
+    whatTheyWerePromised: string;
+    whatTheyFilledOut: string;
+    theirExpectation: string;
+  };
+  theGap: {
+    problem: string;
+    theirMindset: string;
+    ourJob: string;
+  };
+  theValue: {
+    why15MinCall: string[];
+    howToFrameIt: string;
+  };
+  trustBuilders: string[];
+}
+
+// ============================================================================
+// Section 2: Programs, Hooks & Knowledge (from holly-knowledge-base.ts)
+// ============================================================================
 
 export const BOOKING_HOOKS: BookingHook[] = [
   {
@@ -82,22 +170,12 @@ export const BOOKING_HOOKS: BookingHook[] = [
   },
 ];
 
-/**
- * Report Pre-Sell Framings
- * Holly must reference the Mortgage Strategy Report for any pre-booking lead.
- * These are natural language examples she can adapt to the conversation.
- */
 export const REPORT_PRESELL_FRAMINGS = [
   'The strategy report we put together will show you exactly what your options look like with your current balance — rate comparisons, penalty calculations, the works. That\'s what the call walks through.',
   'Before the call our team puts together a personalised report for your situation — not a generic calculator, your actual numbers. Most people say it\'s the first time they\'ve seen the full picture.',
   'You\'ll get a Mortgage Strategy Report before you even have to make any decisions — the call is just walking through what it shows, not a sales pitch.',
 ];
 
-/**
- * Cash Back Program — Late-Stage Re-Engagement ONLY
- * This is real but niche. Holly must NEVER mention it before touch 3,
- * never guarantee eligibility, and never explain mechanics over SMS.
- */
 export const CASH_BACK_PROGRAM = {
   description:
     'A cash back program exists and is available to qualifying clients. Full details are covered in the Mortgage Strategy Report.',
@@ -114,44 +192,6 @@ export const CASH_BACK_PROGRAM = {
   ],
 };
 
-/**
- * Select the best booking hook based on conversation signals
- */
-export function selectBookingHook(conversationText: string): BookingHook {
-  const text = conversationText.toLowerCase();
-
-  // Renewal signals
-  const renewalKeywords = ['renewal', 'renew', 'bank letter', 'term ending', 'term is up', 'maturity', 'renewal offer'];
-  if (renewalKeywords.some(kw => text.includes(kw))) {
-    return BOOKING_HOOKS.find(h => h.id === 'before-your-bank')!;
-  }
-
-  // Rate shopping signals
-  const rateKeywords = ['best rate', 'rate shopping', 'comparing rates', 'lowest rate', 'rate compare', 'shop around', 'better rate'];
-  if (rateKeywords.some(kw => text.includes(kw))) {
-    return BOOKING_HOOKS.find(h => h.id === 'what-they-dont-tell-you')!;
-  }
-
-  // Partner signals
-  const partnerKeywords = ['spouse', 'partner', 'wife', 'husband', 'we need to discuss', 'talk to my', 'check with my', 'other half'];
-  if (partnerKeywords.some(kw => text.includes(kw))) {
-    return BOOKING_HOOKS.find(h => h.id === 'spouse-needs-to-see')!;
-  }
-
-  // Skeptical signals
-  const skepticalKeywords = ['sounds too good', "what's the catch", 'sales pitch', 'yeah right', 'too good to be true', 'scam', 'is this legit', 'hard to believe'];
-  if (skepticalKeywords.some(kw => text.includes(kw))) {
-    return BOOKING_HOOKS.find(h => h.id === 'too-good-to-be-true')!;
-  }
-
-  // Default
-  return BOOKING_HOOKS.find(h => h.id === 'hidden-cost')!;
-}
-
-/**
- * Inspired Mortgage Programs
- * Holly knows about these but decides WHEN and HOW to use them
- */
 export const PROGRAMS: ProgramInfo[] = [
   {
     name: 'Reserved Ultra-Low Rates',
@@ -205,12 +245,6 @@ export const PROGRAMS: ProgramInfo[] = [
   },
 ];
 
-/**
- * Advisor Team Profiles — Single Source of Truth
- * Holly uses these to build credibility for Inspired Mortgage as a brand.
- * She NEVER implies the lead will speak with a specific advisor — always "our team",
- * "our advisors", or "the people you'll be speaking with."
- */
 export const ADVISOR_TEAM_PROFILE = {
   credentials: [
     '60+ years of combined mortgage industry experience across the team',
@@ -240,10 +274,6 @@ export const ADVISOR_TEAM_PROFILE = {
   ],
 };
 
-/**
- * Holly's Core Expertise
- * What she knows about (but isn't a licensed advisor)
- */
 export const HOLLY_ROLE = {
   canDo: [
     'Schedule discovery calls with mortgage advisors',
@@ -268,21 +298,6 @@ export const HOLLY_ROLE = {
   ],
 };
 
-/**
- * Conversation Intelligence
- * Context Holly should be aware of but use naturally
- */
-export interface ConversationContext {
-  touchNumber: number; // How many times Holly has reached out
-  hasReplied: boolean; // Has lead ever responded
-  daysInPipeline: number; // Days since first contact
-  messageHistory: string; // Recent conversation
-  lastMessageFrom: 'holly' | 'lead' | 'none';
-}
-
-/**
- * General Conversation Principles (not rules - just knowledge)
- */
 export const CONVERSATION_PRINCIPLES = {
   earlyStage: {
     name: 'First 1-2 Messages (Building Trust)',
@@ -325,9 +340,6 @@ export const CONVERSATION_PRINCIPLES = {
   },
 };
 
-/**
- * Lead Intelligence Signals (what to pay attention to)
- */
 export const SIGNAL_AWARENESS = {
   urgency: {
     high: [
@@ -361,6 +373,459 @@ export const SIGNAL_AWARENESS = {
       'Acknowledge objection, create value around it. Ex: "Since you already have pre-approval, the main thing is making sure you have the best rate..."',
   },
 };
+
+// ============================================================================
+// Section 3: Behavioral Intelligence (from behavioral-intelligence.ts)
+// ============================================================================
+
+export const BEHAVIORAL_INTELLIGENCE: BehavioralIntelligence = {
+  replyPatterns: {
+    highIntent: {
+      signals: [
+        'What time?',
+        'When can we talk?',
+        'How soon?',
+        'What do I need?',
+        'Call me',
+        'Available today',
+        'ASAP',
+      ],
+      meaning: 'Lead is ready to book NOW - strike while iron is hot',
+      recommendedAction: 'Offer 2-3 specific times and book directly when they pick one. Booking link is fallback only.',
+      exampleResponse: 'Perfect! Greg or Jakub have openings today at 2pm and 4pm PT, or tomorrow morning. Here\'s our calendar: [link]. Takes 10-15 mins and they\'ll get you your rate.',
+    },
+
+    seekingInfo: {
+      signals: [
+        'What\'s the rate?',
+        'What rates do you have?',
+        'How much?',
+        'What\'s the process?',
+        'Do you charge?',
+        'What\'s the fee?',
+        'How does this work?',
+      ],
+      meaning: 'Lead wants info before committing - educate briefly then redirect to call for specifics',
+      recommendedAction: 'Answer briefly, explain why call is needed for exact answer, keep friction low',
+      exampleResponse: 'Great question! Rates depend on your credit/property type (range from 4.89-5.49% right now), but Greg or Jakub can show you your EXACT rate in 10 mins. Free, no obligation. Worth a quick call?',
+    },
+
+    objectionAlreadyWorking: {
+      signals: [
+        'Already working with someone',
+        'Have a broker',
+        'My bank is helping',
+        'Got someone lined up',
+      ],
+      meaning: 'Objection: loyalty to existing relationship. Need to create unique value without bashing competitor.',
+      recommendedAction: 'Acknowledge their relationship, position as "second opinion" or "rate check"',
+      exampleResponse: 'That\'s smart to work with someone you trust! Quick question: have they shown you rates from multiple lenders, or just one? Most clients use us as a second opinion to make sure they\'re getting the absolute best rate. Greg or Jakub can do a 10-min rate comparison - no obligation.',
+    },
+
+    objectionAlreadyApproved: {
+      signals: [
+        'Already pre-approved',
+        'Already got approval',
+        'Have my pre-approval',
+        'Just got approved',
+      ],
+      meaning: 'Objection: thinks they\'re done. Need to pivot to RATE comparison, not competing approval.',
+      recommendedAction: 'Acknowledge approval, shift focus to rate optimization before they lock in',
+      exampleResponse: 'Got it! Since you\'re already pre-approved, the main thing is making sure you lock in the BEST rate before closing. Pre-approvals can vary by 0.20%+ in rate - that\'s $85/month on a $650K mortgage. Greg or Jakub can do a quick rate check against what you have (10 mins). Worth it before you\'re locked in?',
+    },
+
+    objectionTooBusy: {
+      signals: [
+        'Too busy',
+        'Don\'t have time',
+        'Crazy week',
+        'Swamped right now',
+        'Can\'t talk',
+      ],
+      meaning: 'Objection: perceives call as time-consuming. Reduce friction, offer specific short timeframe.',
+      recommendedAction: 'Acknowledge busy schedule, emphasize brevity (10 mins), offer specific time',
+      exampleResponse: 'Totally get it - you\'re busy! That\'s why we keep these quick (10-15 mins max). Greg or Jakub can call you during your commute or lunch break. Does tomorrow at 12:30pm work, or is evening better?',
+    },
+
+    objectionWhatRate: {
+      signals: [
+        'Just tell me the rate',
+        'What rate can you get',
+        'Give me a number',
+        'What\'s your best rate',
+      ],
+      meaning: 'Lead wants instant quote. Explain why rate depends on their specifics, position call as fast way to get answer.',
+      recommendedAction: 'Acknowledge desire for quick answer, explain why call is fastest way to get THEIR exact rate',
+      exampleResponse: 'I wish I could give you an exact number right now! But mortgage rates depend on your credit score, property type, and debt ratios. The FASTEST way to get your exact rate is a 10-min call with Greg or Jakub - they pull your credit and show you real numbers from 30+ lenders. Way faster than back-and-forth texting. Worth it?',
+    },
+
+    engaged: {
+      signals: [
+        'Thanks',
+        'Interesting',
+        'Good to know',
+        'Tell me more',
+        'Okay',
+        'I see',
+        'That makes sense',
+      ],
+      meaning: 'Lead is engaged and listening - don\'t rush to booking, continue building value',
+      recommendedAction: 'Ask diagnostic question, share another value point, build relationship before big ask',
+      exampleResponse: 'Quick question: are you actively looking right now, or planning for a few months out? Want to make sure we prioritize you correctly.',
+    },
+
+    cooling: {
+      signals: [
+        'Maybe later',
+        'I\'ll think about it',
+        'Not right now',
+        'Call you back',
+        'Still looking around',
+        'Just exploring',
+      ],
+      meaning: 'Lead is cooling off - don\'t push, stay top of mind with value-add touches',
+      recommendedAction: 'Give space, soft touch, valuable content, check back in 48-72 hours',
+      exampleResponse: 'No pressure! Most people shop around - that\'s smart. Just FYI, our Reserved Rates pool fills up on a first-come basis, so worth booking a quick spot even if you\'re still comparing. But no rush - I\'ll check in later this week.',
+    },
+
+    corrections: {
+      signals: [
+        'Actually it\'s',
+        'No, I meant',
+        'That\'s not right',
+        'It\'s actually',
+        'Correction:',
+      ],
+      meaning: 'Lead is correcting you - VERY important to acknowledge and adjust approach immediately',
+      recommendedAction: 'Acknowledge correction immediately, apologize if needed, adjust your understanding',
+      exampleResponse: 'Thanks for clarifying! [Acknowledge the correction and pivot strategy based on new info]',
+    },
+  },
+
+  timingSignals: {
+    immediateBooking: [
+      'Accepted offer with subject removal deadline',
+      'Closing in less than 30 days',
+      'Pre-approval expires soon',
+      'Rate hold expiring',
+      'Offers coming in (competitive market)',
+      'Need approval ASAP to make offer',
+    ],
+
+    warmNurture: [
+      'Just browsing',
+      'Planning for next year',
+      'Renewal in 6+ months',
+      'Just exploring options',
+      'No specific timeline',
+      'Not urgent',
+    ],
+
+    giveSpace: [
+      'Said "maybe later" or "I\'ll think about it"',
+      'No reply after 3+ touches',
+      'Short/one-word answers',
+      'Explicitly said "not interested"',
+      'Mentioned already working with someone and didn\'t engage with value prop',
+    ],
+  },
+
+  engagementLevels: {
+    hot: [
+      'Asking multiple questions',
+      'Sharing specific details about their situation',
+      'Mentions timeline or deadline',
+      'Asks about next steps',
+      'Responds quickly (within hours)',
+      'Uses words like "urgent", "ASAP", "soon"',
+    ],
+
+    warm: [
+      'Short but positive replies ("thanks", "interesting")',
+      'Acknowledging messages',
+      'Asks basic questions',
+      'Responds within 24 hours',
+      'Engaged but not urgent',
+    ],
+
+    cool: [
+      'One-word answers ("maybe", "okay")',
+      'Takes 24-48h to respond',
+      'Non-committal language',
+      'Doesn\'t ask follow-up questions',
+      'Vague responses',
+    ],
+
+    cold: [
+      'No reply after 3+ attempts',
+      '"Not interested"',
+      '"No thanks"',
+      'No response for 72+ hours',
+      'Opted out of SMS',
+    ],
+  },
+};
+
+// ============================================================================
+// Section 4: Sales Psychology (from sales-psychology.ts)
+// ============================================================================
+
+export const SALES_PSYCHOLOGY: SalesPsychology = {
+  trustBuilding: {
+    principles: [
+      'Always identify yourself and company first message ("Hi [Name]! Holly from Inspired Mortgage...")',
+      'Reference specific details they provided within first 2 messages (shows you read their info)',
+      'Use "our advisors can..." not "I can..." (you\'re coordinator, not advisor)',
+      'Quantify everything - savings, time, rate difference (specificity = credibility)',
+      'Ask permission before next step ("Worth a quick call?" not "Book here")',
+      'Never say "our rates" - say "rates we can get you" (you work for them, not lenders)',
+    ],
+
+    examples: [
+      {
+        bad: 'Hi! Want to see what rates you qualify for?',
+        good: 'Hi Sarah! Holly from Inspired Mortgage. Saw you have an accepted offer on a property in Vancouver - congrats!',
+        why: 'Good version: identifies self, references specific detail (accepted offer, Vancouver), shows genuine interest',
+      },
+      {
+        bad: 'I can get you great rates. Book a call.',
+        good: 'Our advisors compare 30+ lenders to get you the best rate. Most clients save $200-400/month. Worth a quick 15-min call?',
+        why: 'Good version: specific (30+ lenders), quantified ($200-400), asks permission, low commitment (15 min)',
+      },
+      {
+        bad: 'Our rates are the best!',
+        good: 'The rates we can access through our lender partners are typically 0.10-0.30% below posted rates.',
+        why: 'Good version: you work for them (not lenders), specific percentage, credible (not "best")',
+      },
+    ],
+  },
+
+  frictionReduction: {
+    replacements: [
+      {
+        instead: 'Schedule a consultation',
+        use: 'Quick 10-15 min call',
+        why: '"Consultation" sounds formal/time-consuming. "Quick call" reduces perceived commitment.',
+      },
+      {
+        instead: 'An advisor can call you at [time]',
+        use: 'Here\'s our calendar - grab a spot around [time]',
+        why: 'CRITICAL: NEVER promise a call time without booking. Always direct to calendar first.',
+      },
+      {
+        instead: 'See what you qualify for',
+        use: 'Get your exact rate',
+        why: '"Qualify" implies judgment/rejection. "Get your rate" is what they came for.',
+      },
+      {
+        instead: 'Our rates',
+        use: 'Rates we can get you',
+        why: 'Positions you as working FOR them, not selling TO them.',
+      },
+      {
+        instead: 'Let\'s discuss your situation',
+        use: 'Greg or Jakub can show you the numbers',
+        why: '"Discuss" sounds vague. "Show you numbers" is concrete and valuable.',
+      },
+      {
+        instead: 'Are you interested?',
+        use: 'Worth a quick call?',
+        why: '"Interested" puts them on spot. "Worth it" lets them evaluate value.',
+      },
+      {
+        instead: 'Book here: [long URL]',
+        use: 'Here\'s our calendar (takes 2 mins to book): [short link]',
+        why: 'Explain what happens + reduce perceived time investment.',
+      },
+    ],
+  },
+
+  valueCreation: {
+    principles: [
+      'Always quantify savings in dollars, not percentages ($200/month > 0.20% for most people)',
+      'Compare to their current situation or expectation (vs bank, vs renewal letter, vs posted rates)',
+      'Use real scarcity (Reserved Rate pool first-come basis), never fake (filling up fast!)',
+      'Tie urgency to THEIR timeline (subject removal, renewal date), not yours',
+      'Frame call as "rate comparison" or "second opinion", not sales pitch',
+      'Specificity builds credibility: "30+ lenders" not "many lenders", "10-15 mins" not "quick"',
+    ],
+
+    frameworks: [
+      {
+        name: 'Comparison Anchor',
+        description: 'Ask about their current situation, let them tell you their rate (conversational, not preachy)',
+        example: 'What rate did [their bank] offer you? (Then: "Got it - Greg or Jakub can show you what else is out there in 10 mins. Worth a comparison?")',
+      },
+      {
+        name: 'Pain-to-Gain',
+        description: 'Acknowledge current pain point, offer specific solution',
+        example: 'Since you\'re with TD and looking to refinance, you\'re probably worried about their early breakage penalty. Greg or Jakub can calculate if it\'s worth switching (usually is after 6 months).',
+      },
+      {
+        name: 'Social Proof',
+        description: 'Reference what "most clients" experience',
+        example: 'Most clients save $200-400/month when they shop around vs auto-renewing with their bank.',
+      },
+      {
+        name: 'Future Protection',
+        description: 'Highlight future benefit, not just immediate',
+        example: 'Our Guaranteed Approval locks your rate for 120 days - protects you from rate increases while you\'re house hunting.',
+      },
+      {
+        name: 'Specificity Builds Trust',
+        description: 'Use exact numbers and timeframes',
+        example: 'Greg or Jakub compare exactly 37 lenders in real-time. Takes 12-15 minutes. You\'ll see your exact rate before we hang up.',
+      },
+    ],
+  },
+
+  conversationFlow: {
+    touch1: {
+      goal: 'Build rapport and create curiosity',
+      approach:
+        'Acknowledge their search/form fill, reference specific details, ask one diagnostic question OR share one compelling value point. DO NOT push booking yet.',
+      avoid: [
+        'Sending booking link in first message',
+        'Talking about programs without context',
+        'Generic "how can I help"',
+        'Multiple questions (overwhelming)',
+      ],
+    },
+
+    touch2: {
+      goal: 'Establish value and address their situation',
+      approach:
+        'If they replied: acknowledge their response, share relevant program or value prop, ask diagnostic question. If no reply: different angle, create FOMO or urgency.',
+      avoid: [
+        'Repeating first message',
+        'Ignoring what they said',
+        'Generic follow-up',
+        'Being pushy about booking',
+      ],
+    },
+
+    touch3: {
+      goal: 'Move to booking or address objection',
+      approach:
+        'If engaged: send booking link with low-friction framing. If hesitant: address likely objection (too busy, already working with someone, etc). If cold: soft value-add touch.',
+      avoid: [
+        'Sending booking link if they just gave objection',
+        'Generic "still interested?"',
+        'Being salesy',
+      ],
+    },
+
+    touch4PlusEngaged: {
+      goal: 'Stay top of mind without being annoying (lead HAS replied before)',
+      approach:
+        'Light touch — respect the existing relationship. Value-add content (market updates, rate changes, educational tips), different angles, give them space between messages. Do not push hard or introduce pattern-interrupt tactics.',
+      avoid: [
+        'Repeating same ask',
+        'Desperation ("following up again...")',
+        'High frequency (respect 48-72h minimum)',
+        'Pressure tactics',
+      ],
+    },
+    touch4PlusZeroEngagement: {
+      goal: 'Pattern interrupt required (lead has NEVER replied)',
+      approach:
+        'The soft approach has already failed — a pattern interrupt is needed. Messages should be shorter, more direct, with a single clear call to action. Deploy the cash back hook (if touch 3+), the rate vs. cost reframe, and the Mortgage Strategy Report pre-sell with more urgency. Consider acknowledging the silence directly and honestly. Do not keep asking diagnostic questions — the lead has not engaged with any of them.',
+      avoid: [
+        'More diagnostic questions (they have not answered any)',
+        'Repeating the same angle from earlier touches',
+        'Long messages with multiple points (keep it short and punchy)',
+        'Giving up without deploying all available hooks (cash back, report, rate vs. cost)',
+      ],
+    },
+  },
+};
+
+// ============================================================================
+// Section 5: Lead Journey Context (from lead-journey-context.ts)
+// ============================================================================
+
+export const LEAD_JOURNEY: LeadJourneyContext = {
+  howTheyFoundUs: {
+    searchIntent: [
+      'best mortgage rates',
+      'mortgage broker near me',
+      'refinance calculator',
+      'mortgage pre-approval',
+      'lowest mortgage rate canada',
+      'mortgage renewal rates',
+    ],
+    whatTheyWerePromised: 'Fill out a simple form to get access to the best mortgage rates available',
+    whatTheyFilledOut: 'Location, property value, loan amount, purchase/refinance/renewal, timeline, credit score',
+    theirExpectation: 'They expected to see rates immediately or get a quote/pre-approval',
+  },
+
+  theGap: {
+    problem: 'They filled the form expecting instant rates, but landed on a booking page instead',
+    theirMindset: 'Skeptical ("is this bait-and-switch?"), comparing multiple options, might feel slightly misled',
+    ourJob: 'Bridge the gap by explaining WHY a 15-min discovery call IS the way to get the rate they were promised',
+  },
+
+  theValue: {
+    why15MinCall: [
+      'Mortgage rates depend on credit score, debt ratios, employment type, and property details we need to verify',
+      'Our Reserved Rate pool is exclusive and requires qualification (not publicly posted)',
+      'Advisors can compare 30+ lenders to find the absolute best rate for their specific situation',
+      'Pre-approval locks in their rate for 120 days (protects them from rate increases)',
+      'The call typically finds 0.10-0.30% better rates than posted online = $50-200/month savings',
+    ],
+    howToFrameIt: 'The 15-min call IS how they get the rate. Frame it as the next step in getting their quote, not an obstacle or sales pitch.',
+  },
+
+  trustBuilders: [
+    'Use their name in first message',
+    'Reference what they filled out ("I saw you\'re looking at a $850K purchase in Vancouver...")',
+    'Acknowledge their search intent ("You searched for the best rate - smart move")',
+    'Create urgency around THEIR timeline (subject removal, renewal date), not fake scarcity',
+    'Quantify specific value ("$200-400/month savings", "0.20% rate difference = $85/month on $650K")',
+    'Use low-friction language ("quick 10-15 min call" not "schedule a consultation")',
+    'Position advisors as experts who work for them, not salespeople',
+  ],
+};
+
+// ============================================================================
+// Section 6: Functions (all exported functions from all files)
+// ============================================================================
+
+// --- From holly-knowledge-base.ts ---
+
+/**
+ * Select the best booking hook based on conversation signals
+ */
+export function selectBookingHook(conversationText: string): BookingHook {
+  const text = conversationText.toLowerCase();
+
+  // Renewal signals
+  const renewalKeywords = ['renewal', 'renew', 'bank letter', 'term ending', 'term is up', 'maturity', 'renewal offer'];
+  if (renewalKeywords.some(kw => text.includes(kw))) {
+    return BOOKING_HOOKS.find(h => h.id === 'before-your-bank')!;
+  }
+
+  // Rate shopping signals
+  const rateKeywords = ['best rate', 'rate shopping', 'comparing rates', 'lowest rate', 'rate compare', 'shop around', 'better rate'];
+  if (rateKeywords.some(kw => text.includes(kw))) {
+    return BOOKING_HOOKS.find(h => h.id === 'what-they-dont-tell-you')!;
+  }
+
+  // Partner signals
+  const partnerKeywords = ['spouse', 'partner', 'wife', 'husband', 'we need to discuss', 'talk to my', 'check with my', 'other half'];
+  if (partnerKeywords.some(kw => text.includes(kw))) {
+    return BOOKING_HOOKS.find(h => h.id === 'spouse-needs-to-see')!;
+  }
+
+  // Skeptical signals
+  const skepticalKeywords = ['sounds too good', "what's the catch", 'sales pitch', 'yeah right', 'too good to be true', 'scam', 'is this legit', 'hard to believe'];
+  if (skepticalKeywords.some(kw => text.includes(kw))) {
+    return BOOKING_HOOKS.find(h => h.id === 'too-good-to-be-true')!;
+  }
+
+  // Default
+  return BOOKING_HOOKS.find(h => h.id === 'hidden-cost')!;
+}
 
 /**
  * Build complete context briefing for Holly
@@ -805,4 +1270,196 @@ export async function fetchYouTubeLinkForBriefing(): Promise<string | null> {
     console.warn('[Holly Knowledge Base] Failed to fetch YouTube link:', error);
     return null;
   }
+}
+
+// --- From behavioral-intelligence.ts ---
+
+/**
+ * Analyze a lead's reply and return recommended approach
+ */
+export function analyzeReply(
+  message: string
+): { pattern: string; meaning: string; recommendedAction: string; exampleResponse?: string } | null {
+  const lowerMessage = message.toLowerCase();
+
+  // Check each pattern
+  for (const [patternName, pattern] of Object.entries(BEHAVIORAL_INTELLIGENCE.replyPatterns)) {
+    if (pattern.signals.some(signal => lowerMessage.includes(signal.toLowerCase()))) {
+      return {
+        pattern: patternName,
+        meaning: pattern.meaning,
+        recommendedAction: pattern.recommendedAction,
+        exampleResponse: pattern.exampleResponse,
+      };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Determine if lead should be contacted immediately based on urgency signals
+ */
+export function isImmediateBooking(leadData: any): boolean {
+  const urgency = leadData.motivation_level || '';
+  const timeframe = leadData.timeframe || '';
+
+  return BEHAVIORAL_INTELLIGENCE.timingSignals.immediateBooking.some(
+    signal =>
+      urgency.toLowerCase().includes(signal.toLowerCase()) ||
+      timeframe.toLowerCase().includes(signal.toLowerCase())
+  );
+}
+
+/**
+ * Get conversation strategy based on engagement level
+ */
+export function getConversationStrategy(
+  hasReplied: boolean,
+  lastReply?: string,
+  responseTime?: number
+): 'aggressive' | 'balanced' | 'gentle' | 'space' {
+  if (!hasReplied) {
+    return 'balanced'; // Haven't engaged yet
+  }
+
+  if (!lastReply) {
+    return 'balanced';
+  }
+
+  // Check engagement level
+  const lowerReply = lastReply.toLowerCase();
+
+  const isHot = BEHAVIORAL_INTELLIGENCE.engagementLevels.hot.some(signal =>
+    lowerReply.includes(signal.toLowerCase())
+  );
+  const isWarm = BEHAVIORAL_INTELLIGENCE.engagementLevels.warm.some(signal =>
+    lowerReply.includes(signal.toLowerCase())
+  );
+  const isCool = BEHAVIORAL_INTELLIGENCE.engagementLevels.cool.some(signal =>
+    lowerReply.includes(signal.toLowerCase())
+  );
+
+  if (isHot) return 'aggressive'; // Push for booking
+  if (isWarm) return 'balanced'; // Continue building value
+  if (isCool) return 'gentle'; // Soft touch
+  return 'space'; // Give them room
+}
+
+// --- From sales-psychology.ts ---
+
+/**
+ * Get appropriate language based on conversation stage
+ */
+export function getFrictionReducedLanguage(type: 'booking' | 'qualifying' | 'rates' | 'discuss'): string {
+  const replacements = SALES_PSYCHOLOGY.frictionReduction.replacements;
+
+  switch (type) {
+    case 'booking':
+      return replacements.find(r => r.instead.includes('Book'))?.use || 'quick call';
+    case 'qualifying':
+      return replacements.find(r => r.instead.includes('qualify'))?.use || 'get your exact rate';
+    case 'rates':
+      return replacements.find(r => r.instead === 'Our rates')?.use || 'rates we can get you';
+    case 'discuss':
+      return replacements.find(r => r.instead.includes('discuss'))?.use || 'show you the numbers';
+    default:
+      return 'quick call';
+  }
+}
+
+/**
+ * Generate value proposition using psychology frameworks
+ */
+export function buildValueProp(framework: string, leadData: any): string | null {
+  const frameworks = SALES_PSYCHOLOGY.valueCreation.frameworks;
+  const selectedFramework = frameworks.find(f => f.name === framework);
+
+  if (!selectedFramework) return null;
+
+  // Customize example based on lead data
+  const loanAmount = leadData.loanAmount || leadData.purchasePrice || leadData.home_value || 500000;
+  const savings = Math.round(parseFloat(loanAmount) * 0.003 / 12); // 0.30% rate difference monthly
+
+  return selectedFramework.example.replace(/\$\d+/g, `$${loanAmount}`).replace(/\$\d+-\d+/g, `$${savings}-${savings * 2}`);
+}
+
+/**
+ * Get conversation guidelines for specific touch number
+ * @param touchNumber - Which outbound touch this is
+ * @param hasLeadReplied - Whether the lead has ever replied (used for touch 4+ differentiation)
+ */
+export function getConversationGuidance(touchNumber: number, hasLeadReplied: boolean = false): {
+  goal: string;
+  approach: string;
+  avoid: string[];
+} {
+  if (touchNumber === 1) return SALES_PSYCHOLOGY.conversationFlow.touch1;
+  if (touchNumber === 2) return SALES_PSYCHOLOGY.conversationFlow.touch2;
+  if (touchNumber === 3) return SALES_PSYCHOLOGY.conversationFlow.touch3;
+  return hasLeadReplied
+    ? SALES_PSYCHOLOGY.conversationFlow.touch4PlusEngaged
+    : SALES_PSYCHOLOGY.conversationFlow.touch4PlusZeroEngagement;
+}
+
+// --- From lead-journey-context.ts ---
+
+/**
+ * Generate context-aware introduction for lead's first message
+ */
+export function getLeadJourneyIntro(leadType: string, urgencyLevel?: string): string {
+  let intro = `## 🎯 CRITICAL: UNDERSTAND THE CUSTOMER JOURNEY
+
+**How they found us:**
+They searched Google for "${leadType === 'purchase' ? 'best mortgage rates' : leadType === 'refinance' ? 'refinance rates comparison' : 'mortgage renewal rates'}" and clicked on our ad promising access to exclusive rates.
+
+**What happened:**
+1. They filled out a form with their property/financial details
+2. They expected to see rates immediately or get a quote
+3. Instead, they landed on a booking page with our calendar
+4. ${urgencyLevel === 'I have made an offer to purchase' ? '⚠️ They have an ACCEPTED OFFER with subject removal deadline approaching!' : 'They may feel skeptical or like it was a bait-and-switch'}
+
+**Your critical job:**
+Bridge the gap. They're not refusing the call because they don't want help - they're hesitant because they don't understand WHY they need it to get the rate they were promised.
+
+**The frame:**
+"The 15-min call IS how you get your rate. Our advisors compare 30+ lenders to find you the absolute best rate for your specific situation. Most clients save $200-400/month compared to their bank's offer."
+
+**Trust builders you MUST use:**
+- Reference what they searched for
+- Acknowledge what they filled out
+- Quantify the value (savings in dollars)
+- Use low-friction language ("quick 10-15 min call" not "consultation")
+- Create urgency around THEIR timeline, not fake scarcity
+
+---
+`;
+
+  return intro;
+}
+
+/**
+ * Get lead-specific diagnostic question based on their journey
+ *
+ * IMPORTANT: This is for LATER in the conversation (touch 3-4+), NOT first message
+ * First messages should be simple diagnostic questions from their form data
+ */
+export function getValueProposition(leadData: any): string {
+  const loanType = (leadData.loanType || leadData.lead_type || '').toLowerCase();
+  const urgency = leadData.motivation_level;
+  const lender = leadData.lender;
+
+  let value = '';
+
+  if (urgency === 'I have made an offer to purchase') {
+    value = `Since you have an accepted offer, timing is tight. Our advisors can get you a Guaranteed Approvals Certificate - it makes your offer way stronger. Takes 15 mins. When works - today or tomorrow?`;
+  } else if (loanType.includes('refinance') && lender) {
+    value = `${lender} can be tricky with early breakage penalties. Our advisors specialize in finding lenders with the lowest penalties AND better rates. Worth a quick call to see what's available?`;
+  } else if (loanType.includes('renewal') && lender) {
+    value = `Most people don't realize their bank's renewal letter isn't the best offer out there. Our advisors can show you what else is available - takes 10 mins. Worth a quick comparison?`;
+  } else {
+    value = `Our advisors compare 30+ lenders to find exactly what fits your situation. Takes 10-15 mins. Worth a quick call to see what you qualify for?`;
+  }
+
+  return value;
 }

@@ -4,7 +4,7 @@
  */
 
 import { inngest } from "@/lib/inngest";
-import { processLeadWithAutonomousAgent } from "@/lib/autonomous-agent";
+import { processLeadWithAutonomousAgent } from "@/lib/holly/agent";
 import { sendErrorAlert } from "@/lib/slack";
 import { prisma } from "@/lib/db";
 import { sendEmail } from "@/lib/email";
@@ -60,20 +60,21 @@ export const processLeadReply = inngest.createFunction(
     });
 
     // Step 2: Handle result
-    if (result.success) {
-      console.log(`[Inngest Worker] ✅ Success: ${leadId} → ${result.action}`);
+    const typedResult = result as any;
+    if (typedResult.success) {
+      console.log(`[Inngest Worker] ✅ Success: ${leadId} → ${typedResult.action}`);
       return {
         success: true,
-        action: result.action,
-        message: result.message,
+        action: typedResult.action,
+        message: typedResult.message,
       };
     } else {
-      console.log(`[Inngest Worker] ⏭️  Deferred: ${leadId} → ${result.reason}`);
+      console.log(`[Inngest Worker] ⏭️  Deferred: ${leadId} → ${typedResult.reason}`);
 
       // Only send error alert if it's an actual error (not just "wait" decision or safety guardrail block)
-      const reasonLower = (result.reason || '').toLowerCase();
+      const reasonLower = (typedResult.reason || '').toLowerCase();
       const isError =
-        result.reason &&
+        typedResult.reason &&
         !reasonLower.includes("wait") &&
         !reasonLower.includes("blocked") &&
         !reasonLower.includes("disabled") &&
@@ -85,18 +86,18 @@ export const processLeadReply = inngest.createFunction(
 
       if (isError) {
         await sendErrorAlert({
-          error: new Error(result.reason || "Unknown error"),
+          error: new Error(typedResult.reason || "Unknown error"),
           context: {
             location: "Inngest Worker - process-lead-reply",
             leadId,
-            details: { message, phone, reason: result.reason },
+            details: { message, phone, reason: typedResult.reason },
           },
         });
       }
 
       return {
         success: false,
-        reason: result.reason,
+        reason: typedResult.reason,
       };
     }
   }

@@ -5,8 +5,8 @@
 
 import { prisma } from '@/lib/db';
 import { analyzeDealHealth } from '@/lib/deal-intelligence';
-import { askHollyToDecide } from '@/lib/claude-decision';
-import { validateDecision } from '@/lib/safety-guardrails';
+import { askHollyToDecide } from '@/lib/holly/decision-engine';
+import { validateDecision } from '@/lib/holly/guardrails';
 
 async function simulateAutonomousJourney(email: string) {
   try {

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { ActivityType, CommunicationChannel, LeadStatus } from "@/app/generated/prisma";
 import { sendSlackNotification } from "@/lib/slack";
-import { handleConversation, executeDecision } from "@/lib/ai-conversation-enhanced";
+import { handleConversation, executeDecision } from "@/lib/holly/conversation-handler";
 
 /**
  * Mark an appointment as no-show

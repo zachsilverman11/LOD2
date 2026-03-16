@@ -12,8 +12,8 @@
  */
 
 import { prisma } from '../lib/db';
-import { askHollyToDecide } from '../lib/claude-decision';
-import { validateDecision } from '../lib/safety-guardrails';
+import { askHollyToDecide } from '../lib/holly/decision-engine';
+import { validateDecision } from '../lib/holly/guardrails';
 import { LeadStatus } from '@/app/generated/prisma';
 
 // Test results tracking
@@ -89,7 +89,7 @@ async function test1_MoveStageInterface() {
 
   try {
     // Import the interface to check it compiles
-    const { HollyDecision } = await import('../lib/safety-guardrails');
+    const { HollyDecision } = await import('../lib/holly/guardrails');
 
     // Test that move_stage is a valid action
     const testDecision: typeof HollyDecision = {

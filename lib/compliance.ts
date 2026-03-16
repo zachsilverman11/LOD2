@@ -107,7 +107,7 @@ export async function deleteLeadData(leadId: string) {
       phone: null,
       firstName: "Deleted",
       lastName: "User",
-      rawData: null,
+      rawData: null as any,
       consentEmail: false,
       consentSms: false,
       consentCall: false,

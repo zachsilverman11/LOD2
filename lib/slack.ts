@@ -5,10 +5,12 @@ const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL || "";
 const DASHBOARD_URL = "https://lod2.vercel.app";
 
 interface SlackNotification {
-  type: "new_lead" | "no_response" | "lead_rotting" | "hot_lead_going_cold" | "call_booked" | "call_missed" | "converted" | "lead_escalated" | "app_nudge" | "lead_updated";
-  leadName: string;
-  leadId: string;
+  type: "new_lead" | "no_response" | "lead_rotting" | "hot_lead_going_cold" | "call_booked" | "call_missed" | "converted" | "lead_escalated" | "app_nudge" | "lead_updated" | "warning" | "error";
+  leadName?: string;
+  leadId?: string;
   details?: string;
+  message?: string;
+  context?: Record<string, any>;
   metadata?: Record<string, any>;
 }
 
@@ -364,23 +366,27 @@ export async function sendErrorAlert({ error, context }: ErrorAlert) {
 async function logFailedSlackAlert(data: {
   type: string;
   title: string;
-  leadId: string | null;
+  leadId?: string | null;
   payload: string;
   error: string;
 }) {
   try {
+    if (!data.leadId) {
+      console.error(`[Slack Fallback] Cannot log failed alert to DB — no leadId. Title: ${data.title}, Error: ${data.error}`);
+      return;
+    }
     await prisma.leadActivity.create({
       data: {
-        leadId: data.leadId || undefined,
-        type: 'NOTE_ADDED',
-        channel: 'SYSTEM',
+        leadId: data.leadId,
+        type: 'NOTE_ADDED' as any,
+        channel: 'SYSTEM' as any,
         subject: `⚠️ Failed Slack Alert: ${data.title}`,
         content: `Slack notification failed to send.\n\n**Type:** ${data.type}\n**Error:** ${data.error}\n\n**Payload:**\n\`\`\`\n${data.payload.substring(0, 500)}${data.payload.length > 500 ? '...' : ''}\n\`\`\``,
         metadata: {
           slackAlertFailed: true,
           slackAlertType: data.type,
           slackError: data.error,
-        },
+        } as any,
       },
     });
   } catch (dbError) {

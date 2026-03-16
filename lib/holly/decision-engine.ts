@@ -6,29 +6,29 @@
  * 2. Behavioral Intelligence (SMS pattern recognition)
  * 3. Sales Psychology (proven frameworks)
  * 4. Training Examples (few-shot learning)
- * 5. Learned Examples (from REAL conversation outcomes) ← NEW!
+ * 5. Learned Examples (from REAL conversation outcomes) <- NEW!
  * 6. Extended Thinking (step-by-step reasoning)
  *
  * This makes Holly autonomous, world-class, AND self-improving
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import { Lead } from '@prisma/client';
-import { DealSignals } from './deal-intelligence';
-import { HollyDecision } from './safety-guardrails';
-import { buildHollyBriefing, selectBookingHook } from './holly-knowledge-base';
-import { getLeadJourneyIntro, getValueProposition, LEAD_JOURNEY } from './lead-journey-context';
-import { analyzeReply, isImmediateBooking, BEHAVIORAL_INTELLIGENCE } from './behavioral-intelligence';
-import { getConversationGuidance, SALES_PSYCHOLOGY } from './sales-psychology';
-import { getRelevantExamples } from './holly-training-examples';
-import { LEARNED_EXAMPLES } from './holly-learned-examples';
-import { getLocalTime, getLocalTimeString } from './timezone-utils';
-import { getAvailableSlots, getTimezoneForProvince, TimeSlot } from './calcom';
+import { Lead } from '@/app/generated/prisma';
+import { DealSignals } from '../deal-intelligence';
+import { HollyDecision } from './guardrails';
+import { buildHollyBriefing, selectBookingHook, fetchYouTubeLinkForBriefing } from './brain';
+import { getLeadJourneyIntro, getValueProposition, LEAD_JOURNEY } from './brain';
+import { analyzeReply, isImmediateBooking, BEHAVIORAL_INTELLIGENCE } from './brain';
+import { getConversationGuidance, SALES_PSYCHOLOGY } from './brain';
+import { getRelevantExamples } from './examples';
+import { LEARNED_EXAMPLES } from './examples';
+import { getLocalTime, getLocalTimeString } from '../timezone-utils';
+import { getAvailableSlots, getTimezoneForProvince, TimeSlot } from '../calcom';
 import {
   detectConversationStage,
   buildStageEnforcementPrompt,
   ConversationStage,
-} from './conversation-stage';
+} from './stage';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -132,6 +132,10 @@ export async function askHollyToDecide(
     ? 'renewal'
     : 'purchase';
 
+  // Fetch Greg's latest YouTube video (cached 24h, no-op if env vars not set)
+  const youtubeLink = await fetchYouTubeLinkForBriefing();
+  const youtubeSharedInConversation = recentMessages.includes('youtube.com');
+
   // Build rich context briefing
   const hollyBriefing = buildHollyBriefing({
     leadData: rawData,
@@ -148,6 +152,8 @@ export async function askHollyToDecide(
       started: lead.applicationStartedAt || undefined,
       completed: lead.applicationCompletedAt || undefined,
     },
+    youtubeLink,
+    youtubeSharedInConversation,
   });
 
   // === CONVERSATION STAGE DETECTION ===

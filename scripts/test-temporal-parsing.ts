@@ -4,7 +4,7 @@
  */
 
 import { PrismaClient } from '../app/generated/prisma';
-import { askHollyToDecide } from '../lib/claude-decision';
+import { askHollyToDecide } from '../lib/holly/decision-engine';
 import { analyzeDealHealth } from '../lib/deal-intelligence';
 
 const prisma = new PrismaClient();

@@ -7,7 +7,7 @@
  * All analytics endpoints MUST use these helpers to ensure consistency.
  */
 
-import { Lead, Appointment, CallOutcome, Communication } from '@prisma/client';
+import { Lead, Appointment, CallOutcome, Communication } from '@/app/generated/prisma';
 
 // Type for lead with relations
 export type LeadWithRelations = Lead & {
@@ -94,7 +94,7 @@ export function hasActiveBooking(lead: LeadWithRelations): boolean {
 
 // Has EVER booked (including cancelled appointments)
 export function hasEverBooked(lead: LeadWithRelations): boolean {
-  return lead.appointments && lead.appointments.length > 0;
+  return !!(lead.appointments && lead.appointments.length > 0);
 }
 
 // Has booked and NOT cancelled

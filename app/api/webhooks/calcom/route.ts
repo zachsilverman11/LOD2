@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { ActivityType, CommunicationChannel, LeadStatus } from "@/app/generated/prisma";
 import { sendSlackNotification } from "@/lib/slack";
-import { handleConversation, executeDecision } from "@/lib/ai-conversation-enhanced";
+import { handleConversation, executeDecision } from "@/lib/holly/conversation-handler";
 
 /**
  * Handle Cal.com webhook events
@@ -156,7 +156,7 @@ async function handleBookingCreated(payload: any) {
   // CRITICAL: Check if lead is in a prohibited status (CONVERTED, DEALS_WON)
   // These leads should NOT be reactivated by bookings
   // NOTE: LOST leads ARE allowed to book - they may want to re-engage
-  const prohibitedStatuses = [LeadStatus.CONVERTED, LeadStatus.DEALS_WON];
+  const prohibitedStatuses: LeadStatus[] = [LeadStatus.CONVERTED, LeadStatus.DEALS_WON];
 
   if (prohibitedStatuses.includes(lead.status)) {
     console.warn(`[Cal.com] BLOCKED booking for ${lead.status} lead:`, lead.id, lead.firstName, lead.lastName);

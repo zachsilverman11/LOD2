@@ -11,7 +11,7 @@
  */
 
 import { prisma } from '../lib/db';
-import { processLeadWithAutonomousAgent } from '../lib/autonomous-agent';
+import { processLeadWithAutonomousAgent } from '../lib/holly/agent';
 
 async function testAutonomousSystem() {
   console.log('🧪 Testing Autonomous Holly System...\n');

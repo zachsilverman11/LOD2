@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { createCalComBooking } from "@/lib/calcom";
 import { ActivityType, CommunicationChannel, LeadStatus } from "@/app/generated/prisma";
+import { sendSlackNotification } from "@/lib/slack";
 
 /**
  * Handle Vapi.ai webhook events
@@ -80,7 +81,7 @@ async function handleFunctionCall(payload: any) {
     // CRITICAL: Check if lead is in a prohibited status (CONVERTED, DEALS_WON)
     // These leads should NOT be reactivated by voice AI bookings
     // NOTE: LOST leads ARE allowed to book - they may want to re-engage
-    const prohibitedStatuses = [LeadStatus.CONVERTED, LeadStatus.DEALS_WON];
+    const prohibitedStatuses: LeadStatus[] = [LeadStatus.CONVERTED, LeadStatus.DEALS_WON];
 
     if (prohibitedStatuses.includes(lead.status)) {
       console.warn(`[Vapi] BLOCKED booking for ${lead.status} lead:`, lead.id, lead.firstName, lead.lastName);

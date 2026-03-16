@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { runHollyAgentLoop } from "@/lib/autonomous-agent";
+import { runHollyAgentLoop } from "@/lib/holly/agent";
 
 /**
  * Autonomous Holly Agent Cron
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
       timestamp: new Date().toISOString(),
       duration: `${duration}s`,
       message: "Autonomous Holly agent loop completed",
-      ...result,
+      ...(result as unknown as Record<string, unknown>),
     });
   } catch (error) {
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);

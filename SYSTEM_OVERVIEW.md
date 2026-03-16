@@ -491,7 +491,7 @@ Holly will NEVER:
 - **Hosting**: Vercel (auto-deploys from GitHub)
 
 ### AI & Communication
-- **AI**: OpenAI GPT-4o with function calling
+- **AI**: Claude Sonnet 4.6 (Anthropic) — sole AI backbone for all Holly decisions
 - **SMS**: Twilio (inbound & outbound)
 - **Email**: SendGrid (inbound & outbound with MX records)
 - **Scheduling**: Cal.com API integration with webhooks

@@ -5,7 +5,7 @@
  */
 
 import { prisma } from '../lib/db';
-import { runHollyAgentLoop } from '../lib/autonomous-agent';
+import { runHollyAgentLoop } from '../lib/holly/agent';
 
 interface CheckResult {
   name: string;

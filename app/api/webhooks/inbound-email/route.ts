@@ -13,7 +13,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { handleConversation, executeDecision } from "@/lib/ai-conversation-enhanced";
+import { handleConversation, executeDecision } from "@/lib/holly/conversation-handler";
 import { sendErrorAlert } from "@/lib/slack";
 
 export const maxDuration = 60;

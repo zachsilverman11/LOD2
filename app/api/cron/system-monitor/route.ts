@@ -14,7 +14,6 @@ export async function GET(request: NextRequest) {
     const result = await runSystemMonitor();
 
     return NextResponse.json({
-      success: true,
       timestamp: new Date().toISOString(),
       ...result,
     });

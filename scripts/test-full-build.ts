@@ -8,7 +8,7 @@ import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { join } from "path";
 import { generateReportHTML, type ReportHTMLProps } from "../lib/generate-report-html";
 import { REPORT_COPY } from "../lib/report-copy";
-import { selectBookingHook } from "../lib/holly-knowledge-base";
+import { selectBookingHook } from "../lib/holly/brain";
 import {
   buildReportDeliveryEmail,
   buildDay3FollowUpEmail,

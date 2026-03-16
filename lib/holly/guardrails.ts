@@ -3,10 +3,10 @@
  * Hard boundary enforcement for Holly's autonomous decisions
  */
 
-import { Lead } from '@prisma/client';
-import { DealSignals } from './deal-intelligence';
-import { getLocalTime } from './timezone-utils';
-import { ConversationStage, getDiscoveryQuestionPatterns } from './conversation-stage';
+import { Lead } from '@/app/generated/prisma';
+import { DealSignals } from '../deal-intelligence';
+import { getLocalTime } from '../timezone-utils';
+import { ConversationStage, getDiscoveryQuestionPatterns } from './stage';
 
 export interface ValidationResult {
   isValid: boolean;
@@ -16,6 +16,7 @@ export interface ValidationResult {
 
 export interface HollyDecision {
   thinking: string;
+  customerMindset?: string;
   action: 'send_sms' | 'send_booking_link' | 'send_application_link' | 'book_directly' | 'move_stage' | 'wait' | 'escalate';
   message?: string;
   newStage?: 'CONTACTED' | 'ENGAGED' | 'NURTURING' | 'WAITING_FOR_APPLICATION' | 'LOST';

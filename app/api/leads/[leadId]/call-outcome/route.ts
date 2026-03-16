@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { sendSlackNotification } from "@/lib/slack";
-import { handleConversation, executeDecision } from "@/lib/ai-conversation-enhanced";
+import { handleConversation, executeDecision } from "@/lib/holly/conversation-handler";
 
 /**
  * POST /api/leads/[leadId]/call-outcome

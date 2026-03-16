@@ -1,4 +1,4 @@
-import { runHollyAgentLoop } from '../lib/autonomous-agent';
+import { runHollyAgentLoop } from '../lib/holly/agent';
 
 /**
  * Test autonomous Holly agent loop manually

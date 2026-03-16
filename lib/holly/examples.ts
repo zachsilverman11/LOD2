@@ -1,14 +1,18 @@
 /**
- * Holly Training Examples
+ * Holly Examples
  *
- * Real (anonymized) successful conversations showing EXACTLY how top reps handle different scenarios
- * These examples teach Holly through demonstration, not rules
+ * Merged from holly-training-examples.ts and holly-learned-examples.ts
  *
- * Each example shows:
- * 1. The lead's context and situation
- * 2. What a GOOD message looks like (and why it works)
- * 3. What a BAD message looks like (and why it fails)
+ * TRAINING EXAMPLES: Real (anonymized) successful conversations showing EXACTLY how top reps handle different scenarios.
+ * These examples teach Holly through demonstration, not rules.
+ *
+ * LEARNED EXAMPLES: AUTO-GENERATED from real conversation outcomes.
+ * Run: npx tsx scripts/analyze-holly-performance.ts
  */
+
+// ============================================================================
+// SECTION 1: TRAINING EXAMPLES
+// ============================================================================
 
 export interface TrainingExample {
   scenario: string;
@@ -651,4 +655,33 @@ export function getRelevantExamples(
 
   // Return top 3 most relevant examples
   return examples.slice(0, 3);
+}
+
+// ============================================================================
+// SECTION 2: LEARNED EXAMPLES
+// ============================================================================
+
+export interface LearnedExample {
+  scenario: string;
+  sampleSize: number;
+  successRate: number;
+  whatWorked: {
+    message: string;
+    bookingRate: number;
+    engagementRate: number;
+    whyItWorked: string[];
+  };
+  whatDidntWork: {
+    message: string;
+    bookingRate: number;
+    engagementRate: number;
+    whyItFailed: string[];
+  };
+}
+
+// Will be populated after first week of data collection
+export const LEARNED_EXAMPLES: LearnedExample[] = [];
+
+export function getLearnedExamplesForScenario(scenario: string): LearnedExample | null {
+  return LEARNED_EXAMPLES.find((ex) => ex.scenario.toLowerCase().includes(scenario.toLowerCase())) || null;
 }

@@ -12,9 +12,9 @@
  */
 
 import { prisma } from '../lib/db';
-import { runHollyAgentLoop } from '../lib/autonomous-agent';
+import { runHollyAgentLoop } from '../lib/holly/agent';
 import { analyzeDealHealth } from '../lib/deal-intelligence';
-import { askHollyToDecide } from '../lib/claude-decision';
+import { askHollyToDecide } from '../lib/holly/decision-engine';
 
 // Get test lead emails from command line args
 const testLeadEmails = process.argv.slice(2);

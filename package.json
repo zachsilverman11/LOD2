@@ -26,7 +26,6 @@
     "next": "^15.5.7",
     "next-auth": "^5.0.0-beta.30",
     "nodemailer": "^7.0.12",
-    "openai": "^6.1.0",
     "puppeteer": "^24.35.0",
     "puppeteer-core": "^24.35.0",
     "react": "^18.3.1",

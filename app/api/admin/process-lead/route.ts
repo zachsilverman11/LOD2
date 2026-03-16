@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { processLeadWithAutonomousAgent } from "@/lib/autonomous-agent";
+import { processLeadWithAutonomousAgent } from "@/lib/holly/agent";
 
 export async function POST(request: NextRequest) {
   try {

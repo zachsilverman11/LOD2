@@ -1,5 +1,5 @@
 import { config } from "dotenv";
-import { handleConversation, executeDecision } from "../lib/ai-conversation-enhanced";
+import { handleConversation, executeDecision } from "../lib/holly/conversation-handler";
 import { prisma } from "../lib/db";
 
 config();

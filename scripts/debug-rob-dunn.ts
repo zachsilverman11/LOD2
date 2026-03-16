@@ -3,7 +3,7 @@
  */
 
 import { PrismaClient } from '../app/generated/prisma';
-import { buildHollyBriefing } from '../lib/holly-knowledge-base';
+import { buildHollyBriefing } from '../lib/holly/brain';
 
 const prisma = new PrismaClient();
 

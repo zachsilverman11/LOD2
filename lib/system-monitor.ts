@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { Prisma } from "@/app/generated/prisma";
 import { sendErrorAlert } from "@/lib/slack";
 import { DevCardType, DevCardPriority } from "@/app/generated/prisma";
 
@@ -55,7 +56,7 @@ export async function runSystemMonitor() {
     };
   } catch (error) {
     console.error("Error in system monitor:", error);
-    await sendErrorAlert("System Monitor Failed", error as Error, {});
+    await sendErrorAlert({ error: error as Error, context: { location: "System Monitor" } });
     return {
       success: false,
       error: String(error),
@@ -78,7 +79,7 @@ async function detectErrorPatterns(): Promise<DevCardData[]> {
       createdAt: { gte: oneDayAgo },
       metadata: {
         path: ["error"],
-        not: null,
+        not: Prisma.DbNull,
       },
     },
   });
@@ -91,7 +92,7 @@ async function detectErrorPatterns(): Promise<DevCardData[]> {
         createdAt: { gte: oneDayAgo },
         metadata: {
           path: ["error"],
-          not: null,
+          not: Prisma.DbNull,
         },
       },
       take: 3,
@@ -141,7 +142,7 @@ async function detectPerformanceAnomalies(): Promise<DevCardData[]> {
 
   const totalEngaged = await prisma.lead.count({
     where: {
-      status: { in: ["ENGAGED", "CALL_SCHEDULED", "CALL_COMPLETED", "APPLICATION_STARTED", "CONVERTED", "DEALS_WON"] },
+      status: { in: ["ENGAGED", "CALL_SCHEDULED", "WAITING_FOR_APPLICATION", "APPLICATION_STARTED", "CONVERTED", "DEALS_WON"] },
     },
   });
 
@@ -228,14 +229,14 @@ async function detectEngagementIssues(): Promise<DevCardData[]> {
 
   const recentEngaged = await prisma.lead.count({
     where: {
-      status: { in: ["ENGAGED", "CALL_SCHEDULED", "CALL_COMPLETED"] },
+      status: { in: ["ENGAGED", "CALL_SCHEDULED", "WAITING_FOR_APPLICATION"] },
       updatedAt: { gte: sevenDaysAgo },
     },
   });
 
   const previousEngaged = await prisma.lead.count({
     where: {
-      status: { in: ["ENGAGED", "CALL_SCHEDULED", "CALL_COMPLETED"] },
+      status: { in: ["ENGAGED", "CALL_SCHEDULED", "WAITING_FOR_APPLICATION"] },
       updatedAt: { gte: fourteenDaysAgo, lt: sevenDaysAgo },
     },
   });

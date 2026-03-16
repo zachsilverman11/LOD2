@@ -1,5 +1,5 @@
 import { prisma } from "../lib/db";
-import { handleConversation } from "../lib/ai-conversation-enhanced";
+import { handleConversation } from "../lib/holly/conversation-handler";
 import { bookLeadAppointmentDirectly } from "../lib/direct-booking";
 import { getAvailableSlots, cancelCalComBooking } from "../lib/calcom";
 
