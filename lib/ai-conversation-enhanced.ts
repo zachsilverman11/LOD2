@@ -874,14 +874,11 @@ Greg or Jakub know BC lenders inside out and can tell you exactly what you'd get
 
 **Response strategy:**
 1. Acknowledge their response respectfully
-2. Offer Cal.com direct booking as low-pressure alternative
-3. Leave door open for future
-4. DO NOT send further automated messages
+2. Leave door open for future without sending any links
+3. DO NOT send further automated messages
 
 **Example message:**
-"No worries at all! If you change your mind and want to chat, here's our calendar: ${process.env.CAL_COM_BOOKING_URL || "https://cal.com/inspired-mortgage"}
-
-Otherwise, I'll leave you be. Good luck with everything! 👍"
+"No worries at all! If anything changes down the road, we're always here to help. Wishing you the best!"
 
 **After sending:** Use move_stage action to move lead to LOST status. No further follow-ups unless they reply again.
 

@@ -21,7 +21,8 @@ export interface SalesPsychology {
     touch1: { goal: string; approach: string; avoid: string[] };
     touch2: { goal: string; approach: string; avoid: string[] };
     touch3: { goal: string; approach: string; avoid: string[] };
-    touch4Plus: { goal: string; approach: string; avoid: string[] };
+    touch4PlusEngaged: { goal: string; approach: string; avoid: string[] };
+    touch4PlusZeroEngagement: { goal: string; approach: string; avoid: string[] };
   };
 }
 
@@ -170,15 +171,26 @@ export const SALES_PSYCHOLOGY: SalesPsychology = {
       ],
     },
 
-    touch4Plus: {
-      goal: 'Stay top of mind without being annoying',
+    touch4PlusEngaged: {
+      goal: 'Stay top of mind without being annoying (lead HAS replied before)',
       approach:
-        'Value-add content (market updates, rate changes, educational tips), very soft touches, different angles, give them space between messages.',
+        'Light touch — respect the existing relationship. Value-add content (market updates, rate changes, educational tips), different angles, give them space between messages. Do not push hard or introduce pattern-interrupt tactics.',
       avoid: [
         'Repeating same ask',
         'Desperation ("following up again...")',
         'High frequency (respect 48-72h minimum)',
         'Pressure tactics',
+      ],
+    },
+    touch4PlusZeroEngagement: {
+      goal: 'Pattern interrupt required (lead has NEVER replied)',
+      approach:
+        'The soft approach has already failed — a pattern interrupt is needed. Messages should be shorter, more direct, with a single clear call to action. Deploy the cash back hook (if touch 3+), the rate vs. cost reframe, and the Mortgage Strategy Report pre-sell with more urgency. Consider acknowledging the silence directly and honestly. Do not keep asking diagnostic questions — the lead has not engaged with any of them.',
+      avoid: [
+        'More diagnostic questions (they have not answered any)',
+        'Repeating the same angle from earlier touches',
+        'Long messages with multiple points (keep it short and punchy)',
+        'Giving up without deploying all available hooks (cash back, report, rate vs. cost)',
       ],
     },
   },
@@ -222,8 +234,10 @@ export function buildValueProp(framework: string, leadData: any): string | null 
 
 /**
  * Get conversation guidelines for specific touch number
+ * @param touchNumber - Which outbound touch this is
+ * @param hasLeadReplied - Whether the lead has ever replied (used for touch 4+ differentiation)
  */
-export function getConversationGuidance(touchNumber: number): {
+export function getConversationGuidance(touchNumber: number, hasLeadReplied: boolean = false): {
   goal: string;
   approach: string;
   avoid: string[];
@@ -231,5 +245,7 @@ export function getConversationGuidance(touchNumber: number): {
   if (touchNumber === 1) return SALES_PSYCHOLOGY.conversationFlow.touch1;
   if (touchNumber === 2) return SALES_PSYCHOLOGY.conversationFlow.touch2;
   if (touchNumber === 3) return SALES_PSYCHOLOGY.conversationFlow.touch3;
-  return SALES_PSYCHOLOGY.conversationFlow.touch4Plus;
+  return hasLeadReplied
+    ? SALES_PSYCHOLOGY.conversationFlow.touch4PlusEngaged
+    : SALES_PSYCHOLOGY.conversationFlow.touch4PlusZeroEngagement;
 }

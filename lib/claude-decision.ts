@@ -204,7 +204,7 @@ export async function askHollyToDecide(
   const urgentBooking = isImmediateBooking(rawData);
 
   // === LAYER 3: SALES PSYCHOLOGY ===
-  const conversationGuidance = getConversationGuidance(outboundCount + 1);
+  const conversationGuidance = getConversationGuidance(outboundCount + 1, inboundCount > 0);
 
   // === LAYER 4: TRAINING EXAMPLES ===
   // Calculate appointment context for better example selection
@@ -427,7 +427,7 @@ Supportive, helpful, customer-service oriented. NOT sales-y.
     }
   } catch (err) {
     console.error("[Cal.com] Failed to pre-fetch availability for decision engine:", err);
-    // Non-fatal — Holly can still use send_booking_link as fallback
+    // Non-fatal — Holly will ask for preferred time and book directly
   }
 
   const prompt = `${stageEnforcementBlock}${convertedLeadInstructions}# ⏰ CURRENT DATE & TIME (CRITICAL CONTEXT)
@@ -537,6 +537,24 @@ ${daysSinceLastContact >= 7 ? `- "It's been a while - wanted to check back in on
 - ❌ Acting like it's been hours when it's been days
 - ❌ Generic message that doesn't reference previous conversation
 ` : ''}
+${outboundCount >= 3 && inboundCount === 0 ? `
+## 💰 CASH BACK RE-ENGAGEMENT HOOK (AVAILABLE — USE WITH CARE)
+
+This lead has received ${outboundCount} messages with ZERO replies. A pattern interrupt is needed.
+
+You MAY introduce the cash back angle to create curiosity. Example phrasings:
+- "One more thing worth mentioning — depending on your situation there may also be a cash back component to this. Worth a quick chat to find out if it applies to you."
+- "Quick note — some clients in your situation qualify for cash back on their mortgage. Our team can tell you in 5 minutes whether you're one of them."
+
+**Rules:**
+- NEVER guarantee eligibility — always qualify with "depending on your situation" or "some clients qualify"
+- NEVER explain how the program works over SMS — the details are in the Mortgage Strategy Report
+- Create curiosity, earn the call. That's it.
+` : outboundCount < 3 ? `
+## 🚫 CASH BACK RESTRICTION
+
+**FORBIDDEN before touch 3:** Any mention of cash back, cash back program, or cash back eligibility. This lead has only received ${outboundCount} message${outboundCount !== 1 ? 's' : ''}. Cash back is a late-stage re-engagement tool only. Violations of this rule risk misleading leads about offers they may not qualify for.
+` : ''}
 
 ---
 
@@ -605,6 +623,22 @@ ${examplesSection}
 ${behavioralSection}
 
 ${psychologySection}
+
+## 📄 MANDATORY: MORTGAGE STRATEGY REPORT PRE-SELL
+
+${!hasUpcomingAppointment ? `**🚨 THIS LEAD HAS NOT BOOKED A CALL YET.**
+
+You MUST reference the personalised Mortgage Strategy Report in at least one message per conversation thread. This is not optional and not a suggestion.
+
+Frame it as something built specifically for THEIR situation — their lender, their balance, their timeline — not a generic document or calculator. The report is the concrete deliverable that makes booking the call worthwhile. Without it, you are asking them to give up 15 minutes for nothing tangible.
+
+**Example framings (adapt to their situation):**
+- "The strategy report we put together will show you exactly what your options look like with your current balance — rate comparisons, penalty calculations, the works. That's what the call walks through."
+- "Before the call our team puts together a personalised report for your situation — not a generic calculator, your actual numbers. Most people say it's the first time they've seen the full picture."
+- "You'll get a Mortgage Strategy Report before you even have to make any decisions — the call is just walking through what it shows, not a sales pitch."
+` : `This lead already has a booked call — the report pre-sell is not required. Focus on preparation and excitement.`}
+
+---
 
 ## 🎯 YOUR DECISION TASK
 
@@ -902,14 +936,24 @@ If they say "2pm today" or "tomorrow morning" — find the closest matching slot
 - If no exact match → offer the 2-3 closest alternatives: "2pm is taken, but I have 1:30pm or 3pm — which works?"
 - If they're vague ("sometime this week") → offer 2-3 options across different days
 
+**TWO-MODE BOOKING LOGIC:**
+
+**Mode 1 — Near-term (within 7 days):** Use the pre-fetched availability above. Offer 2-3 specific times, and book directly when they pick one.
+
+**Mode 2 — Future date (beyond 7 days):** When the lead mentions a future month or date beyond the available slots above:
+1. Acknowledge the timeframe enthusiastically (e.g., "May works great!")
+2. Ask for their preferred day and time within that month
+3. Once the lead gives a specific day/time, use action "book_directly" with that exact datetime — do NOT require pre-fetched availability
+4. Confirm via SMS as normal
+
 **WHEN TO SEND THE BOOKING LINK (last resort only):**
-1. Availability data is unavailable (shown above as "unavailable")
-2. They want a date beyond the 7-day window above
-3. After 3+ back-and-forth exchanges where no time works and you've exhausted options
+1. Availability data is unavailable (shown above as "unavailable") AND the lead hasn't specified a future date
+2. After 3+ back-and-forth exchanges where no time works and you've exhausted options
 
 **Rules:**
-- Only offer times that appear in the availability list above
-- Never make up times — only use real availability data
+- For near-term bookings, only offer times that appear in the availability list above
+- Never make up near-term times — only use real availability data
+- For future-date bookings (beyond 7 days), trust the lead's preferred time and book directly
 - When you say "I'll book that for you" — you MUST use action: "book_directly" to actually do it
 - NEVER send the booking link as a "helpful" first move — always try to book directly first
 
