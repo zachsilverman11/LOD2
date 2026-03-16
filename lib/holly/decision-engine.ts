@@ -118,9 +118,18 @@ export async function askHollyToDecide(
     : 0;
 
   // Get MOST RECENT inbound reply for behavioral analysis (not first/oldest)
-  const lastReply = lead.communications
+  const lastInbound = lead.communications
     ?.filter((c: any) => c.direction === 'INBOUND')
-    .sort((a: any, b: any) => b.createdAt.getTime() - a.createdAt.getTime())[0]?.content;
+    .sort((a: any, b: any) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+  const lastReply = lastInbound?.content;
+
+  // Calculate days since lead's last INBOUND reply (independent of Holly's outbound timing)
+  // This catches "replied once then went silent" — daysSinceLastContact won't, because
+  // Holly's own messages keep resetting lastContactedAt.
+  const daysSinceLastInboundReply = lastInbound
+    ? (now.getTime() - new Date(lastInbound.createdAt).getTime()) / (1000 * 60 * 60 * 24)
+    : null;
+  const unansweredFollowUps = inboundCount > 0 ? outboundCount - inboundCount : 0;
 
   // Determine lead type
   const loanType = (rawData?.loanType || rawData?.lead_type || '').toLowerCase();
@@ -278,12 +287,34 @@ ${ex.badApproach.whyItFails.map(w => `  - ${w}`).join('\n')}
 `
     : '';
 
-  // Build behavioral intelligence section
+  // Build behavioral intelligence section (with temporal staleness context)
   const behavioralSection = replyAnalysis
-    ? `
+    ? (() => {
+        let stalenessLine = '';
+        if (daysSinceLastInboundReply !== null) {
+          if (daysSinceLastInboundReply < 0.5) {
+            stalenessLine = '**Staleness:** 🟢 Fresh reply — respond naturally';
+          } else if (daysSinceLastInboundReply < 1) {
+            stalenessLine = '**Staleness:** 🟡 Reply from earlier today — light follow-up tone';
+          } else if (daysSinceLastInboundReply < 2) {
+            stalenessLine = '**Staleness:** 🟠 Reply from yesterday — gentle re-engagement tone';
+          } else {
+            stalenessLine = `**Staleness:** 🔴 Reply is ${Math.floor(daysSinceLastInboundReply)} days old — STALE. Do NOT treat as active conversation. Full re-engagement mode.`;
+          }
+        }
+
+        const replyTimestamp = lastInbound
+          ? new Date(lastInbound.createdAt).toLocaleString('en-US', {
+              month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true
+            })
+          : 'Unknown';
+
+        return `
 ## 🧠 BEHAVIORAL ANALYSIS OF THEIR LAST REPLY
 
 **They said:** "${lastReply}"
+**Sent:** ${replyTimestamp}${unansweredFollowUps > 0 ? ` (${unansweredFollowUps} unanswered follow-up${unansweredFollowUps !== 1 ? 's' : ''} sent since)` : ''}
+${stalenessLine}
 
 **Pattern detected:** ${replyAnalysis.pattern}
 **What it means:** ${replyAnalysis.meaning}
@@ -292,7 +323,8 @@ ${ex.badApproach.whyItFails.map(w => `  - ${w}`).join('\n')}
 ${replyAnalysis.exampleResponse ? `**Example response:**\n\`\`\`\n${replyAnalysis.exampleResponse}\n\`\`\`` : ''}
 
 ---
-`
+`;
+      })()
     : '';
 
   // Build sales psychology section
@@ -516,7 +548,16 @@ Before interpreting ANY time word from the lead:
 **NEVER assume or guess what "tonight" or "tomorrow" means. Always anchor to the message timestamp.**
 
 Always calculate days/weeks from the appropriate context - message timestamp for relative words, current date for specific dates.
-${daysSinceLastContact >= 2 && outboundCount > 0 ? `
+${(() => {
+  // Condition 1: Holly herself has been silent for 2+ days (original check)
+  const hollyGoneQuiet = daysSinceLastContact >= 2 && outboundCount > 0;
+  // Condition 2: Lead replied but has gone silent — Holly sent 2+ unanswered follow-ups
+  const leadGoneQuiet = daysSinceLastInboundReply !== null
+    && daysSinceLastInboundReply >= 1
+    && unansweredFollowUps >= 2;
+
+  if (hollyGoneQuiet) {
+    return `
 
 ---
 
@@ -542,7 +583,45 @@ ${daysSinceLastContact >= 7 ? `- "It's been a while - wanted to check back in on
 - ❌ "Following up on my last message" (ignores the gap)
 - ❌ Acting like it's been hours when it's been days
 - ❌ Generic message that doesn't reference previous conversation
-` : ''}
+`;
+  }
+
+  if (leadGoneQuiet) {
+    const daysSinceReplyRounded = Math.floor(daysSinceLastInboundReply);
+    return `
+
+---
+
+## 🔄 RE-ENGAGEMENT ALERT: LEAD HAS GONE QUIET
+
+⚠️ **CRITICAL:** ${firstName} replied ${daysSinceReplyRounded} day${daysSinceReplyRounded !== 1 ? 's' : ''} ago but has NOT responded to your last ${unansweredFollowUps} follow-up${unansweredFollowUps !== 1 ? 's' : ''}.
+**Their last reply was:** "${lastReply}"
+**Today's date:** ${currentDateFormatted}
+
+This is NOT an active conversation. ${firstName} has gone silent.
+
+**You MUST:**
+- Do NOT continue as if this is an active conversation
+- Do NOT reference their last reply as if it just happened
+- This is a re-engagement — treat it as such
+- Acknowledge the silence naturally (don't be awkward about it)
+- Try a DIFFERENT angle — do not repeat value props already used in recent messages
+- Keep it short — long messages haven't been working
+
+**Examples of good re-engagement after silence:**
+- "Hey ${firstName}! No worries if the timing wasn't right before. Quick question — are you still exploring options for your purchase?"
+- "Hi ${firstName}! I know I've sent a few messages — just wanted to check if you're still looking into this or if the timing's off?"
+
+**BAD (DO NOT DO THIS):**
+- ❌ Responding to their last reply as if it just happened
+- ❌ Repeating the same angles from your previous follow-ups
+- ❌ Sending another long pitch — they've already ignored several
+- ❌ "Just following up!" with no new angle or value
+`;
+  }
+
+  return '';
+})()}
 ${outboundCount >= 3 && inboundCount === 0 ? `
 ## 💰 CASH BACK RE-ENGAGEMENT HOOK (AVAILABLE — USE WITH CARE)
 
