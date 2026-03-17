@@ -1066,6 +1066,9 @@ If they say "2pm today" or "tomorrow morning" — find the closest matching slot
 
     const decision: HollyDecision = JSON.parse(jsonText);
 
+    // Tag the decision with whether live slots were available (used by guardrails)
+    decision._availabilitySlotsProvided = availabilitySummary.length > 0;
+
     // Log decision for debugging
     console.log(
       `[Holly - Enhanced] ${firstName}: ${decision.thinking} → ${decision.action} (confidence: ${decision.confidence})`

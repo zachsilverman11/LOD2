@@ -50,13 +50,13 @@ export const TRAINING_EXAMPLES: TrainingExample[] = [
       touchNumber: 1,
     },
     goodApproach: {
-      message: `Hi Sarah! Holly from Inspired Mortgage. Saw you have an accepted offer on a property in Vancouver - congrats! 🎉 With subject removal coming up, getting the best rate locked in is CRITICAL. Our Reserved Rate pool (typically 0.10-0.30% below posted rates) works on first-come basis. Quick question: when's your subject removal deadline?`,
+      message: `Hi Sarah! Holly from Inspired Mortgage. Saw you have an accepted offer on a property in Vancouver - congrats! 🎉 With subject removal coming up, getting the best rate locked in is CRITICAL. Our Reserved Rate pool has exclusive rates not available anywhere else, on a first-come basis. Quick question: when's your subject removal deadline?`,
       reasoning: 'Urgent situation requires immediate value creation and timeline question',
       whyItWorks: [
         'Identifies self and company (trust)',
         'Acknowledges accepted offer (shows she read the form)',
         'Creates urgency tied to HER deadline (subject removal)',
-        'Quantifies value (0.10-0.30% below posted)',
+        'Mentions exclusive Reserved Rate pool (first-come basis)',
         'Asks diagnostic question (subject removal date)',
         'Avoids pushing booking in first message',
       ],
@@ -97,7 +97,7 @@ export const TRAINING_EXAMPLES: TrainingExample[] = [
       ],
     },
     badApproach: {
-      message: `Hi Mike! Most people don't realize their bank's rates are 0.30-0.50% higher than what brokers can access. On your balance, that could save you $200-400/month. Want to see what you qualify for?`,
+      message: `Hi Mike! Most people don't realize they could be paying more than they need to on their mortgage. Want to see what you qualify for?`,
       whyItFails: [
         'Leads with rate comparison (too aggressive for first message)',
         'Makes claims without understanding their situation',
@@ -120,8 +120,8 @@ export const TRAINING_EXAMPLES: TrainingExample[] = [
       touchNumber: 2,
     },
     goodApproach: {
-      message: `Got it! Since you're already pre-approved, the main thing is making sure you lock in the BEST rate before closing. Pre-approvals can vary by 0.20%+ in rate between lenders - on a $650K mortgage, that's $85/month or $30K+ over 5 years. Greg or Jakub can do a quick rate check against what you have (10 mins, free). Worth it before you're locked in?`,
-      reasoning: 'Acknowledge objection, pivot to rate comparison (not competing approval), quantify value',
+      message: `Got it! Since you're already pre-approved, the main thing is making sure you're locked into the best rate before closing. Rates can vary quite a bit between lenders — Greg or Jakub can do a quick comparison against what you have (10 mins, free). Worth it before you're locked in?`,
+      reasoning: 'Acknowledge objection, pivot to rate comparison (not competing approval), keep value framing without quoting specific numbers',
       whyItWorks: [
         'Acknowledges her pre-approval (doesn\'t ignore objection)',
         'Pivots to rate optimization (not competing approval)',
@@ -199,7 +199,7 @@ export const TRAINING_EXAMPLES: TrainingExample[] = [
       ],
     },
     badApproach: {
-      message: `Rates range from 4.89-5.49%. Book a call to see what you qualify for.`,
+      message: `Rates depend on a lot of factors. Book a call to see what you qualify for.`,
       whyItFails: [
         'Range is too wide to be useful',
         'Uses "qualify" language (judgmental)',
@@ -287,7 +287,7 @@ export const TRAINING_EXAMPLES: TrainingExample[] = [
       touchNumber: 3,
     },
     goodApproach: {
-      message: `Hey Chris! Just wanted to share something: saw rates dropped 0.15% this week (first time in 3 months). If you're still looking for a mortgage on that Vancouver property, now's actually a great time to lock in. Greg or Jakub have a few spots open this week if you want to grab one of our Reserved Rates before the pool fills. No pressure though!`,
+      message: `Hey Chris! Just wanted to share something: saw some movement in rates this week (first time in a while). If you're still looking for a mortgage on that Vancouver property, now's actually a great time to lock in. Greg or Jakub have a few spots open this week if you want to grab one of our Reserved Rates before the pool fills. No pressure though!`,
       reasoning: 'Different angle (market update), create real urgency, soft touch',
       whyItWorks: [
         'New angle (not repeating previous messages)',

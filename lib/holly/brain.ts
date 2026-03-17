@@ -201,7 +201,7 @@ export const PROGRAMS: ProgramInfo[] = [
     keyBenefits: [
       'Exclusivity (not publicly available)',
       'Urgency (limited availability)',
-      'Real savings (typically 0.10-0.25% lower)',
+      'Real savings (lower than posted rates)',
     ],
     whenToMention:
       'When lead is comparing rates, has urgent timeline, or needs a reason to act now. Creates curiosity.',
@@ -333,7 +333,7 @@ export const CONVERSATION_PRINCIPLES = {
     approach:
       'Value-add content, market updates, soft check-ins. Very light touch. They know you exist.',
     examples: [
-      '"Saw rates dropped 0.15% this week - thought of your situation"',
+      '"Saw some movement in rates this week - thought of your situation"',
       '"Just checking in - did you end up finding something?"',
     ],
     avoid: ['Pressure', 'Urgency', 'Being pushy'],
@@ -407,7 +407,7 @@ export const BEHAVIORAL_INTELLIGENCE: BehavioralIntelligence = {
       ],
       meaning: 'Lead wants info before committing - educate briefly then redirect to call for specifics',
       recommendedAction: 'Answer briefly, explain why call is needed for exact answer, keep friction low',
-      exampleResponse: 'Great question! Rates depend on your credit/property type (range from 4.89-5.49% right now), but Greg or Jakub can show you your EXACT rate in 10 mins. Free, no obligation. Worth a quick call?',
+      exampleResponse: 'Great question! Rates depend on your credit, property type, and a few other factors — so I can\'t give you an accurate number over text. But Greg or Jakub can pull your exact rate in 10 mins. Free, no obligation. Worth a quick call?',
     },
 
     objectionAlreadyWorking: {
@@ -431,7 +431,7 @@ export const BEHAVIORAL_INTELLIGENCE: BehavioralIntelligence = {
       ],
       meaning: 'Objection: thinks they\'re done. Need to pivot to RATE comparison, not competing approval.',
       recommendedAction: 'Acknowledge approval, shift focus to rate optimization before they lock in',
-      exampleResponse: 'Got it! Since you\'re already pre-approved, the main thing is making sure you lock in the BEST rate before closing. Pre-approvals can vary by 0.20%+ in rate - that\'s $85/month on a $650K mortgage. Greg or Jakub can do a quick rate check against what you have (10 mins). Worth it before you\'re locked in?',
+      exampleResponse: 'Got it! Since you\'re already pre-approved, the main thing is making sure you lock in the BEST rate before closing. Rates can vary quite a bit between lenders — on a $650K mortgage even a small difference adds up to real money over 5 years. Greg or Jakub can do a quick comparison against what you have (10 mins, free). Worth it before you\'re locked in?',
     },
 
     objectionTooBusy: {
@@ -594,8 +594,8 @@ export const SALES_PSYCHOLOGY: SalesPsychology = {
       },
       {
         bad: 'Our rates are the best!',
-        good: 'The rates we can access through our lender partners are typically 0.10-0.30% below posted rates.',
-        why: 'Good version: you work for them (not lenders), specific percentage, credible (not "best")',
+        good: 'The rates we can access through our lender partners are below posted rates — the advisor will show you exactly how much on the call.',
+        why: 'Good version: you work for them (not lenders), positions call as the answer, credible without quoting numbers Holly cannot know',
       },
     ],
   },
@@ -642,7 +642,7 @@ export const SALES_PSYCHOLOGY: SalesPsychology = {
 
   valueCreation: {
     principles: [
-      'Always quantify savings in dollars, not percentages ($200/month > 0.20% for most people)',
+      'Always quantify savings in dollars, NEVER in rate percentages — "$200/month" is relatable; "0.20%" is not (and Holly cannot discuss specific rates)',
       'Compare to their current situation or expectation (vs bank, vs renewal letter, vs posted rates)',
       'Use real scarcity (Reserved Rate pool first-come basis), never fake (filling up fast!)',
       'Tie urgency to THEIR timeline (subject removal, renewal date), not yours',
@@ -771,7 +771,7 @@ export const LEAD_JOURNEY: LeadJourneyContext = {
       'Our Reserved Rate pool is exclusive and requires qualification (not publicly posted)',
       'Advisors can compare 30+ lenders to find the absolute best rate for their specific situation',
       'Pre-approval locks in their rate for 120 days (protects them from rate increases)',
-      'The call typically finds 0.10-0.30% better rates than posted online = $50-200/month savings',
+      'The call typically finds better rates than what\'s posted online — how much depends on their situation (never quote specific percentages)',
     ],
     howToFrameIt: 'The 15-min call IS how they get the rate. Frame it as the next step in getting their quote, not an obstacle or sales pitch.',
   },
@@ -781,7 +781,7 @@ export const LEAD_JOURNEY: LeadJourneyContext = {
     'Reference what they filled out ("I saw you\'re looking at a $850K purchase in Vancouver...")',
     'Acknowledge their search intent ("You searched for the best rate - smart move")',
     'Create urgency around THEIR timeline (subject removal, renewal date), not fake scarcity',
-    'Quantify specific value ("$200-400/month savings", "0.20% rate difference = $85/month on $650K")',
+    'Quantify value in monthly dollars ("could mean hundreds per month in savings"), NEVER in rate percentages',
     'Use low-friction language ("quick 10-15 min call" not "schedule a consultation")',
     'Position advisors as experts who work for them, not salespeople',
   ],
