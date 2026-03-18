@@ -34,20 +34,30 @@ Return ONLY a valid JSON array of strings. No markdown, no explanation, just the
 
     const text =
       message.content[0].type === "text" ? message.content[0].text : "";
-    const bullets = JSON.parse(text);
 
-    return Response.json({ bullets });
-  } catch (error) {
-    console.error("Error generating bullets:", error);
+    // Strip markdown code fences Claude sometimes wraps around JSON
+    const cleanedText = text
+      .replace(/```json\n?/g, "")
+      .replace(/```\n?/g, "")
+      .trim();
 
-    // Check if it's a JSON parse error vs API error
-    if (error instanceof SyntaxError) {
+    let bullets: string[];
+    try {
+      bullets = JSON.parse(cleanedText);
+    } catch (parseError) {
+      console.error("Failed to parse AI response for bullets. Raw response:", cleanedText);
       return Response.json(
-        { error: "Failed to parse AI response" },
+        {
+          error: "Failed to parse AI response",
+          rawSnippet: cleanedText.slice(0, 200),
+        },
         { status: 500 }
       );
     }
 
+    return Response.json({ bullets });
+  } catch (error) {
+    console.error("Error generating bullets:", error);
     return Response.json(
       { error: "Failed to generate report summary" },
       { status: 500 }

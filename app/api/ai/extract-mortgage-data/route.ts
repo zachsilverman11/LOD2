@@ -121,9 +121,12 @@ Return ONLY a valid JSON object. No markdown, no explanation, just the JSON.`,
     try {
       extracted = JSON.parse(cleanedText);
     } catch {
-      console.error("Failed to parse AI response:", cleanedText);
+      console.error("Failed to parse AI response for mortgage data. Raw response:", cleanedText);
       return Response.json(
-        { error: "Failed to parse AI response" },
+        {
+          error: "Failed to parse AI response",
+          rawSnippet: cleanedText.slice(0, 200),
+        },
         { status: 500 }
       );
     }
