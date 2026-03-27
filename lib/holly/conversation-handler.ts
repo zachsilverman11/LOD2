@@ -269,12 +269,14 @@ function generateSystemPrompt(
     exampleLanguage = `"These reserved rates fill quickly..." / "Want to check what you qualify for before they're gone?" / "Limited spots available..."`;
   } else if (daysInStage <= 10) {
     urgencyLevel = "MODERATE (Days 7-10)";
-    urgencyGuidance = "Increase urgency - final check before archiving, rates won't hold forever.";
-    exampleLanguage = `"This is my final check before I archive your file..." / "Reserved rates won't hold forever..." / "Need to confirm fit before releasing them..."`;
+    urgencyGuidance =
+      "Firmer but honest urgency: reserved-rate pool, timing, value of a quick call. Do NOT say you are archiving their file, sending a final message, or that you will never follow up. Automation may reach out again; false finality breaks trust.";
+    exampleLanguage = `"Wanted to bump this up - reserved spots have been moving..." / "If timing's tight I can grab you a quick slot..." / "No pressure, but worth locking in while this pool's open..."`;
   } else {
     urgencyLevel = "HIGH (Days 11-14)";
-    urgencyGuidance = "Last chance tone - releasing rate slot, closing file, final opportunity.";
-    exampleLanguage = `"Final opportunity before releasing your rate slot..." / "Closing your file tomorrow unless..." / "Last chance to secure these rates..."`;
+    urgencyGuidance =
+      "Direct, respectful urgency without lying about closure. Never promise a 'last' message or that their file is closing. You may check in again later at lower frequency.";
+    exampleLanguage = `"I'll stay brief - if you still want better numbers than the bank showed, I'm here..." / "Happy to pause if now's not the time - just say the word..."`;
   }
 
   // Determine which program to lead with based on lead type
@@ -1115,9 +1117,9 @@ export async function handleConversation(
     const youtubeSharedInConversation = conversationText.includes("youtube.com");
 
     if (youtubeSharedInConversation) {
-      systemPrompt += `\n\n## 🎬 GREG'S YOUTUBE SHOW\n\n⚠️ **ALREADY SHARED** — You already mentioned the YouTube show in this conversation. Do NOT mention it again.`;
+      systemPrompt += `\n\n## 🎬 GREG'S YOUTUBE SHOW\n\n⚠️ **ALREADY SHARED.** You already mentioned the YouTube show in this conversation. Do NOT mention it again.`;
     } else {
-      systemPrompt += `\n\n## 🎬 GREG'S YOUTUBE SHOW (Trust Builder — Use Once Per Conversation)\n\n📺 **THE YOUTUBE SHOW** — Use this ONCE per conversation as a trust-building value-add.\n\n**When to use:** Messages 2-4, when rapport is building. NOT in your first message. NOT as a booking pitch.\n\n**How to use it naturally:**\n"By the way — our co-founder Greg Williamson has a weekly show where he breaks down what's actually happening in the mortgage market and gives you the straight goods on your best options. No fluff, no sales pitch — just a few minutes of real talk. Since you're looking at a mortgage, this week's episode is worth a watch: ${youtubeLink}"\n\n**Rules:**\n- Drop it naturally mid-conversation, not as a sales pitch\n- Use it as a credibility/trust builder ("this guy knows his stuff")\n- Do NOT follow up asking if they watched it\n- Do NOT use it in the first message\n- Once you've shared it, move on — don't dwell on it`;
+      systemPrompt += `\n\n## 🎬 GREG'S YOUTUBE SHOW (Trust Builder - Use Once Per Conversation)\n\n📺 **THE YOUTUBE SHOW.** Use this ONCE per conversation as a trust-building value-add.\n\n**When to use:** Messages 2-4, when rapport is building. NOT in your first message. NOT as a booking pitch.\n\n**How to use it naturally:**\n"By the way, our co-founder Greg Williamson has a weekly show where he breaks down what's actually happening in the mortgage market. No fluff, just a few minutes of real talk. This week's episode: ${youtubeLink}"\n\n**Rules:**\n- Drop it naturally mid-conversation, not as a sales pitch\n- Use it as a credibility/trust builder ("this guy knows his stuff")\n- Do NOT follow up asking if they watched it\n- Do NOT use it in the first message\n- Once you've shared it, move on. Don't dwell on it`;
     }
   }
 
@@ -1145,7 +1147,7 @@ export async function handleConversation(
       : '';
     messages.push({
       role: "user",
-      content: `This lead has an existing conversation with ${context.conversationHistory.length} prior messages. Review the conversation history in the system prompt and continue the conversation naturally.\n\n🚨 CRITICAL: Do NOT re-introduce yourself. Do NOT say "It's Holly from Inspired Mortgage" — they already know who you are. Continue from where the conversation left off.${hasAppointment}\n\nDecide the best next action based on the conversation so far. Use one of the available tools to respond.`,
+      content: `This lead has an existing conversation with ${context.conversationHistory.length} prior messages. Review the conversation history in the system prompt and continue the conversation naturally.\n\n🚨 CRITICAL: Do NOT re-introduce yourself. Do NOT say "It's Holly from Inspired Mortgage." They already know who you are. Continue from where the conversation left off.${hasAppointment}\n\nDecide the best next action based on the conversation so far. Use one of the available tools to respond.`,
     });
   } else {
     // FIRST CONTACT — genuinely new lead with zero prior communications

@@ -50,7 +50,7 @@ export const TRAINING_EXAMPLES: TrainingExample[] = [
       touchNumber: 1,
     },
     goodApproach: {
-      message: `Hi Sarah! Holly from Inspired Mortgage. Saw you have an accepted offer on a property in Vancouver - congrats! 🎉 With subject removal coming up, getting the best rate locked in is CRITICAL. Our Reserved Rate pool has exclusive rates not available anywhere else, on a first-come basis. Quick question: when's your subject removal deadline?`,
+      message: `Saw you have an accepted offer in Vancouver, Sarah. Congrats 🎉 Subject removal timing is huge for rate lock. Our Reserved Rate pool is first come. When's your removal date?`,
       reasoning: 'Urgent situation requires immediate value creation and timeline question',
       whyItWorks: [
         'Identifies self and company (trust)',
@@ -85,7 +85,7 @@ export const TRAINING_EXAMPLES: TrainingExample[] = [
       touchNumber: 1,
     },
     goodApproach: {
-      message: `Hi Mike! Holly from Inspired Mortgage. Saw you're looking to refinance your Vancouver condo with TD. Quick question - what's prompting the refinance right now?`,
+      message: `Quick one, Mike. Holly from Inspired Mortgage. Saw your Vancouver condo refi inquiry. What's prompting it right now?`,
       reasoning: 'Conversational, uses their form data, asks diagnostic question to understand situation',
       whyItWorks: [
         'Uses specific details from form (Vancouver condo, TD Bank)',
@@ -120,7 +120,7 @@ export const TRAINING_EXAMPLES: TrainingExample[] = [
       touchNumber: 2,
     },
     goodApproach: {
-      message: `Got it! Since you're already pre-approved, the main thing is making sure you're locked into the best rate before closing. Rates can vary quite a bit between lenders — Greg or Jakub can do a quick comparison against what you have (10 mins, free). Worth it before you're locked in?`,
+      message: `Got it. Main thing now is locking the best rate before you close. Rates vary a lot between lenders. Greg or Jakub can compare in 10 mins, free. Worth it before you're locked in?`,
       reasoning: 'Acknowledge objection, pivot to rate comparison (not competing approval), keep value framing without quoting specific numbers',
       whyItWorks: [
         'Acknowledges her pre-approval (doesn\'t ignore objection)',
@@ -187,7 +187,7 @@ export const TRAINING_EXAMPLES: TrainingExample[] = [
       touchNumber: 2,
     },
     goodApproach: {
-      message: `Great question! Wish I could give you an exact number right now, but mortgage rates depend on your credit score and property details. Here's the thing: the FASTEST way to get YOUR exact rate is a 10-min call with Greg or Jakub. They pull your credit and show you real numbers from 30+ lenders. Way faster than back-and-forth texts. Want them to call you this afternoon?`,
+      message: `Can't nail the exact rate over text. Depends on credit and property. Greg or Jakub can pull real numbers in a 10 min call. This afternoon work?`,
       reasoning: 'Acknowledge desire for instant answer, explain why call is fastest, make it easy',
       whyItWorks: [
         'Validates her question',
@@ -221,7 +221,7 @@ export const TRAINING_EXAMPLES: TrainingExample[] = [
       touchNumber: 2,
     },
     goodApproach: {
-      message: `Great question! The process is actually pretty simple: (1) Greg or Jakub do a quick call to understand your situation and pull your credit, (2) They shop 30+ lenders in real-time to find your best rate, (3) You get a pre-approval same day that locks your rate for 120 days. Whole thing takes about 2 weeks from start to closing. Are you looking to refinance soon, or planning for a few months out?`,
+      message: `Quick call, they pull credit and shop 30+ lenders. Pre-approval same day, rate locked 120 days, whole thing ~2 weeks. Refi soon or a few months out?`,
       reasoning: 'Answer question clearly, continue conversation, ask diagnostic question',
       whyItWorks: [
         'Answers his question thoroughly but concisely',
@@ -254,7 +254,7 @@ export const TRAINING_EXAMPLES: TrainingExample[] = [
       touchNumber: 3,
     },
     goodApproach: {
-      message: `No pressure at all! Most people do shop around - that's smart. Just FYI, our Reserved Rate pool works on a first-come basis, so worth grabbing a quick spot even if you're still comparing options. But zero rush - I'll check back in a few days with any rate updates. Sound good?`,
+      message: `No pressure. Most people shop around and that's smart. Reserved Rate pool is first come if you want a spot while you compare. Zero rush. I'll check in less often from here unless you text me. Sound good?`,
       reasoning: 'Give space, soft value/urgency, stay top of mind, ask permission to follow up',
       whyItWorks: [
         'Respects her decision (no pressure)',
@@ -287,7 +287,7 @@ export const TRAINING_EXAMPLES: TrainingExample[] = [
       touchNumber: 3,
     },
     goodApproach: {
-      message: `Hey Chris! Just wanted to share something: saw some movement in rates this week (first time in a while). If you're still looking for a mortgage on that Vancouver property, now's actually a great time to lock in. Greg or Jakub have a few spots open this week if you want to grab one of our Reserved Rates before the pool fills. No pressure though!`,
+      message: `Chris, saw rates move a bit this week. If you're still on the Vancouver place, could be a good window. A few Reserved Rate spots left this week if you want one. No pressure.`,
       reasoning: 'Different angle (market update), create real urgency, soft touch',
       whyItWorks: [
         'New angle (not repeating previous messages)',
@@ -386,7 +386,7 @@ export const TRAINING_EXAMPLES: TrainingExample[] = [
       touchNumber: 1,
     },
     goodApproach: {
-      message: `Hi Derek! I'm Holly from Inspired Mortgage. I see you reached out a few days ago about your refinance - thanks for your patience! I'm here now and would love to help you get exact numbers. Quick question: what's prompting the refinance right now?`,
+      message: `Derek, Holly here from Inspired Mortgage. You reached out a few days ago on the refi. Thanks for hanging in. What's prompting the refinance right now?`,
       reasoning: 'Acknowledge delay professionally but briefly, then move forward with value',
       whyItWorks: [
         'Acknowledges the 3-day delay ("a few days ago")',
@@ -420,7 +420,7 @@ export const TRAINING_EXAMPLES: TrainingExample[] = [
       touchNumber: 2,
     },
     goodApproach: {
-      message: `Hi Katarzyna! Sorry for going quiet on you. Wanted to circle back on your purchase situation. Are you still looking at properties in Vancouver, or has your timeline shifted at all?`,
+      message: `Sorry I went quiet, Katarzyna. Circling back on your purchase. Still hunting in Vancouver or did your timeline shift?`,
       reasoning: 'Brief acknowledgment of gap, reference previous conversation, ask about current state',
       whyItWorks: [
         'Acknowledges going silent ("sorry for going quiet")',

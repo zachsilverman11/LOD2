@@ -5,7 +5,7 @@
 
 import { prisma } from '../db';
 import { LeadStatus } from '@/app/generated/prisma';
-import { analyzeDealHealth } from '../deal-intelligence';
+import { analyzeDealHealth, resolveNextReviewHoursAfterOutbound } from '../deal-intelligence';
 import { askHollyToDecide } from './decision-engine';
 import { validateDecision, detectMessageRepetition } from './guardrails';
 import { detectConversationStage } from './stage';
@@ -495,8 +495,16 @@ export async function processLeadWithAutonomousAgent(
           },
         });
 
-        // Schedule next review based on temperature
-        const nextReview = new Date(now.getTime() + signals.nextReviewHours * 60 * 60 * 1000);
+        const inboundCount =
+          lead.communications?.filter((c: any) => c.direction === 'INBOUND').length ?? 0;
+        const outboundBefore =
+          lead.communications?.filter((c: any) => c.direction === 'OUTBOUND').length ?? 0;
+        const reviewHours = resolveNextReviewHoursAfterOutbound({
+          signals,
+          inboundCount,
+          outboundCountBeforeThisSend: outboundBefore,
+        });
+        const nextReview = new Date(now.getTime() + reviewHours * 60 * 60 * 1000);
         await prisma.lead.update({
           where: { id: lead.id },
           data: {
@@ -828,8 +836,16 @@ export async function runHollyAgentLoop() {
               }),
             });
 
-            // Schedule next review based on temperature
-            const nextReview = new Date(now.getTime() + signals.nextReviewHours * 60 * 60 * 1000);
+            const inboundCount =
+              lead.communications?.filter((c: any) => c.direction === 'INBOUND').length ?? 0;
+            const outboundBefore =
+              lead.communications?.filter((c: any) => c.direction === 'OUTBOUND').length ?? 0;
+            const reviewHours = resolveNextReviewHoursAfterOutbound({
+              signals,
+              inboundCount,
+              outboundCountBeforeThisSend: outboundBefore,
+            });
+            const nextReview = new Date(now.getTime() + reviewHours * 60 * 60 * 1000);
             await prisma.lead.update({
               where: { id: lead.id },
               data: {

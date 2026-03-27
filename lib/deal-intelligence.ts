@@ -152,6 +152,12 @@ export function analyzeDealHealth(lead: LeadWithRelations): DealSignals {
       break;
   }
 
+  // Zero inbound replies: widen spacing between reviews (cron eligibility). SMS sends are still
+  // capped by the 4h guardrail, but this prevents near-daily autonomous retries on silent leads.
+  if (repliedCount === 0 && outboundMessages.length > 0 && temperature !== 'hot') {
+    nextReviewHours = nextReviewHoursAfterZeroReplyOutbound(outboundMessages.length);
+  }
+
   // === REASONING CONTEXT ===
   const reasoningContext = [
     `Status: ${lead.status}`,
@@ -183,6 +189,31 @@ export function analyzeDealHealth(lead: LeadWithRelations): DealSignals {
     reasoningContext,
     nextReviewHours,
   };
+}
+
+/**
+ * Hours until Holly should run again after an outbound touch, for leads who have never replied.
+ * Increasing gaps: 3d, 4d, 5d, 7d, 9d, then 14d.
+ */
+export function nextReviewHoursAfterZeroReplyOutbound(touchCountAfterSend: number): number {
+  const gapsHours = [72, 96, 120, 168, 216, 336];
+  const idx = Math.min(Math.max(touchCountAfterSend - 1, 0), gapsHours.length - 1);
+  return gapsHours[idx];
+}
+
+/**
+ * After sending SMS (or equivalent outbound), merge temperature-based scheduling with zero-reply backoff.
+ * `outboundCountBeforeThisSend` = outbound count in DB before this send is persisted.
+ */
+export function resolveNextReviewHoursAfterOutbound(params: {
+  signals: DealSignals;
+  inboundCount: number;
+  outboundCountBeforeThisSend: number;
+}): number {
+  if (params.inboundCount > 0 || params.signals.temperature === 'hot') {
+    return params.signals.nextReviewHours;
+  }
+  return nextReviewHoursAfterZeroReplyOutbound(params.outboundCountBeforeThisSend + 1);
 }
 
 // === HELPER FUNCTIONS ===
