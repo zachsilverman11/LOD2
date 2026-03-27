@@ -23,7 +23,13 @@ import { getConversationGuidance, SALES_PSYCHOLOGY } from './brain';
 import { getRelevantExamples } from './examples';
 import { LEARNED_EXAMPLES } from './examples';
 import { getLocalTime, getLocalTimeString } from '../timezone-utils';
-import { getAvailableSlots, getTimezoneForProvince, TimeSlot } from '../calcom';
+import {
+  getAvailableSlots,
+  getAvailabilityWindow,
+  getTimezoneForProvince,
+  CALCOM_AVAILABILITY_DEFAULT_DAYS_AHEAD,
+  TimeSlot,
+} from '../calcom';
 import {
   detectConversationStage,
   buildStageEnforcementPrompt,
@@ -426,15 +432,13 @@ Supportive, helpful, customer-service oriented. NOT sales-y.
 `
       : '';
 
-  // Pre-fetch 7-day availability so Holly can offer specific times
+  // Pre-fetch live availability (shared window with conversation-handler via getAvailabilityWindow)
   let availabilitySummary = "";
   try {
     const tz = getTimezoneForProvince(province);
-    const today = new Date();
-    const startDate = today.toLocaleDateString("en-CA"); // YYYY-MM-DD
-    const endDate = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString("en-CA");
+    const { start, end } = getAvailabilityWindow();
 
-    const slots = await getAvailableSlots(startDate, endDate, tz);
+    const slots = await getAvailableSlots(start, end, tz);
 
     if (slots.length > 0) {
       const slotsByDay: Record<string, TimeSlot[]> = {};
@@ -1004,10 +1008,10 @@ If the lead's **last inbound message** is a concrete time or day choice (e.g. "T
 
 **🗓️ DIRECT BOOKING — YOUR #1 CONVERSION TOOL 🗓️**
 
-${availabilitySummary ? `**📅 GREG'S LIVE AVAILABILITY (next 7 days):**
+${availabilitySummary ? `**📅 GREG'S LIVE AVAILABILITY (next ${CALCOM_AVAILABILITY_DEFAULT_DAYS_AHEAD} days):**
 ${availabilitySummary}
 
-You KNOW these times are available RIGHT NOW. Use them proactively.` : `**📅 LIVE CALENDAR DATA:** Open slots for the next 7 days are **not** in this prompt right now (the fetch failed, or the API returned no times).
+You KNOW these times are available RIGHT NOW. Use them proactively.` : `**📅 LIVE CALENDAR DATA:** Open slots for the next ${CALCOM_AVAILABILITY_DEFAULT_DAYS_AHEAD} days are **not** in this prompt right now (the fetch failed, or the API returned no times).
 
 **Do not** jump to \`send_booking_link\` as your first move.
 
@@ -1041,9 +1045,9 @@ If they say "2pm today" or "tomorrow morning" — find the closest matching slot
 
 **TWO-MODE BOOKING LOGIC:**
 
-**Mode 1 — Near-term (within 7 days):** Use the pre-fetched availability above. Offer 2-3 specific times, and book directly when they pick one.
+**Mode 1 — Near-term (within the pre-fetched window, ~${CALCOM_AVAILABILITY_DEFAULT_DAYS_AHEAD} days):** Use the pre-fetched availability above. Offer 2-3 specific times, and book directly when they pick one.
 
-**Mode 2 — Future date (beyond 7 days):** When the lead mentions a future month or date beyond the available slots above:
+**Mode 2 — Future date (beyond that window):** When the lead mentions a future month or date beyond the available slots above:
 1. Acknowledge the timeframe enthusiastically (e.g., "May works great!")
 2. Ask for their preferred day and time within that month
 3. Once the lead gives a specific day/time, use action "book_directly" with that exact datetime — do NOT require pre-fetched availability
@@ -1057,7 +1061,7 @@ If they say "2pm today" or "tomorrow morning" — find the closest matching slot
 - When the live availability list **is** shown above: for near-term bookings, only offer times from that list; never invent times
 - When **no** list is shown (fetch failed or empty): use \`send_sms\` to ask preferred day/time, then \`book_directly\` when they specify — still avoid \`send_booking_link\` unless they ask for the link or you're truly stuck after multiple tries
 - Never make up specific slot times as if they were from Cal.com when you don't have the list
-- For future-date bookings (beyond 7 days), trust the lead's preferred time and book directly
+- For future-date bookings (beyond the pre-fetched window), trust the lead's preferred time and book directly
 - When you say "I'll book that for you" — you MUST use action: "book_directly" to actually do it
 - NEVER send the booking link as a "helpful" first move — always try to book directly first
 

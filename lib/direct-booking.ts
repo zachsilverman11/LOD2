@@ -10,6 +10,11 @@ export interface DirectBookingDecisionInput {
   bookingLeadTimezone?: string;
   message?: string;
   reasoning?: string;
+  /** Audit: executeDecision action (e.g. book_appointment_directly) */
+  hollyAction?: string;
+  /** Audit: decision-engine tool / original action when different from hollyAction */
+  hollyIntent?: string;
+  availabilitySlotsProvided?: boolean;
 }
 
 export interface DirectBookingOptions {
@@ -148,6 +153,11 @@ export async function bookLeadAppointmentDirectly(
           bookingUid: booking.uid,
           bookedAt: booking.startTime,
           directBooking: true,
+          hollyAction: decision.hollyAction ?? "book_appointment_directly",
+          ...(decision.hollyIntent != null && { hollyIntent: decision.hollyIntent }),
+          ...(decision.availabilitySlotsProvided !== undefined && {
+            availabilitySlotsProvided: decision.availabilitySlotsProvided,
+          }),
         },
       },
     });

@@ -391,6 +391,8 @@ export async function processLeadWithAutonomousAgent(
             action: 'send_sms',
             message: decision.message,
             reasoning: `Stage transition message: ${lead.status} → ${decision.newStage}`,
+            intent: decision.action,
+            availabilitySlotsProvided: decision._availabilitySlotsProvided === true,
           });
         }
 
@@ -475,6 +477,8 @@ export async function processLeadWithAutonomousAgent(
           action: executionAction,
           message: decision.message,
           reasoning: decision.thinking,
+          intent: decision.action,
+          availabilitySlotsProvided: decision._availabilitySlotsProvided === true,
           // Pass booking fields if this is a direct booking
           ...(decision.action === 'book_directly' && {
             bookingStartTime: (decision as any).bookingStartTime,
@@ -828,6 +832,8 @@ export async function runHollyAgentLoop() {
               action: executionAction,
               message: decision.message,
               reasoning: decision.thinking,
+              intent: decision.action,
+              availabilitySlotsProvided: decision._availabilitySlotsProvided === true,
               ...(decision.action === 'book_directly' && {
                 bookingStartTime: (decision as any).bookingStartTime,
                 bookingLeadName: (decision as any).bookingLeadName,

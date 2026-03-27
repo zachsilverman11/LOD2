@@ -6,7 +6,9 @@ import { sendErrorAlert, sendSlackNotification } from "../slack";
 import { quickDelay } from "../human-delay";
 import {
   getAvailableSlots,
+  getAvailabilityWindow,
   getTimezoneForProvince,
+  CALCOM_AVAILABILITY_DEFAULT_DAYS_AHEAD,
   type TimeSlot,
 } from "../calcom";
 import { ACTIVE_APPOINTMENT_STATUSES } from "../appointment-status";
@@ -75,6 +77,24 @@ interface AIDecision {
   bookingLeadName?: string;
   bookingLeadEmail?: string;
   bookingLeadTimezone?: string;
+  /** Claude tool name (handleConversation) or decision-engine action before execute mapping (automation / agent) */
+  intent?: string;
+  /** Whether live Cal.com slots were present in Holly's context for this turn */
+  availabilitySlotsProvided?: boolean;
+}
+
+/** SMS Communication audit fields — merge at create time */
+function hollyOutboundSmsMetadata(
+  decision: AIDecision,
+  extra?: Record<string, unknown>
+): Record<string, unknown> {
+  const meta: Record<string, unknown> = { ...(extra || {}) };
+  meta.hollyAction = decision.action;
+  if (decision.intent != null) meta.hollyIntent = decision.intent;
+  if (decision.availabilitySlotsProvided !== undefined) {
+    meta.availabilitySlotsProvided = decision.availabilitySlotsProvided;
+  }
+  return meta;
 }
 
 interface BookingAvailabilityContext {
@@ -193,7 +213,7 @@ If the lead is ready to book, use \`send_booking_link\` as the fallback.`;
     .join("\n");
 
   return `# LIVE CALENDAR AVAILABILITY
-These are REAL live Cal.com slots for the next 7 days.
+These are REAL live Cal.com slots for the next ${CALCOM_AVAILABILITY_DEFAULT_DAYS_AHEAD} days.
 
 Use this timezone when speaking to the lead: ${timeZone}
 
@@ -203,7 +223,7 @@ Use this timezone when speaking to the lead: ${timeZone}
 - \`bookingStartTime\` MUST be one exact ISO time from the list below
 - Only use \`send_booking_link\` as a fallback when:
   1. availability is unavailable
-  2. they want a time outside this 7-day window
+  2. they want a time outside this prefetched window (~${CALCOM_AVAILABILITY_DEFAULT_DAYS_AHEAD} days)
   3. you have already offered multiple options and none work
 
 LIVE SLOT LIST:
@@ -224,11 +244,8 @@ async function getBookingAvailabilityContext(
   const timeZone = getTimezoneForProvince(province);
 
   try {
-    const startDate = new Date().toISOString();
-    const endDate = new Date(
-      Date.now() + 7 * 24 * 60 * 60 * 1000
-    ).toISOString();
-    const slots = await getAvailableSlots(startDate, endDate, timeZone);
+    const { start, end } = getAvailabilityWindow();
+    const slots = await getAvailableSlots(start, end, timeZone);
 
     return {
       timeZone,
@@ -1496,6 +1513,10 @@ Remember: The goal of message #1 is NOT to book them. It's to demonstrate you re
       break;
   }
 
+  decision.intent = toolUse.name;
+  decision.availabilitySlotsProvided =
+    bookingAvailability != null && bookingAvailability.slots.length > 0;
+
   return decision;
 }
 
@@ -1651,7 +1672,9 @@ export async function executeDecision(
               channel: "SMS",
               direction: "OUTBOUND",
               content: decision.message,
-              metadata: { aiReasoning: decision.reasoning },
+              metadata: hollyOutboundSmsMetadata(decision, {
+                aiReasoning: decision.reasoning,
+              }),
             },
           });
 
@@ -1782,7 +1805,10 @@ export async function executeDecision(
               channel: "SMS",
               direction: "OUTBOUND",
               content: decision.message,
-              metadata: { aiReasoning: decision.reasoning, multiChannel: true },
+              metadata: hollyOutboundSmsMetadata(decision, {
+                aiReasoning: decision.reasoning,
+                multiChannel: true,
+              }),
             },
           });
 
@@ -1852,7 +1878,10 @@ export async function executeDecision(
                 direction: "OUTBOUND",
                 content: fallbackMsg,
                 intent: "booking_link_sent",
-                metadata: { aiReasoning: decision.reasoning, fallbackReason: "no_email" },
+                metadata: hollyOutboundSmsMetadata(decision, {
+                  aiReasoning: decision.reasoning,
+                  fallbackReason: "no_email",
+                }),
               },
             });
             await updateLeadAfterContact(leadId, lead.status);
@@ -1872,6 +1901,9 @@ export async function executeDecision(
                 ),
               message: decision.message,
               reasoning: decision.reasoning,
+              hollyAction: decision.action,
+              hollyIntent: decision.intent,
+              availabilitySlotsProvided: decision.availabilitySlotsProvided,
             },
             {
               sendConfirmationSms: true,
@@ -1925,11 +1957,11 @@ export async function executeDecision(
                 direction: "OUTBOUND",
                 content: fallbackMessage,
                 intent: "booking_link_sent",
-                metadata: {
+                metadata: hollyOutboundSmsMetadata(decision, {
                   aiReasoning: decision.reasoning,
                   directBookingFailed: true,
                   error: error instanceof Error ? error.message : String(error),
-                },
+                }),
               },
             });
 
@@ -2016,7 +2048,9 @@ export async function executeDecision(
               direction: "OUTBOUND",
               content: messageWithLink,
               intent: "booking_link_sent",
-              metadata: { aiReasoning: decision.reasoning },
+              metadata: hollyOutboundSmsMetadata(decision, {
+                aiReasoning: decision.reasoning,
+              }),
             },
           });
         } catch (error) {
@@ -2053,7 +2087,9 @@ export async function executeDecision(
               direction: "OUTBOUND",
               content: messageWithLink,
               intent: "application_link_sent",
-              metadata: { aiReasoning: decision.reasoning },
+              metadata: hollyOutboundSmsMetadata(decision, {
+                aiReasoning: decision.reasoning,
+              }),
             },
           });
 

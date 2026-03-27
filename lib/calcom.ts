@@ -158,6 +158,21 @@ export function getTimezoneForProvince(province?: string): string {
 
 // ─── V2: Available Slots ────────────────────────────────────────────────────
 
+/** Default horizon for Holly slot pre-fetch (sync prompts with `getAvailabilityWindow()`). */
+export const CALCOM_AVAILABILITY_DEFAULT_DAYS_AHEAD = 21;
+
+/**
+ * Single source of truth for Cal.com slots query range.
+ * Returns ISO 8601 datetimes accepted by `getAvailableSlots` (same format both Holly paths use).
+ */
+export function getAvailabilityWindow(
+  daysAhead: number = CALCOM_AVAILABILITY_DEFAULT_DAYS_AHEAD
+): { start: string; end: string } {
+  const start = new Date();
+  const end = new Date(start.getTime() + daysAhead * 24 * 60 * 60 * 1000);
+  return { start: start.toISOString(), end: end.toISOString() };
+}
+
 /**
  * Get available time slots for a given date range (Cal.com v2).
  *

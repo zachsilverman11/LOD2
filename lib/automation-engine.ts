@@ -52,6 +52,8 @@ async function getHollyDecision(leadId: string): Promise<{
   bookingStartTime?: string;
   bookingLeadName?: string;
   bookingLeadEmail?: string;
+  intent?: string;
+  availabilitySlotsProvided?: boolean;
 }> {
   // 1. Load lead with full context (communications, appointments, callOutcomes)
   const lead = await prisma.lead.findUnique({
@@ -149,6 +151,8 @@ async function getHollyDecision(leadId: string): Promise<{
     reasoning: hollyDecision.thinking,
     newStage: hollyDecision.newStage,
     followupHours: hollyDecision.waitHours,
+    intent: hollyDecision.action,
+    availabilitySlotsProvided: hollyDecision._availabilitySlotsProvided === true,
   };
 
   if (action === "book_appointment_directly") {

@@ -6,7 +6,9 @@ import { sendErrorAlert, sendSlackNotification } from "./slack";
 import { quickDelay } from "./human-delay";
 import {
   getAvailableSlots,
+  getAvailabilityWindow,
   getTimezoneForProvince,
+  CALCOM_AVAILABILITY_DEFAULT_DAYS_AHEAD,
   type TimeSlot,
 } from "./calcom";
 import { ACTIVE_APPOINTMENT_STATUSES } from "./appointment-status";
@@ -176,7 +178,7 @@ If the lead is ready to book, use \`send_booking_link\` as the fallback.`;
     .join("\n");
 
   return `# LIVE CALENDAR AVAILABILITY
-These are REAL live Cal.com slots for the next 7 days.
+These are REAL live Cal.com slots for the next ${CALCOM_AVAILABILITY_DEFAULT_DAYS_AHEAD} days.
 
 Use this timezone when speaking to the lead: ${timeZone}
 
@@ -186,7 +188,7 @@ Use this timezone when speaking to the lead: ${timeZone}
 - \`bookingStartTime\` MUST be one exact ISO time from the list below
 - Only use \`send_booking_link\` as a fallback when:
   1. availability is unavailable
-  2. they want a time outside this 7-day window
+  2. they want a time outside this prefetched window (~${CALCOM_AVAILABILITY_DEFAULT_DAYS_AHEAD} days)
   3. you have already offered multiple options and none work
 
 LIVE SLOT LIST:
@@ -207,11 +209,8 @@ async function getBookingAvailabilityContext(
   const timeZone = getTimezoneForProvince(province);
 
   try {
-    const startDate = new Date().toISOString();
-    const endDate = new Date(
-      Date.now() + 7 * 24 * 60 * 60 * 1000
-    ).toISOString();
-    const slots = await getAvailableSlots(startDate, endDate, timeZone);
+    const { start, end } = getAvailabilityWindow();
+    const slots = await getAvailableSlots(start, end, timeZone);
 
     return {
       timeZone,

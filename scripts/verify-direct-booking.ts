@@ -1,11 +1,10 @@
 import { prisma } from "../lib/db";
 import { handleConversation } from "../lib/holly/conversation-handler";
 import { bookLeadAppointmentDirectly } from "../lib/direct-booking";
-import { getAvailableSlots, cancelCalComBooking } from "../lib/calcom";
+import { getAvailableSlots, getAvailabilityWindow, cancelCalComBooking } from "../lib/calcom";
 
 async function main() {
-  const start = new Date().toISOString();
-  const end = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const { start, end } = getAvailabilityWindow();
   const slots = await getAvailableSlots(start, end, "America/Vancouver");
 
   if (slots.length === 0) {
