@@ -7,6 +7,7 @@ import { executeDecision } from "@/lib/holly/conversation-handler";
 import { askHollyToDecide } from "@/lib/holly/decision-engine";
 import { analyzeDealHealth } from "@/lib/deal-intelligence";
 import { validateDecision, HollyDecision } from "@/lib/holly/guardrails";
+import { detectConversationStage } from "@/lib/holly/stage";
 import { sendSlackNotification, sendErrorAlert, sendSlackAlertWithDedup, hasUpcomingAppointment } from "@/lib/slack";
 import { ACTIVE_APPOINTMENT_STATUSES } from "@/lib/appointment-status";
 
@@ -48,6 +49,9 @@ async function getHollyDecision(leadId: string): Promise<{
   reasoning: string;
   newStage?: string;
   followupHours?: number;
+  bookingStartTime?: string;
+  bookingLeadName?: string;
+  bookingLeadEmail?: string;
 }> {
   // 1. Load lead with full context (communications, appointments, callOutcomes)
   const lead = await prisma.lead.findUnique({
@@ -86,8 +90,24 @@ async function getHollyDecision(leadId: string): Promise<{
   // 4. Ask Holly (Claude) to decide
   const hollyDecision = await askHollyToDecide(lead, signals);
 
-  // 5. Validate the decision with safety guardrails
-  const validation = validateDecision(hollyDecision, { lead, signals });
+  const conversationStage = detectConversationStage({
+    lead: {
+      status: lead.status,
+      applicationStartedAt: lead.applicationStartedAt || null,
+      applicationCompletedAt: lead.applicationCompletedAt || null,
+    },
+    appointments: lead.appointments || [],
+    callOutcomes: lead.callOutcomes || [],
+    communications: lead.communications || [],
+  });
+
+  // 5. Validate the decision with safety guardrails (match autonomous agent: slot + stage context)
+  const validation = validateDecision(hollyDecision, {
+    lead,
+    signals,
+    conversationStage,
+    availabilitySlotsProvided: hollyDecision._availabilitySlotsProvided === true,
+  });
 
   if (!validation.isValid) {
     console.log(`[getHollyDecision] Decision blocked by guardrails: ${validation.errors.join(", ")}`);
@@ -114,17 +134,33 @@ async function getHollyDecision(leadId: string): Promise<{
     };
   }
 
-  // 6. Convert HollyDecision to AIDecision format
-  // Map 'wait' action to 'do_nothing' (executeDecision doesn't support 'wait')
-  const action = hollyDecision.action === "wait" ? "do_nothing" : hollyDecision.action;
+  // 6. Convert HollyDecision to AIDecision format for executeDecision
+  // Map 'wait' → 'do_nothing'; 'book_directly' → 'book_appointment_directly' (executeDecision switch)
+  let action: string =
+    hollyDecision.action === "wait"
+      ? "do_nothing"
+      : hollyDecision.action === "book_directly"
+        ? "book_appointment_directly"
+        : hollyDecision.action;
 
-  return {
+  const base = {
     action,
     message: hollyDecision.message,
     reasoning: hollyDecision.thinking,
     newStage: hollyDecision.newStage,
     followupHours: hollyDecision.waitHours,
   };
+
+  if (action === "book_appointment_directly") {
+    return {
+      ...base,
+      bookingStartTime: hollyDecision.bookingStartTime,
+      bookingLeadName: hollyDecision.bookingLeadName,
+      bookingLeadEmail: hollyDecision.bookingLeadEmail,
+    };
+  }
+
+  return base;
 }
 
 /**

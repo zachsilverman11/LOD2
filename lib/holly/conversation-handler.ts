@@ -1914,9 +1914,7 @@ export async function executeDecision(
           // Fallback: send booking link instead
           try {
             const bookingUrl = process.env.CAL_COM_BOOKING_URL || "https://cal.com/your-link";
-            const fallbackMessage = decision.message.includes("booked")
-              ? `Hey ${lead.firstName || "there"}! I'm having a bit of trouble locking that time in on my end. Here's our calendar so you can grab it directly — should only take a sec!\n\n${bookingUrl}`
-              : `${decision.message}\n\n${bookingUrl}`;
+            const fallbackMessage = `Hey ${lead.firstName || "there"}! Something went wrong on my end finishing the booking. Here's the link to grab that time (or another slot) directly:\n\n${bookingUrl}`;
 
             await sendSms({ to: lead.phone, body: fallbackMessage });
 
