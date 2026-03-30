@@ -293,11 +293,12 @@ export async function getAvailableSlotsForDay(
 export async function createDirectBooking(
   params: DirectBookingParams
 ): Promise<BookingConfirmation> {
-  // Use the authenticated v2 API endpoint so the booking goes to the team's
-  // round-robin hosts (not Zach's personal calendar). The old unauthenticated
-  // public endpoint (app.cal.com/api/book/event) falls back to the team admin's
-  // personal event type when given a team ROUND_ROBIN event type ID.
-  const apiKey = getApiKey();
+  // IMPORTANT: Do NOT send an Authorization header here.
+  // The team event type (round-robin) is public — no auth needed.
+  // When we authenticated with Zach's personal API key, Cal.com treated him
+  // as the organizer and routed every booking to his personal calendar instead
+  // of round-robin-ing to Greg / Jakub.  Unauthenticated v2 bookings respect
+  // the team's scheduling type correctly.
   const eventTypeId = params.eventTypeId || parseInt(process.env.CALCOM_EVENT_TYPE_ID || "") || DEFAULT_EVENT_TYPE_ID;
 
   const body = {
@@ -319,7 +320,6 @@ export async function createDirectBooking(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
       "cal-api-version": CALCOM_API_VERSION_BOOKINGS,
     },
     body: JSON.stringify(body),
