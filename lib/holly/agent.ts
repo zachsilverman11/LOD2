@@ -567,7 +567,7 @@ export async function runHollyAgentLoop() {
 
     const leadsToReview = await prisma.lead.findMany({
       where: {
-        status: { notIn: ['LOST', 'CONVERTED', 'DEALS_WON', 'APPLICATION_STARTED'] },
+        status: { notIn: ['LOST', 'CONVERTED', 'DEALS_WON', 'APPLICATION_STARTED', 'CALL_SCHEDULED'] },
         consentSms: true,
         managedByAutonomous: true, // Only autonomous leads
         hollyDisabled: false, // Skip leads with Holly disabled (manual relationships)
@@ -916,7 +916,7 @@ export async function runHollyAgentLoop() {
         hollyDisabled: false,
         consentSms: true,
         managedByAutonomous: true,
-        status: { notIn: ['LOST', 'CONVERTED', 'DEALS_WON', 'APPLICATION_STARTED'] },
+        status: { notIn: ['LOST', 'CONVERTED', 'DEALS_WON', 'APPLICATION_STARTED', 'CALL_SCHEDULED'] },
       },
       select: {
         id: true,
