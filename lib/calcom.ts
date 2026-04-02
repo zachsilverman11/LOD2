@@ -21,42 +21,11 @@ const CALCOM_API_VERSION_BOOKINGS = "2024-08-13";
 // ─── Public booking endpoint (same as cal.com booking page — no auth needed) ───
 const CALCOM_PUBLIC_BOOKING_URL = "https://app.cal.com/api/book/event";
 
-// ─── V1 base URL kept for backward-compatible cancel/reschedule if needed ───
-const CALCOM_API_V1_URL = "https://api.cal.com/v1";
 
 // ─── Known event type ID (discovered from public booking page) ───
 const DEFAULT_EVENT_TYPE_ID = 3298267;
 
 // ─── Types ──────────────────────────────────────────────────────────────────
-
-export interface CalComBooking {
-  id: number;
-  uid: string;
-  title: string;
-  description?: string;
-  startTime: string;
-  endTime: string;
-  attendees: {
-    name: string;
-    email: string;
-    timeZone: string;
-  }[];
-  metadata?: Record<string, unknown>;
-}
-
-export interface CreateBookingParams {
-  eventTypeId: number;
-  start: string; // ISO 8601 format
-  responses: {
-    name: string;
-    email: string;
-    guests?: string[];
-    notes?: string;
-  };
-  timeZone?: string;
-  language?: string;
-  metadata?: Record<string, unknown>;
-}
 
 export interface TimeSlot {
   /** ISO 8601 UTC start time */
@@ -90,31 +59,6 @@ export interface BookingConfirmation {
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
-
-function getApiKey(): string {
-  const apiKey = process.env.CALCOM_API_KEY;
-  if (!apiKey) {
-    throw new Error("CALCOM_API_KEY is not set");
-  }
-  return apiKey;
-}
-
-function getEventTypeId(): number {
-  const id = process.env.CALCOM_EVENT_TYPE_ID;
-  if (!id) {
-    throw new Error("CALCOM_EVENT_TYPE_ID is not set");
-  }
-  return parseInt(id, 10);
-}
-
-/** Standard v2 headers */
-function v2Headers(apiKey: string): Record<string, string> {
-  return {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${apiKey}`,
-    "cal-api-version": CALCOM_API_VERSION_BOOKINGS,
-  };
-}
 
 /**
  * Determine timezone for a lead based on province.
@@ -357,86 +301,3 @@ export async function createDirectBooking(
   };
 }
 
-// ─── Legacy v1 functions (preserved for backward compatibility) ─────────────
-
-/**
- * Create a new booking in Cal.com (v1 — legacy)
- * @deprecated Use createDirectBooking (v2) instead
- */
-export async function createCalComBooking(
-  params: CreateBookingParams
-): Promise<CalComBooking> {
-  const apiKey = getApiKey();
-
-  const response = await fetch(`${CALCOM_API_V1_URL}/bookings`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(params),
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Cal.com API error: ${error}`);
-  }
-
-  return response.json();
-}
-
-/**
- * Cancel a booking
- */
-export async function cancelCalComBooking(
-  bookingId: number,
-  reason?: string
-): Promise<void> {
-  const apiKey = getApiKey();
-
-  const response = await fetch(
-    `${CALCOM_API_V1_URL}/bookings/${bookingId}/cancel?apiKey=${encodeURIComponent(apiKey)}`,
-    {
-      method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ reason }),
-    }
-  );
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Cal.com API error: ${error}`);
-  }
-}
-
-/**
- * Reschedule a booking
- */
-export async function rescheduleCalComBooking(
-  bookingUid: string,
-  newStart: string,
-  reason?: string
-): Promise<CalComBooking> {
-  const apiKey = getApiKey();
-
-  const response = await fetch(
-    `${CALCOM_API_V1_URL}/bookings/${bookingUid}/reschedule`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({ start: newStart, reason }),
-    }
-  );
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Cal.com API error: ${error}`);
-  }
-
-  return response.json();
-}

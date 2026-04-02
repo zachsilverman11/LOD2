@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { createCalComBooking } from "@/lib/calcom";
 import { ActivityType, CommunicationChannel, LeadStatus } from "@/app/generated/prisma";
 import { sendSlackNotification } from "@/lib/slack";
 
@@ -118,21 +117,8 @@ async function handleFunctionCall(payload: any) {
         throw new Error("CALCOM_EVENT_TYPE_ID not configured");
       }
 
-      const booking = await createCalComBooking({
-        eventTypeId,
-        start: preferredDate || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // Default to tomorrow
-        responses: {
-          name: name || `${lead.firstName} ${lead.lastName}`,
-          email: email || lead.email,
-          notes: notes || "Booked via AI voice assistant",
-        },
-        timeZone: "America/Toronto",
-        metadata: {
-          leadId,
-          source: "voice_ai",
-          callId: call.id,
-        },
-      });
+      // TODO: Migrate to createDirectBooking (v2) before re-enabling VAPI
+      throw new Error("VAPI booking disabled — Cal.com v1 API removed. Migrate to createDirectBooking (v2).");
 
       // Create appointment record
       await prisma.appointment.create({
