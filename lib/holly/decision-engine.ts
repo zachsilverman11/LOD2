@@ -154,6 +154,7 @@ export async function askHollyToDecide(
   // Build rich context briefing
   const hollyBriefing = buildHollyBriefing({
     leadData: rawData,
+    leadEmail: lead.email,
     conversationContext: {
       touchNumber: outboundCount + 1,
       hasReplied: inboundCount > 0,
