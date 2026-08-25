@@ -1301,9 +1301,10 @@ ${suggestedPrograms
 `;
   }
 
-  // Add booking hook based on conversation signals
-  const selectedHook = selectBookingHook(conversationContext.messageHistory);
-  briefing += `
+  // Add booking hook based on conversation signals (SKIP for alt_private)
+  if (!isAltPrivate) {
+    const selectedHook = selectBookingHook(conversationContext.messageHistory);
+    briefing += `
 ---
 
 ## 🪝 BOOKING HOOK: "${selectedHook.name}"
@@ -1318,6 +1319,30 @@ ${selectedHook.followUpNudge}
 
 **Remember:** Adapt this to the conversation. Don't copy-paste. The hook is the ANGLE, not a script.
 `;
+  } else {
+    // Alt_private: solutions-track CTA (no rate/qualify/cash-back language)
+    briefing += `
+---
+
+## 📞 CALL-TO-ACTION FOR ALT_PRIVATE
+
+**The call is to understand the real blocker and see if a path exists.**
+
+**Good CTAs:**
+- "Quick call so the team can understand what's going on and see if there's a path. Sound good?"
+- "The team works these files all the time. Short call to understand your situation and see what's possible. Does this afternoon work?"
+- "Let's get you on a quick call with the team. They can understand the full picture and see if they can help. When works for you?"
+
+**Avoid:**
+- ❌ "See if you qualify"
+- ❌ "Get your rate"
+- ❌ "Access our reserved rates"
+- ❌ "Cash back available"
+- ❌ "Best rate comparison"
+
+**Frame it as:** An honest conversation, not a sales pitch or qualification test.
+`;
+  }
 
   // Add YouTube show hook (trust-building, NOT a booking pitch)
   if (youtubeLink) {

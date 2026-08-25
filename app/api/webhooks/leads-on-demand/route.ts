@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
   try {
     const payload = await req.json();
 
-    console.log("[Leads on Demand] Received lead:", payload);
+    console.log("[Leads on Demand] Received lead - processing");
 
     // Log the webhook
     await prisma.webhookEvent.create({
@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      console.log(`[Leads on Demand] Updated existing lead: ${lead.id}`);
+      console.log(`[Leads on Demand] Updated existing lead: ${lead.id}, source: leads_on_demand`);
     } else {
       // Get current cohort config
       const cohortConfig = await prisma.cohortConfig.findFirst({
@@ -185,7 +185,7 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      console.log(`[Leads on Demand] Created new lead: ${lead.id}`);
+      console.log(`[Leads on Demand] Created new lead: ${lead.id}, source: leads_on_demand`);
 
       // Send Slack notification for new lead
       const loanInfo = payload.loanType === "purchase"

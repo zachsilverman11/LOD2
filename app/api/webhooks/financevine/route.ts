@@ -24,9 +24,27 @@ import { deriveLeadSegment, formatPhoneE164 } from "@/lib/lead-segmentation";
  */
 export async function POST(req: NextRequest) {
   try {
+    // Optional webhook authentication
+    const webhookSecret = process.env.FINANCEVINE_WEBHOOK_SECRET;
+    if (webhookSecret) {
+      const headerSecret = req.headers.get("X-Webhook-Secret");
+      const querySecret = req.nextUrl.searchParams.get("key");
+      const providedSecret = headerSecret || querySecret;
+
+      if (providedSecret !== webhookSecret) {
+        console.warn("[FinanceVine] Webhook authentication failed - invalid secret");
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401 }
+        );
+      }
+    } else {
+      console.warn("[FinanceVine] FINANCEVINE_WEBHOOK_SECRET not set - webhook is unauthenticated");
+    }
+
     const payload = await req.json();
 
-    console.log("[FinanceVine] Received lead:", payload);
+    console.log("[FinanceVine] Received lead - processing");
 
     // Log the webhook
     await prisma.webhookEvent.create({
@@ -131,7 +149,7 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      console.log(`[FinanceVine] Updated existing lead: ${lead.id}`);
+      console.log(`[FinanceVine] Updated existing lead: ${lead.id}, source: financevine`);
     } else {
       // Get current cohort config
       const cohortConfig = await prisma.cohortConfig.findFirst({
@@ -190,7 +208,7 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      console.log(`[FinanceVine] Created new lead: ${lead.id}`);
+      console.log(`[FinanceVine] Created new lead: ${lead.id}, source: financevine`);
 
       // Send Slack notification for new lead
       const goalInfo = primaryGoal || mortgageType || "mortgage inquiry";

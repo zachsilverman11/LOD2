@@ -54,15 +54,42 @@ All unmapped fields will be stored in `rawData` for future reference.
 
 ## Security
 
-The webhook currently accepts any POST request. To secure it:
+### Environment Variables
 
-1. **Option A: Shared secret header**
-   - Add a custom header in Zapier: `X-FinanceVine-Secret: your-secret-key`
-   - Update the webhook route to validate this header
+Set these environment variables to enable webhook authentication:
 
-2. **Option B: Query parameter**
-   - Use: `https://your-domain.com/api/webhooks/financevine?key=your-secret-key`
-   - Update the webhook route to validate this parameter
+- `FINANCEVINE_WEBHOOK_SECRET` - Secret key for FinanceVine webhook
+- `RATES_CA_WEBHOOK_SECRET` - Secret key for rates.ca webhook (when ready)
+
+If these environment variables are **not set**, webhooks will accept unauthenticated requests (with a warning logged).
+
+If set, the webhook requires authentication via **Option A** or **Option B**:
+
+### Option A: Header Authentication (Recommended)
+
+Add a custom header in Zapier:
+```
+X-Webhook-Secret: your-secret-key
+```
+
+Webhook URL:
+```
+https://your-domain.com/api/webhooks/financevine
+```
+
+### Option B: Query Parameter Authentication
+
+Webhook URL with secret in query string:
+```
+https://your-domain.com/api/webhooks/financevine?key=your-secret-key
+```
+
+### Setup Steps
+
+1. Generate a strong random secret (e.g., `openssl rand -hex 32`)
+2. Set `FINANCEVINE_WEBHOOK_SECRET` in your environment (Vercel dashboard, .env file, etc.)
+3. Configure Zapier with the same secret using Option A or Option B
+4. Test the webhook - unauthenticated requests will return 401 Unauthorized
 
 ## Testing
 
