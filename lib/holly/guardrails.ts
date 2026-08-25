@@ -341,8 +341,8 @@ export function validateDecision(
   }
 
   // === HARD RULE: alt_private segment bans (private/alternative playbook) ===
-  const rawData = context.lead.rawData as any;
-  const segment = rawData?.segment || context.lead.status; // fallback to checking lead directly
+  // Read segment from schema field (context.lead.segment), fallback to rawData if needed
+  const segment = context.lead.segment || (rawData as any)?.segment;
   const isAltPrivate = segment === 'alt_private';
 
   if (isAltPrivate && decision.message) {
