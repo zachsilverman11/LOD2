@@ -581,6 +581,179 @@ export const TRAINING_EXAMPLES: TrainingExample[] = [
       ],
     },
   },
+
+  // ============================================
+  // SCENARIO 12: ALT_PRIVATE - BANK SAID NO
+  // ============================================
+  {
+    scenario: 'FinanceVine lead - bank said no (alt_private segment)',
+    leadContext: {
+      name: 'Marco',
+      type: 'refinance',
+      urgency: 'bank said no',
+      touchNumber: 1,
+    },
+    goodApproach: {
+      message: `Marco, Holly from Inspired Mortgage. FinanceVine connected us. Saw the bank wasn't an option on this one. We work files like this all the time - income, credit, whatever the blocker is. Quick call so the team can understand what's going on and see if there's a path. Sound good?`,
+      reasoning: 'Normalizes the bank rejection, shows we work these files, gets them to a call without promising funding',
+      whyItWorks: [
+        'Names the situation they already shared (bank wasn\'t an option)',
+        'Normalizes it (we work files like this all the time)',
+        'Doesn\'t promise funding or a lender',
+        'Frames call as honest look at situation',
+        'No rate hooks, no programs, no qualification language',
+        'Empathetic and understanding tone',
+      ],
+    },
+    badApproach: {
+      message: `Hi Marco! We have reserved ultra-low rates and guaranteed approvals! Cash back available. Let's see if you qualify!`,
+      whyItFails: [
+        'Uses banned alt_private phrases (ultra-low rates, guaranteed approval, cash back)',
+        'Promises things that may not be possible',
+        'Uses "see if you qualify" (judgmental)',
+        'Feels like generic sales pitch',
+        'Ignores their actual situation (bank said no)',
+        'Will trigger guardrails and be blocked',
+      ],
+    },
+  },
+
+  // ============================================
+  // SCENARIO 13: ALT_PRIVATE - NEED FUNDS ASAP
+  // ============================================
+  {
+    scenario: 'FinanceVine lead - need funds ASAP (alt_private segment)',
+    leadContext: {
+      name: 'Samantha',
+      type: 'refinance',
+      urgency: 'need funds this month',
+      touchNumber: 1,
+    },
+    goodApproach: {
+      message: `Samantha, Holly from Inspired Mortgage. Saw you need funds this month and FinanceVine connected us. Timing is tight but we work speed files all the time. Quick call so the team can understand the timeline and what's possible. Does this afternoon work?`,
+      reasoning: 'Acknowledges urgency, shows we work speed files, frames call around timeline and possibilities',
+      whyItWorks: [
+        'Names their urgency (need funds this month)',
+        'Shows we work these files (speed)',
+        'Doesn\'t promise funding, but shows urgency is understood',
+        'Frames call as honest timeline check',
+        'No rate hooks or qualification language',
+        'Respects their urgency with immediate availability',
+      ],
+    },
+    badApproach: {
+      message: `Hi! We can get you the best rates with no penalties! Quick approval guaranteed!`,
+      whyItFails: [
+        'Uses banned phrases (best rates, no penalties, guaranteed)',
+        'Ignores their actual need (speed, not rate)',
+        'Promises guaranteed approval (can\'t do that)',
+        'Feels generic and not tailored to their urgency',
+        'Will trigger guardrails',
+      ],
+    },
+  },
+
+  // ============================================
+  // SCENARIO 14: ALT_PRIVATE - DEBT CONSOLIDATION
+  // ============================================
+  {
+    scenario: 'FinanceVine lead - debt consolidation (alt_private segment)',
+    leadContext: {
+      name: 'Travis',
+      type: 'refinance',
+      urgency: 'consolidate debt',
+      touchNumber: 1,
+    },
+    goodApproach: {
+      message: `Travis, Holly from Inspired Mortgage. Saw you're looking at consolidating debt. We work these all the time. Quick call so the team can understand the full picture - property equity, what you're consolidating, all of it. Sound good?`,
+      reasoning: 'Acknowledges their goal, shows we work these files, gets them to a call to understand the full situation',
+      whyItWorks: [
+        'Names their goal (consolidating debt)',
+        'Normalizes it (we work these all the time)',
+        'Frames call as understanding the full picture',
+        'No rate promises or qualification language',
+        'Shows we need details before knowing if path exists',
+      ],
+    },
+    badApproach: {
+      message: `We can consolidate your debt with low rates! Let me pull your credit and see if you qualify!`,
+      whyItFails: [
+        'Uses banned phrases (low rates, pull your credit, see if you qualify)',
+        'Promises debt consolidation without knowing details',
+        'Too aggressive on credit pull before call',
+        'Feels pushy and salesy',
+        'Will trigger guardrails',
+      ],
+    },
+  },
+
+  // ============================================
+  // SCENARIO 15: ALT_PRIVATE - CONSTRUCTION/MESSY PROPERTY
+  // ============================================
+  {
+    scenario: 'FinanceVine lead - construction/unusual property (alt_private segment)',
+    leadContext: {
+      name: 'Alex',
+      type: 'purchase',
+      urgency: 'construction property',
+      touchNumber: 1,
+    },
+    goodApproach: {
+      message: `Alex, Holly from Inspired Mortgage. Saw you're looking at a construction property. Those can be tricky with standard lenders but we work them. Quick call so the team can understand the property situation and what's possible. Sound good?`,
+      reasoning: 'Acknowledges the unusual property, shows we work these, gets them to a call without promising approval',
+      whyItWorks: [
+        'Names the property challenge (construction)',
+        'Normalizes difficulty (tricky with standard lenders)',
+        'Shows we work these files',
+        'Frames call as understanding property and possibilities',
+        'No promises, just honest assessment',
+      ],
+    },
+    badApproach: {
+      message: `We have guaranteed approvals for any property! Reserved rates available!`,
+      whyItFails: [
+        'Uses banned phrases (guaranteed approvals, reserved rates)',
+        'Promises approval for any property (can\'t do that)',
+        'Ignores the actual challenge (construction)',
+        'Feels too good to be true',
+        'Will trigger guardrails',
+      ],
+    },
+  },
+
+  // ============================================
+  // SCENARIO 16: ALT_PRIVATE - FINANCEVINE HANDOFF
+  // ============================================
+  {
+    scenario: 'FinanceVine lead - handoff from another number (alt_private segment)',
+    leadContext: {
+      name: 'Priya',
+      type: 'refinance',
+      urgency: 'bruised credit',
+      touchNumber: 1,
+    },
+    goodApproach: {
+      message: `Priya, Holly from Inspired Mortgage. FinanceVine connected us on your refinance. Banks can be tough with credit that's not perfect but we work these files. Quick call so the team can understand your situation. Does this afternoon work?`,
+      reasoning: 'Identifies handoff source, normalizes credit issue, gets them to a call without judging',
+      whyItWorks: [
+        'Identifies as Holly from Inspired Mortgage (new number)',
+        'Credits FinanceVine for connection (they already got an intro)',
+        'Normalizes credit issue (banks can be tough)',
+        'No judgment or qualification language',
+        'Frames call as understanding, not selling',
+      ],
+    },
+    badApproach: {
+      message: `Hi! I see you filled out a FinanceVine form. We need to pull your credit to see if you qualify for our low rates.`,
+      whyItFails: [
+        'Sounds accusatory (filled out a form)',
+        'Uses banned phrases (pull your credit, see if you qualify, low rates)',
+        'Feels like they\'re in trouble or being interrogated',
+        'Doesn\'t acknowledge the handoff naturally',
+        'Will trigger guardrails',
+      ],
+    },
+  },
 ];
 
 /**

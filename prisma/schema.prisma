@@ -17,6 +17,10 @@ model Lead {
   lastName               String
   status                 LeadStatus            @default(NEW)
   source                 String?
+  segment                String?
+  intent                 String?
+  bankability            String?
+  variant                String?
   rawData                Json?
   consentEmail           Boolean               @default(false)
   consentSms             Boolean               @default(false)
