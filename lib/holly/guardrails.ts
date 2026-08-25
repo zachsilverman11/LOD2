@@ -340,6 +340,41 @@ export function validateDecision(
     }
   }
 
+  // === HARD RULE: alt_private segment bans (private/alternative playbook) ===
+  const rawData = context.lead.rawData as any;
+  const segment = rawData?.segment || context.lead.status; // fallback to checking lead directly
+  const isAltPrivate = segment === 'alt_private';
+
+  if (isAltPrivate && decision.message) {
+    const message = decision.message.toLowerCase();
+
+    // Banned phrases for alt_private segment
+    const altPrivateBannedPatterns = [
+      /\blow\s+rates?\b/i,                        // "low rates" / "low rate"
+      /\bultra[\s-]?low\b/i,                      // "ultra-low" / "ultra low"
+      /\breserved\s+rates?\b/i,                   // "reserved rates" / "reserved rate"
+      /\bno\s+penalties\b/i,                      // "no penalties"
+      /\bguaranteed\s+approval/i,                 // "guaranteed approval"
+      /\bcash\s+back\b/i,                         // "cash back"
+      /\bbest\s+rate/i,                           // "best rate"
+      /\bwhat\s+rate\s+(is|does)\s+your\s+bank/i, // "what rate is your bank at"
+      /\bpull\s+(your\s+)?credit/i,               // "pull your credit" / "pull credit"
+      /\bsee\s+if\s+you\s+qualify/i,              // "see if you qualify"
+      /\bcheck\s+if\s+you\s+qualify/i,            // "check if you qualify"
+    ];
+
+    const violations = altPrivateBannedPatterns.filter(pattern => pattern.test(message));
+    if (violations.length > 0) {
+      errors.push(
+        'CRITICAL: alt_private segment violation. This lead is private/alternative (NOT bankable). ' +
+        'Message contains banned phrase(s) for alt_private: low rates, ultra-low, reserved rates, no penalties, ' +
+        'guaranteed approval, cash back, best rate, pull credit, or see if you qualify. ' +
+        'Use the alt_private playbook: focus on understanding their situation, normalizing that banks have a box, ' +
+        'and getting them to a short call with the team.'
+      );
+    }
+  }
+
   // === SOFT WARNING: Flag long messages (>320 chars = 2 SMS) ===
   if (decision.message && decision.message.length > 320) {
     warnings.push(

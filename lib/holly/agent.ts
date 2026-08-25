@@ -151,6 +151,87 @@ export async function processLeadWithAutonomousAgent(
       console.log(`[Holly Agent] 💬 Processing SMS reply from ${lead.firstName} ${lead.lastName} (status: ${lead.status}) - reactive response allowed`);
     }
 
+    // 🚨 FINANCEVINE HANDOFF TIMING
+    // FinanceVine leads need special timing to avoid double-pitching
+    const rawData = lead.rawData as any;
+    const source = lead.source || rawData?.source || '';
+    const isFinanceVine = source === 'financevine';
+
+    if (isFinanceVine && triggerSource === 'cron') {
+      const ingestTimestamp = rawData?.ingestTimestamp;
+      const hasInboundReplies = (lead.communications || []).some(
+        (c: any) => c.direction === 'INBOUND'
+      );
+
+      if (ingestTimestamp) {
+        const ingestTime = new Date(ingestTimestamp);
+        const now = new Date();
+        const minutesSinceIngest = (now.getTime() - ingestTime.getTime()) / (1000 * 60);
+
+        // Check for opt-out indicators in first inbound (if any)
+        if (hasInboundReplies) {
+          const firstInbound = (lead.communications || [])
+            .filter((c: any) => c.direction === 'INBOUND')
+            .sort((a: any, b: any) => a.createdAt.getTime() - b.createdAt.getTime())[0];
+
+          const optOutPatterns = [
+            /\bstop\b/i,
+            /\bunsubscribe\b/i,
+            /\bdon'?t\s+(bother|contact|text|call)/i,
+            /\bno\s+longer\s+interested\b/i,
+            /\bremove\s+me\b/i,
+          ];
+
+          const isOptOut = optOutPatterns.some((pattern) =>
+            pattern.test(firstInbound.content)
+          );
+
+          if (isOptOut) {
+            console.log(
+              `[Holly Agent] 🚫 ${lead.firstName} ${lead.lastName} - FinanceVine lead opted out in first message, skipping`
+            );
+            return {
+              success: false,
+              reason: 'FinanceVine lead opted out',
+            };
+          }
+
+          // If they inbound-replied to us, respond immediately (reactive mode)
+          console.log(
+            `[Holly Agent] 💬 ${lead.firstName} ${lead.lastName} - FinanceVine lead inbound-replied, proceeding with reactive response`
+          );
+        } else {
+          // No inbound replies yet - enforce timing
+          const MIN_WAIT_MINUTES = 5; // Opt-out window
+          const HANDOFF_DELAY_MINUTES = 30; // First touch delay
+
+          if (minutesSinceIngest < MIN_WAIT_MINUTES) {
+            console.log(
+              `[Holly Agent] ⏱️  ${lead.firstName} ${lead.lastName} - FinanceVine lead ingested ${minutesSinceIngest.toFixed(1)} min ago, waiting for 5-min opt-out window`
+            );
+            return {
+              success: false,
+              reason: `FinanceVine opt-out window (${minutesSinceIngest.toFixed(1)} min < 5 min)`,
+            };
+          }
+
+          if (minutesSinceIngest < HANDOFF_DELAY_MINUTES) {
+            console.log(
+              `[Holly Agent] ⏱️  ${lead.firstName} ${lead.lastName} - FinanceVine lead ingested ${minutesSinceIngest.toFixed(1)} min ago, waiting for 30-min handoff delay`
+            );
+            return {
+              success: false,
+              reason: `FinanceVine handoff delay (${minutesSinceIngest.toFixed(1)} min < 30 min)`,
+            };
+          }
+
+          console.log(
+            `[Holly Agent] ✅ ${lead.firstName} ${lead.lastName} - FinanceVine lead passed timing checks (${minutesSinceIngest.toFixed(1)} min since ingest)`
+          );
+        }
+      }
+    }
+
     console.log(`[Holly Agent] 🔍 Processing ${lead.firstName} ${lead.lastName}...`);
 
     // === ANALYZE DEAL HEALTH ===

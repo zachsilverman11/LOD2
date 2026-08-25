@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { processLeadWithAutonomousAgent } from "@/lib/holly/agent";
 import { sendSlackNotification, sendErrorAlert } from "@/lib/slack";
 import { correctNames } from "@/lib/name-correction";
+import { deriveLeadSegment } from "@/lib/lead-segmentation";
 
 /**
  * Webhook endpoint for Leads on Demand
@@ -83,6 +84,12 @@ export async function POST(req: NextRequest) {
       phone = `+${phone}`; // Assume it's formatted correctly
     }
 
+    // Derive segment, intent, bankability
+    const segmentation = deriveLeadSegment({
+      source: "leads_on_demand",
+      rawData: payload,
+    });
+
     // Check if lead already exists
     const existingLead = await prisma.lead.findFirst({
       where: {
@@ -101,11 +108,14 @@ export async function POST(req: NextRequest) {
           lastName,
           phone,
           email: payload.email,
+          source: "leads_on_demand",
+          segment: segmentation.segment,
+          intent: segmentation.intent,
+          bankability: segmentation.bankability,
           rawData: payload,
           consentSms: payload.consent === "TRUE" || payload.consent === true,
           consentEmail: payload.consent === "TRUE" || payload.consent === true,
           consentCall: payload.consent === "TRUE" || payload.consent === true,
-          source: "leads_on_demand",
           updatedAt: new Date(),
         },
       });
@@ -135,6 +145,9 @@ export async function POST(req: NextRequest) {
           phone,
           status: "NEW",
           source: "leads_on_demand",
+          segment: segmentation.segment,
+          intent: segmentation.intent,
+          bankability: segmentation.bankability,
           rawData: payload,
           consentSms: payload.consent === "TRUE" || payload.consent === true,
           consentEmail: payload.consent === "TRUE" || payload.consent === true,
