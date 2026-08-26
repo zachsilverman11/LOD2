@@ -5,6 +5,7 @@ import { ActivityType, CommunicationChannel } from "@/app/generated/prisma";
 import { inngest } from "@/lib/inngest";
 import { sendErrorAlert } from "@/lib/slack";
 import { validateTwilioSignature } from "@/lib/twilio-signature";
+import { findLeadByPhone } from "@/lib/phone-matching";
 
 /**
  * Handle incoming SMS messages from Twilio
@@ -85,14 +86,10 @@ export async function POST(request: NextRequest) {
     // Normalize phone number
     const normalizedPhone = normalizePhoneNumber(from);
 
-    // Find lead by phone number
-    const lead = await prisma.lead.findFirst({
-      where: {
-        phone: {
-          contains: normalizedPhone.replace("+", "").slice(-10), // Match last 10 digits
-        },
-      },
-    });
+    // Find lead by phone number using deterministic matching
+    // This prevents inbound SMS from attaching to the wrong lead when multiple leads
+    // share the same last-10 digits (incident 2026-08-26: Harper Test collision)
+    const lead = await findLeadByPhone(from);
 
     if (lead) {
       // Handle opt-out (CASL compliance)
@@ -195,6 +192,20 @@ export async function POST(request: NextRequest) {
           },
         });
       }
+
+      // 🔄 CRON FALLBACK: Set nextReviewAt to now
+      // This ensures the 15-min autonomous-holly cron picks up this lead immediately
+      // if Inngest fails to process the reply (incident 2026-08-26: Harper Test never got reply)
+      // 
+      // Important: We set nextReviewAt but NOT lastContactedAt, because:
+      // - nextReviewAt = when Holly should review the lead (now = immediate)
+      // - lastContactedAt = when we last sent an outbound message (unchanged, this is inbound)
+      await prisma.lead.update({
+        where: { id: lead.id },
+        data: {
+          nextReviewAt: new Date(),
+        },
+      });
     }
 
     // Log webhook event
