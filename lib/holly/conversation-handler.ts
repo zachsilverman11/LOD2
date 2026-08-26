@@ -1458,11 +1458,34 @@ Remember: The goal of message #1 is NOT to book them. It's to demonstrate you re
   const response = await anthropic.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 1536,
-    system: systemPrompt,
+    system: [
+      {
+        type: "text",
+        text: systemPrompt,
+        cache_control: { type: "ephemeral" }
+      }
+    ],
     messages: [{ role: "user", content: userContent }],
     tools: claudeTools,
     tool_choice: { type: "any" },
   });
+
+  // Log cache performance (no PII)
+  const usage = response.usage;
+  if (usage) {
+    const cacheCreation = (usage as any).cache_creation_input_tokens || 0;
+    const cacheRead = (usage as any).cache_read_input_tokens || 0;
+    const uncached = usage.input_tokens || 0;
+    
+    if (cacheCreation > 0 || cacheRead > 0) {
+      const leadName = context.leadData?.name || context.leadData?.first_name || 'Unknown';
+      console.log(
+        `[Conversation Handler Cache] ${leadName}: ` +
+        `cache_creation=${cacheCreation} cache_read=${cacheRead} uncached=${uncached} ` +
+        `(${cacheRead > 0 ? `${Math.round((cacheRead / (cacheRead + uncached)) * 100)}% cached` : 'cache miss'})`
+      );
+    }
+  }
 
   // Parse AI response
   const toolUse = response.content.find(block => block.type === 'tool_use');
