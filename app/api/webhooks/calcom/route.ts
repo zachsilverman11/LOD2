@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { ActivityType, CommunicationChannel, LeadStatus } from "@/app/generated/prisma";
 import { sendSlackNotification } from "@/lib/slack";
 import { handleConversation, executeDecision } from "@/lib/holly/conversation-handler";
+import { findLeadByPhone } from "@/lib/phone-matching";
 
 /**
  * Handle Cal.com webhook events
@@ -87,19 +88,13 @@ async function handleBookingCreated(payload: any) {
       })
     : null;
 
-  // If not found by email, try phone number (match last 10 digits)
+  // If not found by email, try phone number (deterministic matching)
   // CRITICAL: Only match if we have a real phone number (at least 10 digits)
   // This prevents false matches when Cal.com sends "integrations:daily" or similar non-phone values
   if (!lead && attendeePhone) {
-    const phoneDigits = attendeePhone.replace(/\D/g, "").slice(-10);
+    const phoneDigits = attendeePhone.replace(/\D/g, "");
     if (phoneDigits.length >= 10) {
-      lead = await prisma.lead.findFirst({
-        where: {
-          phone: {
-            contains: phoneDigits,
-          },
-        },
-      });
+      lead = await findLeadByPhone(attendeePhone);
     }
   }
 
