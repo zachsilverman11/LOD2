@@ -30,6 +30,9 @@ export interface HollyDecision {
   bookingLeadEmail?: string;
   // Internal flag: was live Cal.com availability provided to Holly? (used by guardrails)
   _availabilitySlotsProvided?: boolean;
+  // Internal flag: availability was deliberately NOT pre-fetched (first outbound,
+  // lead has not asked about timing). Distinct from a failed/empty fetch.
+  _availabilityPrefetchSkipped?: boolean;
 }
 
 interface DecisionContext {
@@ -168,6 +171,18 @@ export function validateDecision(
       'CRITICAL: Holly chose send_booking_link but live calendar availability was provided. ' +
       'Offer specific times from the availability list and use book_directly when they pick one. ' +
       'Only send the link if availability is unavailable or all offered times were rejected.'
+    );
+  }
+
+  // === HARD RULE: Don't send booking link on the first touch ===
+  // Availability is not pre-fetched for the first outbound (see decision-engine),
+  // so `availabilitySlotsProvided` is false there. Without this rule, skipping
+  // the fetch would quietly unblock the link Holly is never allowed to send on
+  // touch 1 (brain.ts conversationFlow.touch1).
+  if (decision.action === 'send_booking_link' && decision._availabilityPrefetchSkipped) {
+    errors.push(
+      'CRITICAL: Holly chose send_booking_link on the first touch. Touch 1 is an intro plus one ' +
+      'diagnostic question — no booking link. Live availability is loaded on every later message.'
     );
   }
 

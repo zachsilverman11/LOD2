@@ -249,9 +249,18 @@ LIVE SLOT LIST:
 ${slotLines}`;
 }
 
+function buildFirstTouchAvailabilityBlock(): string {
+  return `# LIVE CALENDAR AVAILABILITY
+Not loaded for this message. This is the FIRST CONTACT — the lead has not replied yet, so this message is an intro plus one diagnostic question, not a booking ask.
+
+- Do NOT offer specific times, and do NOT use \`send_booking_link\` or \`book_appointment_directly\` here.
+- Real slots are loaded automatically on every later message, so you can offer exact times as soon as they reply.`;
+}
+
 async function getBookingAvailabilityContext(
   context: LeadContext,
-  existingAppointment?: any
+  existingAppointment?: any,
+  options: { skipPrefetch?: boolean } = {}
 ): Promise<BookingAvailabilityContext | null> {
   if (existingAppointment) {
     return null;
@@ -261,6 +270,17 @@ async function getBookingAvailabilityContext(
     context.leadData?.province ||
     (context.lead.rawData as { province?: string } | null)?.province;
   const timeZone = getTimezoneForProvince(province);
+
+  // First outbound: the first-contact playbook below forbids asking for a
+  // meeting, so the ~21-day slot grid would be fetched and never used.
+  if (options.skipPrefetch) {
+    console.log("[Cal.com] Skipped availability pre-fetch: first contact, no conversation yet");
+    return {
+      timeZone,
+      slots: [],
+      promptBlock: buildFirstTouchAvailabilityBlock(),
+    };
+  }
 
   try {
     const { start, end } = getAvailabilityWindow();
@@ -1134,9 +1154,14 @@ export async function handleConversation(
     orderBy: { scheduledAt: "asc" },
   });
 
+  // Nothing inbound, no special context and no history = the very first outbound.
+  const isFirstOutbound =
+    !incomingMessage && !specialContext && context.conversationHistory.length === 0;
+
   const bookingAvailability = await getBookingAvailabilityContext(
     context,
-    existingAppointment
+    existingAppointment,
+    { skipPrefetch: isFirstOutbound }
   );
   let systemPrompt = generateSystemPrompt(
     context,

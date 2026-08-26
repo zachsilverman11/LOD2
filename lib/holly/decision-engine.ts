@@ -508,43 +508,60 @@ Supportive, helpful, customer-service oriented. NOT sales-y.
       : '';
 
   // Pre-fetch live availability (shared window with conversation-handler via getAvailabilityWindow)
+  //
+  // Skipped on the very first outbound: touch 1 is an intro + one diagnostic
+  // question — brain.ts `conversationFlow.touch1` forbids pushing booking or
+  // sending a link — so the ~21-day slot grid is built and never used. Every
+  // later tick still pre-fetches (and now shares one HTTP call per process via
+  // the getAvailableSlots cache). `availabilityPrefetchSkipped` below keeps the
+  // guardrail on send_booking_link armed, so the skip cannot make Holly fall
+  // back to the link.
+  const availabilityPrefetchSkipped =
+    Array.isArray(lead.communications) && lead.communications.length === 0;
+
   let availabilitySummary = "";
-  try {
-    const tz = getTimezoneForProvince(province);
-    const { start, end } = getAvailabilityWindow();
+  if (availabilityPrefetchSkipped) {
+    console.log(
+      `[Cal.com] Skipped availability pre-fetch for ${firstName}: first outbound, no conversation yet`
+    );
+  } else {
+    try {
+      const tz = getTimezoneForProvince(province);
+      const { start, end } = getAvailabilityWindow();
 
-    const slots = await getAvailableSlots(start, end, tz);
+      const slots = await getAvailableSlots(start, end, tz);
 
-    if (slots.length > 0) {
-      const slotsByDay: Record<string, TimeSlot[]> = {};
-      for (const slot of slots) {
-        const dayKey = new Date(slot.time).toLocaleDateString("en-US", {
-          timeZone: tz,
-          weekday: "long",
-          month: "short",
-          day: "numeric",
-        });
-        if (!slotsByDay[dayKey]) slotsByDay[dayKey] = [];
-        slotsByDay[dayKey].push(slot);
-      }
-
-      const lines: string[] = [];
-      for (const [day, daySlots] of Object.entries(slotsByDay)) {
-        const times = daySlots.map((s) =>
-          new Date(s.time).toLocaleTimeString("en-US", {
+      if (slots.length > 0) {
+        const slotsByDay: Record<string, TimeSlot[]> = {};
+        for (const slot of slots) {
+          const dayKey = new Date(slot.time).toLocaleDateString("en-US", {
             timeZone: tz,
-            hour: "numeric",
-            minute: "2-digit",
-            hour12: true,
-          })
-        );
-        lines.push(`**${day}:** ${times.join(", ")}`);
+            weekday: "long",
+            month: "short",
+            day: "numeric",
+          });
+          if (!slotsByDay[dayKey]) slotsByDay[dayKey] = [];
+          slotsByDay[dayKey].push(slot);
+        }
+
+        const lines: string[] = [];
+        for (const [day, daySlots] of Object.entries(slotsByDay)) {
+          const times = daySlots.map((s) =>
+            new Date(s.time).toLocaleTimeString("en-US", {
+              timeZone: tz,
+              hour: "numeric",
+              minute: "2-digit",
+              hour12: true,
+            })
+          );
+          lines.push(`**${day}:** ${times.join(", ")}`);
+        }
+        availabilitySummary = lines.join("\n");
       }
-      availabilitySummary = lines.join("\n");
+    } catch (err) {
+      console.error("[Cal.com] Failed to pre-fetch availability for decision engine:", err);
+      // Non-fatal — Holly will ask for preferred time and book directly
     }
-  } catch (err) {
-    console.error("[Cal.com] Failed to pre-fetch availability for decision engine:", err);
-    // Non-fatal — Holly will ask for preferred time and book directly
   }
 
   // === BUILD UNCACHED USER BLOCK (varies per lead) ===
@@ -1084,7 +1101,10 @@ If the lead's **last inbound message** is a concrete time or day choice (e.g. "T
 ${availabilitySummary ? `**📅 GREG'S LIVE AVAILABILITY (next ${CALCOM_AVAILABILITY_DEFAULT_DAYS_AHEAD} days):**
 ${availabilitySummary}
 
-You KNOW these times are available RIGHT NOW. Use them proactively.` : `**📅 LIVE CALENDAR DATA:** Open slots for the next ${CALCOM_AVAILABILITY_DEFAULT_DAYS_AHEAD} days are **not** in this prompt right now (the fetch failed, or the API returned no times).
+You KNOW these times are available RIGHT NOW. Use them proactively.` : availabilityPrefetchSkipped ? `**📅 LIVE CALENDAR DATA:** Not loaded for this message. This is your **first touch** — ${firstName} has not replied yet, so the goal is an intro plus one diagnostic question, not a booking ask.
+
+- **Do not** offer specific times, and **do not** use \`send_booking_link\` or \`book_directly\` in this message.
+- The full live slot list is loaded automatically on every later message, so you can offer real times the moment they engage.` : `**📅 LIVE CALENDAR DATA:** Open slots for the next ${CALCOM_AVAILABILITY_DEFAULT_DAYS_AHEAD} days are **not** in this prompt right now (the fetch failed, or the API returned no times).
 
 **Do not** jump to \`send_booking_link\` as your first move.
 
@@ -1187,6 +1207,10 @@ If they say "2pm today" or "tomorrow morning" — find the closest matching slot
 
     // Tag the decision with whether live slots were available (used by guardrails)
     decision._availabilitySlotsProvided = availabilitySummary.length > 0;
+    // …and whether they were absent because we deliberately skipped the fetch,
+    // so guardrails can tell "no slots to offer" from "not this lead's turn to
+    // be offered slots" and keep blocking the booking-link fallback.
+    decision._availabilityPrefetchSkipped = availabilityPrefetchSkipped;
 
     // Log decision for debugging
     console.log(
