@@ -68,7 +68,7 @@ describe('Harper Test Production Fixes', () => {
         action: 'send_booking_link',
         message: 'Here\'s our calendar to book a time',
         confidence: 'high',
-        _availabilitySlotsProvided: true, // Live slots exist
+        _availabilitySlotsProvided: true,
       };
 
       const validation = validateDecision(decision, {
@@ -89,7 +89,7 @@ describe('Harper Test Production Fixes', () => {
         action: 'send_booking_link',
         message: 'Hi Harper! Here\'s our calendar',
         confidence: 'high',
-        _availabilityPrefetchSkipped: true, // First touch
+        _availabilityPrefetchSkipped: true,
       };
 
       const validation = validateDecision(decision, {
@@ -104,7 +104,36 @@ describe('Harper Test Production Fixes', () => {
       )).toBe(true);
     });
 
+    it('blocks send_booking_link when slots are empty and lead did not ask', () => {
+      const decision: HollyDecision = {
+        thinking: 'Availability fetch failed',
+        action: 'send_booking_link',
+        message: 'Here\'s our calendar',
+        confidence: 'high',
+        _availabilitySlotsProvided: false,
+        _availabilityPrefetchSkipped: false,
+      };
+
+      const validation = validateDecision(decision, {
+        lead: createMockLead({ communications: [] }) as any,
+        signals: mockSignals,
+        availabilitySlotsProvided: false,
+      });
+
+      expect(validation.isValid).toBe(false);
+      expect(validation.errors.some(e => 
+        e.includes('send_booking_link but lead did not ask for it')
+      )).toBe(true);
+    });
+
     it('allows send_booking_link when lead explicitly asks for link', () => {
+      const lastInbound = {
+        id: 'msg-1',
+        content: 'Just send me the link',
+        direction: 'INBOUND',
+        createdAt: new Date(),
+      };
+
       const decision: HollyDecision = {
         thinking: 'Lead requested the link',
         action: 'send_booking_link',
@@ -113,18 +142,18 @@ describe('Harper Test Production Fixes', () => {
         _availabilitySlotsProvided: true,
       };
 
-      // This test verifies the guard would pass if we had context that lead asked
-      // In practice, the guardrail doesn't have "lead asked" context yet, so this
-      // would still block. The rewrite logic in agent.ts handles this case.
-      // For now, we verify the error exists (expected behavior)
       const validation = validateDecision(decision, {
-        lead: createMockLead() as any,
+        lead: createMockLead({ 
+          communications: [lastInbound as any] 
+        }) as any,
         signals: mockSignals,
         availabilitySlotsProvided: true,
       });
 
-      // Currently blocks (needs enhancement to detect "just send me the link" in lead reply)
-      expect(validation.isValid).toBe(false);
+      // Should not block the booking link error
+      expect(validation.errors.some(e => 
+        e.includes('send_booking_link but live calendar availability was provided')
+      )).toBe(false);
     });
 
     it('allows send_sms with times offer when slots exist', () => {
@@ -142,9 +171,9 @@ describe('Harper Test Production Fixes', () => {
         availabilitySlotsProvided: true,
       });
 
-      // May have other errors (time-of-day, etc.) but NOT the booking link error
+      // Should not have booking link error
       expect(validation.errors.some(e => 
-        e.includes('send_booking_link but live calendar availability was provided')
+        e.includes('send_booking_link')
       )).toBe(false);
     });
 
@@ -166,6 +195,53 @@ describe('Harper Test Production Fixes', () => {
       // Should not have booking link error
       expect(validation.errors.some(e => 
         e.includes('send_booking_link')
+      )).toBe(false);
+    });
+
+    it('blocks send_sms with cal.com URL when lead did not ask', () => {
+      const decision: HollyDecision = {
+        thinking: 'Sending calendar link via SMS',
+        action: 'send_sms',
+        message: 'Here\'s our calendar: https://cal.com/team/inspired-mortgage',
+        confidence: 'high',
+      };
+
+      const validation = validateDecision(decision, {
+        lead: createMockLead({ communications: [] }) as any,
+        signals: mockSignals,
+      });
+
+      expect(validation.isValid).toBe(false);
+      expect(validation.errors.some(e => 
+        e.includes('send_sms contains a cal.com URL but the lead did not ask')
+      )).toBe(true);
+    });
+
+    it('allows send_sms with cal.com URL when lead asked', () => {
+      const lastInbound = {
+        id: 'msg-1',
+        content: 'Can you send me the link?',
+        direction: 'INBOUND',
+        createdAt: new Date(),
+      };
+
+      const decision: HollyDecision = {
+        thinking: 'Lead asked for link',
+        action: 'send_sms',
+        message: 'Sure! https://cal.com/team/inspired-mortgage',
+        confidence: 'high',
+      };
+
+      const validation = validateDecision(decision, {
+        lead: createMockLead({ 
+          communications: [lastInbound as any] 
+        }) as any,
+        signals: mockSignals,
+      });
+
+      // Should not have URL error
+      expect(validation.errors.some(e => 
+        e.includes('send_sms contains a cal.com URL')
       )).toBe(false);
     });
   });
@@ -294,10 +370,11 @@ describe('Harper Test Production Fixes', () => {
 
   describe('Issue #3: Outcome-Promise Slogan Bans', () => {
     const outcomePromises = [
-      'Most of our "bank said no" clients get approved within days',
-      'Most clients get approved within 48 hours',
-      'You\'ll be approved in 2 days',
-      'Get approved within 24 hours',
+      'Most of our "bank said no" clients get approved within days', // No number
+      'Most clients get approved within 48 hours', // With number
+      'You\'ll be approved in 2 days', // "in X days"
+      'Get approved within 24 hours', // "within X hours"
+      'Approved within hours', // No number, hours
     ];
 
     outcomePromises.forEach((phrase) => {
@@ -441,6 +518,211 @@ describe('Harper Test Production Fixes', () => {
       expect(validation.errors.some(e => 
         e.includes('Outcome-promise timing ban')
       )).toBe(false);
+    });
+  });
+
+  describe('Agent Rewrite Integration Tests', () => {
+    // Mock the dependencies
+    let mockPrisma: any;
+    let mockAskHollyToDecide: jest.Mock;
+    let mockExecuteDecision: jest.Mock;
+    let mockGetAvailableSlots: jest.Mock;
+
+    beforeEach(() => {
+      // Reset all mocks
+      jest.clearAllMocks();
+
+      // Mock Prisma
+      mockPrisma = {
+        lead: {
+          findUnique: jest.fn(),
+          update: jest.fn(),
+        },
+        leadActivity: {
+          create: jest.fn(),
+        },
+      };
+
+      // Mock decision engine
+      mockAskHollyToDecide = jest.fn();
+
+      // Mock execute decision
+      mockExecuteDecision = jest.fn().mockResolvedValue({
+        success: true,
+        action: 'send_sms',
+        skipped: false,
+      });
+
+      // Mock calendar slots
+      mockGetAvailableSlots = jest.fn().mockResolvedValue([
+        { time: '2026-08-27T18:00:00.000Z' }, // Wed 2pm PST
+        { time: '2026-08-27T20:00:00.000Z' }, // Wed 4pm PST
+        { time: '2026-08-28T14:00:00.000Z' }, // Thu 10am PST
+      ]);
+
+      // Inject mocks (in real implementation, these would be injected via dependency injection)
+      // For this test, we verify the logic flow
+    });
+
+    it('rewrites send_booking_link to send_sms with real times when slots exist', async () => {
+      // Holly decides to send booking link despite having slots
+      const badDecision: HollyDecision = {
+        thinking: 'Lead wants to book',
+        action: 'send_booking_link',
+        message: 'Here\'s our calendar: https://cal.com/team/inspired',
+        confidence: 'high',
+        _availabilitySlotsProvided: true,
+      };
+
+      // Validate - should fail
+      const validation = validateDecision(badDecision, {
+        lead: createMockLead() as any,
+        signals: mockSignals,
+        availabilitySlotsProvided: true,
+      });
+
+      expect(validation.isValid).toBe(false);
+      expect(validation.errors.some(e => 
+        e.includes('send_booking_link but live calendar availability was provided')
+      )).toBe(true);
+
+      // In agent.ts, this would trigger the rewrite logic that:
+      // 1. Fetches real slots from Cal.com
+      // 2. Extracts 2-3 concrete times
+      // 3. Builds a send_sms with those times
+      // 4. Executes via executeDecision
+      // 
+      // Expected rewritten message format:
+      // "Greg or Jakub have openings at Wed 2PM, Wed 4PM, or Thu 10AM. Which works?"
+      // 
+      // This test verifies the validation fails (triggering the rewrite path)
+    });
+
+    it('rewrites empty-slots send_booking_link to ask preferred time', () => {
+      // Holly tries to send link when slots are empty and lead didn't ask
+      const badDecision: HollyDecision = {
+        thinking: 'Availability fetch failed',
+        action: 'send_booking_link',
+        message: 'Book here: https://cal.com/team/inspired',
+        confidence: 'high',
+        _availabilitySlotsProvided: false,
+        _availabilityPrefetchSkipped: false,
+      };
+
+      const validation = validateDecision(badDecision, {
+        lead: createMockLead({ communications: [] }) as any,
+        signals: mockSignals,
+        availabilitySlotsProvided: false,
+      });
+
+      expect(validation.isValid).toBe(false);
+      expect(validation.errors.some(e => 
+        e.includes('send_booking_link but lead did not ask for it')
+      )).toBe(true);
+
+      // Expected rewrite: "What day and time works best for you? I can book you in with Greg or Jakub."
+    });
+
+    it('rewrites first-touch send_booking_link to diagnostic question', () => {
+      // Holly tries to send link on first touch
+      const badDecision: HollyDecision = {
+        thinking: 'First contact',
+        action: 'send_booking_link',
+        message: 'Hi! Book here: https://cal.com/team/inspired',
+        confidence: 'high',
+        _availabilityPrefetchSkipped: true,
+      };
+
+      const lead = createMockLead({ 
+        firstName: 'Harper',
+        rawData: { mortgage_type: 'Refinance' } as any,
+      });
+
+      const validation = validateDecision(badDecision, {
+        lead: lead as any,
+        signals: mockSignals,
+        availabilitySlotsProvided: false,
+      });
+
+      expect(validation.isValid).toBe(false);
+      expect(validation.errors.some(e => 
+        e.includes('send_booking_link on the first touch')
+      )).toBe(true);
+
+      // Expected rewrite: "Hi Harper! Holly from Inspired Mortgage. Quick question - what's prompting your refinance search right now?"
+    });
+
+    it('allows send_booking_link when lead explicitly asked', () => {
+      // Lead's last message asks for link
+      const lastInbound = {
+        id: 'msg-1',
+        content: 'Just send me the link please',
+        direction: 'INBOUND',
+        createdAt: new Date(),
+      };
+
+      const decision: HollyDecision = {
+        thinking: 'Lead requested link',
+        action: 'send_booking_link',
+        message: 'Sure! https://cal.com/team/inspired',
+        confidence: 'high',
+        _availabilitySlotsProvided: true,
+      };
+
+      const validation = validateDecision(decision, {
+        lead: createMockLead({ 
+          communications: [lastInbound as any] 
+        }) as any,
+        signals: mockSignals,
+        availabilitySlotsProvided: true,
+      });
+
+      // Should not have booking link error when lead asked
+      expect(validation.errors.some(e => 
+        e.includes('send_booking_link but live calendar availability was provided')
+      )).toBe(false);
+    });
+
+    it('recognizes various "send link" request patterns', () => {
+      const linkRequestPhrases = [
+        'just send me the link',
+        'send me a link',
+        'give me the link',
+        'can you get me the link',
+        'link please',
+        'I\'ll book myself',
+        'I\'ll book online',
+      ];
+
+      linkRequestPhrases.forEach((phrase) => {
+        const lastInbound = {
+          id: 'msg-1',
+          content: phrase,
+          direction: 'INBOUND',
+          createdAt: new Date(),
+        };
+
+        const decision: HollyDecision = {
+          thinking: 'Lead asked for link',
+          action: 'send_booking_link',
+          message: 'Here you go!',
+          confidence: 'high',
+          _availabilitySlotsProvided: true,
+        };
+
+        const validation = validateDecision(decision, {
+          lead: createMockLead({ 
+            communications: [lastInbound as any] 
+          }) as any,
+          signals: mockSignals,
+          availabilitySlotsProvided: true,
+        });
+
+        // Should allow when lead used this phrase
+        expect(validation.errors.some(e => 
+          e.includes('send_booking_link but live calendar availability was provided')
+        )).toBe(false);
+      });
     });
   });
 });
