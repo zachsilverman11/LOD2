@@ -468,13 +468,17 @@ export async function processLeadWithAutonomousAgent(
         if (decision.message && lead.consentSms && lead.phone) {
           console.log(`[Holly Agent] 💬 Sending farewell message to ${lead.firstName} before moving to ${decision.newStage}`);
 
-          await executeDecision(lead.id, {
+          const result = await executeDecision(lead.id, {
             action: 'send_sms',
             message: decision.message,
             reasoning: `Stage transition message: ${lead.status} → ${decision.newStage}`,
             intent: decision.action,
             availabilitySlotsProvided: decision._availabilitySlotsProvided === true,
-          });
+          }, triggerSource);
+          
+          if (!result.success) {
+            console.warn(`[Holly Agent] ⚠️  Farewell message failed: ${result.skipReason || result.error}`);
+          }
         }
 
         // Update lead status
@@ -554,7 +558,7 @@ export async function processLeadWithAutonomousAgent(
         const executionAction = decision.action === 'book_directly' ? 'book_appointment_directly' : decision.action;
 
         // Real execution
-        await executeDecision(lead.id, {
+        const result = await executeDecision(lead.id, {
           action: executionAction,
           message: decision.message,
           reasoning: decision.thinking,
@@ -567,36 +571,54 @@ export async function processLeadWithAutonomousAgent(
             bookingLeadEmail: (decision as any).bookingLeadEmail,
             bookingLeadTimezone: getTimezoneForProvince((lead.rawData as any)?.province),
           }),
-        });
+        }, triggerSource);
 
-        // Track conversation outcome for continuous learning
-        trackConversationOutcome({
-          leadId: lead.id,
-          messageSent: decision.message || '',
-          hollyDecision: {
-            ...decision,
-            sentAt: now,
+        // Only advance timing if send was successful
+        if (!result.success) {
+          console.log(`[Holly Agent] ⚠️  ${lead.firstName}: Action ${result.action} failed/skipped - ${result.skipReason || result.error}`);
+          // Return result but don't advance timing
+          return { success: false, action: result.action, reason: result.skipReason || result.error };
+        }
+        
+        // Track conversation outcome for continuous learning (only on successful sends)
+        if (result.success && !result.skipped) {
+          trackConversationOutcome({
+            leadId: lead.id,
+            messageSent: decision.message || '',
+            hollyDecision: {
+              ...decision,
+              sentAt: now,
+              signals,
+            },
+          });
+        }
+
+        // Only advance lastContactedAt / nextReviewAt if a message was actually sent
+        // Don't advance for do_nothing, wait, escalate, or skipped/failed sends
+        const shouldAdvanceTiming = result.success && !result.skipped && 
+          !['do_nothing', 'wait', 'escalate'].includes(result.action);
+        
+        if (shouldAdvanceTiming) {
+          const inboundCount =
+            lead.communications?.filter((c: any) => c.direction === 'INBOUND').length ?? 0;
+          const outboundBefore =
+            lead.communications?.filter((c: any) => c.direction === 'OUTBOUND').length ?? 0;
+          const reviewHours = resolveNextReviewHoursAfterOutbound({
             signals,
-          },
-        });
-
-        const inboundCount =
-          lead.communications?.filter((c: any) => c.direction === 'INBOUND').length ?? 0;
-        const outboundBefore =
-          lead.communications?.filter((c: any) => c.direction === 'OUTBOUND').length ?? 0;
-        const reviewHours = resolveNextReviewHoursAfterOutbound({
-          signals,
-          inboundCount,
-          outboundCountBeforeThisSend: outboundBefore,
-        });
-        const nextReview = new Date(now.getTime() + reviewHours * 60 * 60 * 1000);
-        await prisma.lead.update({
-          where: { id: lead.id },
-          data: {
-            nextReviewAt: nextReview,
-            lastContactedAt: now,
-          },
-        });
+            inboundCount,
+            outboundCountBeforeThisSend: outboundBefore,
+          });
+          const nextReview = new Date(now.getTime() + reviewHours * 60 * 60 * 1000);
+          await prisma.lead.update({
+            where: { id: lead.id },
+            data: {
+              nextReviewAt: nextReview,
+              lastContactedAt: now,
+            },
+          });
+        } else {
+          console.log(`[Holly Agent] ⏭️  ${lead.firstName}: Skipping timing advance (${result.action} ${result.skipped ? 'skipped' : 'non-contact action'})`);
+        }
       }
 
       return { success: true, action: decision.action, message: decision.message };

@@ -1610,12 +1610,24 @@ async function updateLeadAfterContact(leadId: string, currentStatus: string) {
 }
 
 /**
+ * Result of executing a decision
+ */
+export interface ExecuteDecisionResult {
+  success: boolean;
+  action: string;
+  skipped?: boolean;
+  skipReason?: string;
+  error?: string;
+}
+
+/**
  * Execute the AI's decision
  */
 export async function executeDecision(
   leadId: string,
-  decision: AIDecision
-): Promise<void> {
+  decision: AIDecision,
+  triggerSource?: 'cron' | 'sms_reply'
+): Promise<ExecuteDecisionResult> {
   const lead = await prisma.lead.findUnique({ where: { id: leadId } });
   if (!lead || !lead.phone) throw new Error("Lead not found or no phone");
 
@@ -1640,11 +1652,17 @@ export async function executeDecision(
       },
     });
 
-    return; // EXIT - do nothing
+    return { 
+      success: false, 
+      action: decision.action, 
+      skipped: true, 
+      skipReason: 'Holly disabled for this lead' 
+    };
   }
 
   // 🔒 RACE CONDITION PREVENTION: Check for very recent outbound messages
   // This catches duplicate sends that slip through the processing lock
+  // BUT: Don't block reactive responses to inbound SMS - those should always go through
   const RACE_CONDITION_WINDOW_MS = 30000; // 30 seconds
   const recentOutbound = await prisma.communication.findFirst({
     where: {
@@ -1655,7 +1673,7 @@ export async function executeDecision(
     orderBy: { createdAt: 'desc' }
   });
 
-  if (recentOutbound) {
+  if (recentOutbound && triggerSource !== 'sms_reply') {
     const secondsAgo = Math.round((Date.now() - recentOutbound.createdAt.getTime()) / 1000);
     console.log(
       `[Execute Decision] ⏸️ BLOCKED: Race condition detected! Message sent ${secondsAgo}s ago. ` +
@@ -1678,7 +1696,12 @@ export async function executeDecision(
       },
     });
 
-    return; // EXIT - don't send duplicate
+    return { 
+      success: false, 
+      action: decision.action, 
+      skipped: true, 
+      skipReason: `Duplicate blocked - message sent ${secondsAgo}s ago` 
+    };
   }
 
   // 🛡️ COLD INTRO GUARDRAIL: Block Holly from re-introducing herself to leads with existing conversations
@@ -1721,7 +1744,12 @@ export async function executeDecision(
           details: `🚨 Holly tried to re-introduce herself to a lead with ${priorComms} existing messages. Cold intro was BLOCKED. Check the conversation — Holly may have lost context.`,
         });
 
-        return; // EXIT - don't send cold intro to existing lead
+        return { 
+          success: false, 
+          action: decision.action, 
+          skipped: true, 
+          skipReason: `Cold intro blocked - lead has ${priorComms} existing messages` 
+        };
       }
     }
   }
@@ -1750,6 +1778,8 @@ export async function executeDecision(
           });
 
           await updateLeadAfterContact(leadId, lead.status);
+          
+          return { success: true, action: 'send_sms' };
         } catch (error) {
           // Check if this is a Twilio opt-out error (error 21610)
           const err = error as any;
@@ -1776,26 +1806,35 @@ export async function executeDecision(
                 metadata: {
                   twilioError: "21610",
                   errorMessage: err.message,
-                  phone: lead.phone,
+                  // Don't log full phone per security requirements
                 },
               },
             });
 
             // Don't send error alert for opt-outs - this is expected behavior
             console.log(`[AI Conversation] ✅ Lead ${leadId} successfully marked as opted-out`);
-            return; // Exit without throwing - this is handled
+            return { 
+              success: false, 
+              action: 'send_sms', 
+              skipped: true, 
+              skipReason: 'Lead opted out (Twilio 21610)' 
+            };
           }
 
-          // For all other errors, send alert and rethrow
+          // For all other errors, send alert and return error
           await sendErrorAlert({
             error: error instanceof Error ? error : new Error(String(error)),
             context: {
               location: "ai-conversation-enhanced - send_sms",
               leadId,
-              details: { message: decision.message, phone: lead.phone },
+              details: { message: decision.message },
             },
           });
-          throw error;
+          return { 
+            success: false, 
+            action: 'send_sms', 
+            error: error instanceof Error ? error.message : String(error) 
+          };
         }
       }
       break;
@@ -1814,6 +1853,8 @@ export async function executeDecision(
             metadata: { aiReasoning: decision.reasoning },
           },
         });
+        
+        return { success: true, action: 'schedule_followup' };
       }
       break;
 
@@ -1822,7 +1863,12 @@ export async function executeDecision(
         try {
           if (!lead.email) {
             console.warn(`[AI] Cannot send email - no email address for lead ${leadId}`);
-            break;
+            return { 
+              success: false, 
+              action: 'send_email', 
+              skipped: true, 
+              skipReason: 'No email address' 
+            };
           }
 
           await sendEmail({
@@ -1847,16 +1893,21 @@ export async function executeDecision(
           });
 
           await updateLeadAfterContact(leadId, lead.status);
+          return { success: true, action: 'send_email' };
         } catch (error) {
           await sendErrorAlert({
             error: error instanceof Error ? error : new Error(String(error)),
             context: {
               location: "ai-conversation-enhanced - send_email",
               leadId,
-              details: { subject: decision.emailSubject, email: lead.email },
+              details: { subject: decision.emailSubject },
             },
           });
-          throw error;
+          return { 
+            success: false, 
+            action: 'send_email', 
+            error: error instanceof Error ? error.message : String(error) 
+          };
         }
       }
       break;
@@ -1914,7 +1965,44 @@ export async function executeDecision(
           }
 
           await updateLeadAfterContact(leadId, lead.status);
+          return { success: true, action: 'send_both' };
         } catch (error) {
+          // Check for opt-out on SMS
+          const err = error as any;
+          if (err?.isTwilioOptOut && err?.twilioErrorCode === 21610) {
+            console.log(`[AI Conversation] Lead ${leadId} opted out via Twilio (error 21610) - marking as opted-out and LOST`);
+
+            await prisma.lead.update({
+              where: { id: leadId },
+              data: {
+                consentSms: false,
+                status: "LOST",
+                nextReviewAt: new Date("2099-12-31"),
+              },
+            });
+
+            await prisma.leadActivity.create({
+              data: {
+                leadId,
+                type: "NOTE_ADDED",
+                channel: "SYSTEM",
+                subject: "🚫 Lead Opted Out - Twilio Block",
+                content: "Lead has been blocked by Twilio from receiving SMS (Error 21610: Unsubscribed recipient). Lead marked as LOST.",
+                metadata: {
+                  twilioError: "21610",
+                  errorMessage: err.message,
+                },
+              },
+            });
+
+            return { 
+              success: false, 
+              action: 'send_both', 
+              skipped: true, 
+              skipReason: 'Lead opted out (Twilio 21610)' 
+            };
+          }
+
           await sendErrorAlert({
             error: error instanceof Error ? error : new Error(String(error)),
             context: {
@@ -1923,12 +2011,14 @@ export async function executeDecision(
               details: {
                 smsMessage: decision.message,
                 emailSubject: decision.emailSubject,
-                phone: lead.phone,
-                email: lead.email
               },
             },
           });
-          throw error;
+          return { 
+            success: false, 
+            action: 'send_both', 
+            error: error instanceof Error ? error.message : String(error) 
+          };
         }
       }
       break;
@@ -1956,7 +2046,7 @@ export async function executeDecision(
               },
             });
             await updateLeadAfterContact(leadId, lead.status);
-            break;
+            return { success: true, action: 'book_appointment_directly', skipped: true, skipReason: 'Sent booking link fallback (no email)' };
           }
 
           const { booking, startTime } = await bookLeadAppointmentDirectly(
@@ -2011,6 +2101,8 @@ export async function executeDecision(
               metadata: { bookingUid: booking.uid, directBooking: true },
             },
           });
+          
+          return { success: true, action: 'book_appointment_directly' };
         } catch (error) {
           console.error(`[Direct Booking] ❌ Failed for lead ${leadId}:`, error);
 
@@ -2047,6 +2139,8 @@ export async function executeDecision(
                 content: `Holly tried to book directly but Cal.com API returned an error. Sent booking link instead.\n\nError: ${error instanceof Error ? error.message : String(error)}`,
               },
             });
+            
+            return { success: true, action: 'book_appointment_directly', skipped: true, skipReason: 'Sent booking link fallback (booking failed)' };
           } catch (fallbackError) {
             await sendErrorAlert({
               error: fallbackError instanceof Error ? fallbackError : new Error(String(fallbackError)),
@@ -2056,6 +2150,12 @@ export async function executeDecision(
                 details: { originalError: error instanceof Error ? error.message : String(error) },
               },
             });
+            
+            return { 
+              success: false, 
+              action: 'book_appointment_directly', 
+              error: `Booking and fallback both failed: ${error instanceof Error ? error.message : String(error)}` 
+            };
           }
         }
       }
@@ -2099,8 +2199,12 @@ export async function executeDecision(
               },
             });
 
-            // Don't throw error - just skip and continue
-            break;
+            return { 
+              success: false, 
+              action: 'send_booking_link', 
+              skipped: true, 
+              skipReason: `Duplicate blocked - link sent ${minutesAgo} minutes ago` 
+            };
           }
 
           const bookingUrl = process.env.CAL_COM_BOOKING_URL || "https://cal.com/your-link";
@@ -2124,16 +2228,59 @@ export async function executeDecision(
               }),
             },
           });
+          
+          await updateLeadAfterContact(leadId, lead.status);
+          return { success: true, action: 'send_booking_link' };
         } catch (error) {
+          // Check for opt-out
+          const err = error as any;
+          if (err?.isTwilioOptOut && err?.twilioErrorCode === 21610) {
+            console.log(`[Booking Link] Lead ${leadId} opted out via Twilio (error 21610)`);
+
+            await prisma.lead.update({
+              where: { id: leadId },
+              data: {
+                consentSms: false,
+                status: "LOST",
+                nextReviewAt: new Date("2099-12-31"),
+              },
+            });
+
+            await prisma.leadActivity.create({
+              data: {
+                leadId,
+                type: "NOTE_ADDED",
+                channel: "SYSTEM",
+                subject: "🚫 Lead Opted Out - Twilio Block",
+                content: "Lead has been blocked by Twilio from receiving SMS (Error 21610: Unsubscribed recipient). Lead marked as LOST.",
+                metadata: {
+                  twilioError: "21610",
+                  errorMessage: err.message,
+                },
+              },
+            });
+
+            return { 
+              success: false, 
+              action: 'send_booking_link', 
+              skipped: true, 
+              skipReason: 'Lead opted out (Twilio 21610)' 
+            };
+          }
+
           await sendErrorAlert({
             error: error instanceof Error ? error : new Error(String(error)),
             context: {
               location: "ai-conversation-enhanced - send_booking_link",
               leadId,
-              details: { message: decision.message, phone: lead.phone },
+              details: { message: decision.message },
             },
           });
-          throw error;
+          return { 
+            success: false, 
+            action: 'send_booking_link', 
+            error: error instanceof Error ? error.message : String(error) 
+          };
         }
       }
       break;
@@ -2165,16 +2312,57 @@ export async function executeDecision(
           });
 
           await updateLeadAfterContact(leadId, lead.status);
+          return { success: true, action: 'send_application_link' };
         } catch (error) {
+          // Check for opt-out
+          const err = error as any;
+          if (err?.isTwilioOptOut && err?.twilioErrorCode === 21610) {
+            console.log(`[Application Link] Lead ${leadId} opted out via Twilio (error 21610)`);
+
+            await prisma.lead.update({
+              where: { id: leadId },
+              data: {
+                consentSms: false,
+                status: "LOST",
+                nextReviewAt: new Date("2099-12-31"),
+              },
+            });
+
+            await prisma.leadActivity.create({
+              data: {
+                leadId,
+                type: "NOTE_ADDED",
+                channel: "SYSTEM",
+                subject: "🚫 Lead Opted Out - Twilio Block",
+                content: "Lead has been blocked by Twilio from receiving SMS (Error 21610: Unsubscribed recipient). Lead marked as LOST.",
+                metadata: {
+                  twilioError: "21610",
+                  errorMessage: err.message,
+                },
+              },
+            });
+
+            return { 
+              success: false, 
+              action: 'send_application_link', 
+              skipped: true, 
+              skipReason: 'Lead opted out (Twilio 21610)' 
+            };
+          }
+
           await sendErrorAlert({
             error: error instanceof Error ? error : new Error(String(error)),
             context: {
               location: "ai-conversation-enhanced - send_application_link",
               leadId,
-              details: { message: decision.message, phone: lead.phone },
+              details: { message: decision.message },
             },
           });
-          throw error;
+          return { 
+            success: false, 
+            action: 'send_application_link', 
+            error: error instanceof Error ? error.message : String(error) 
+          };
         }
       }
       break;
@@ -2193,6 +2381,8 @@ export async function executeDecision(
             content: `Stage changed to ${decision.newStage}: ${decision.reasoning}`,
           },
         });
+        
+        return { success: true, action: 'move_stage' };
       }
       break;
 
@@ -2204,10 +2394,14 @@ export async function executeDecision(
           content: `🚨 ESCALATED: ${decision.reasoning}`,
         },
       });
-      break;
+      
+      return { success: true, action: 'escalate' };
 
     case "do_nothing":
       console.log(`[AI] No action: ${decision.reasoning}`);
-      break;
+      return { success: true, action: 'do_nothing', skipped: true, skipReason: decision.reasoning };
   }
+  
+  // Fallback if no case matched or action didn't return
+  return { success: false, action: decision.action || 'unknown', error: 'Action not handled' };
 }
