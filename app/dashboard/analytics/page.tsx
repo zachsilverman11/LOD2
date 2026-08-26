@@ -57,6 +57,17 @@ interface LoanTypeAnalytics {
   totals: LoanTypeData;
 }
 
+interface SourceComparisonData {
+  name: string;
+  totalLeads: number;
+  contacted: number;
+  engaged: number;
+  booked: number;
+  contactRate: number;
+  engagementRate: number;
+  bookingRate: number;
+}
+
 interface BookingSourceStats {
   source: string;
   displayName: string;
@@ -87,27 +98,39 @@ export default function AnalyticsPage() {
   const [cohortData, setCohortData] = useState<CohortComparisonData | null>(null);
   const [loanTypeData, setLoanTypeData] = useState<LoanTypeAnalytics | null>(null);
   const [bookingSourceData, setBookingSourceData] = useState<BookingSourceData | null>(null);
+  const [sourceComparison, setSourceComparison] = useState<{ financevine: SourceComparisonData; lod: SourceComparisonData } | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Cohort filtering
   const [selectedCohort, setSelectedCohort] = useState<string>("all");
   const [availableCohorts, setAvailableCohorts] = useState<string[]>([]);
 
+  // Source and segment filtering
+  const [selectedSource, setSelectedSource] = useState<string>("all");
+  const [selectedSegment, setSelectedSegment] = useState<string>("all");
+
   const fetchAnalytics = useCallback(async () => {
     setLoading(true);
     try {
-      const cohortParam = selectedCohort !== "all" ? `?cohort=${selectedCohort}` : "";
-      const [overviewRes, cohortRes, loanTypeRes, bookingSourceRes] = await Promise.all([
-        fetch(`/api/analytics/overview${cohortParam}`),
+      const params = new URLSearchParams();
+      if (selectedCohort !== "all") params.append("cohort", selectedCohort);
+      if (selectedSource !== "all") params.append("source", selectedSource);
+      if (selectedSegment !== "all") params.append("segment", selectedSegment);
+      const queryString = params.toString() ? `?${params.toString()}` : "";
+
+      const [overviewRes, cohortRes, loanTypeRes, bookingSourceRes, sourceCompRes] = await Promise.all([
+        fetch(`/api/analytics/overview${queryString}`),
         fetch("/api/analytics/cohort-comparison"),
-        fetch(`/api/analytics/loan-types${cohortParam}`),
-        fetch(`/api/analytics/booking-sources${cohortParam}`),
+        fetch(`/api/analytics/loan-types${queryString}`),
+        fetch(`/api/analytics/booking-sources${selectedCohort !== "all" ? `?cohort=${selectedCohort}` : ""}`),
+        fetch(`/api/analytics/source-comparison${selectedCohort !== "all" ? `?cohort=${selectedCohort}` : ""}`),
       ]);
 
       const overviewData = await overviewRes.json();
       const cohortComparisonData = await cohortRes.json();
       const loanTypeAnalytics = await loanTypeRes.json();
       const bookingSourceAnalytics = await bookingSourceRes.json();
+      const sourceComparisonData = await sourceCompRes.json();
 
       if (overviewData.success) {
         setOverview(overviewData.data);
@@ -124,12 +147,15 @@ export default function AnalyticsPage() {
       if (bookingSourceAnalytics.success) {
         setBookingSourceData(bookingSourceAnalytics.data);
       }
+      if (sourceComparisonData.success) {
+        setSourceComparison(sourceComparisonData.data);
+      }
     } catch (error) {
       console.error("Failed to fetch analytics:", error);
     } finally {
       setLoading(false);
     }
-  }, [selectedCohort]);
+  }, [selectedCohort, selectedSource, selectedSegment]);
 
   useEffect(() => {
     fetchAnalytics();
@@ -175,46 +201,97 @@ export default function AnalyticsPage() {
     <div className="min-h-screen bg-[#FAFAF9]">
       <DashboardHeader subtitle="Analytics" />
 
-      {/* Secondary Toolbar - Cohort Filter */}
+      {/* Secondary Toolbar - Filters */}
       <div className="bg-white border-b border-[#E5E0D8]">
         <div className="max-w-full mx-auto px-4 py-3 sm:px-6 lg:px-8">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-            <label className="text-sm font-medium text-[#55514D]">Filter by Cohort:</label>
-            <select
-              value={selectedCohort}
-              onChange={(e) => setSelectedCohort(e.target.value)}
-              className="min-h-11 rounded-lg border border-[#E5E0D8] bg-white px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[#625FFF]/20 focus:border-[#625FFF] sm:text-sm"
-            >
-              <option value="all">All Cohorts</option>
-              {availableCohorts.map((cohort) => (
-                <option key={cohort} value={cohort}>
-                  {cohort}
-                </option>
-              ))}
-            </select>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+            {/* Cohort Filter */}
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
+              <label className="text-sm font-medium text-[#55514D] whitespace-nowrap">Cohort:</label>
+              <select
+                value={selectedCohort}
+                onChange={(e) => setSelectedCohort(e.target.value)}
+                className="min-h-11 rounded-lg border border-[#E5E0D8] bg-white px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[#625FFF]/20 focus:border-[#625FFF] sm:text-sm"
+              >
+                <option value="all">All Cohorts</option>
+                {availableCohorts.map((cohort) => (
+                  <option key={cohort} value={cohort}>
+                    {cohort}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Source Filter */}
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
+              <label className="text-sm font-medium text-[#55514D] whitespace-nowrap">Source:</label>
+              <select
+                value={selectedSource}
+                onChange={(e) => setSelectedSource(e.target.value)}
+                className="min-h-11 rounded-lg border border-[#E5E0D8] bg-white px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[#625FFF]/20 focus:border-[#625FFF] sm:text-sm"
+              >
+                <option value="all">All Sources</option>
+                <option value="financevine">FinanceVine</option>
+                <option value="leads_on_demand">Leads On Demand</option>
+                <option value="rates_ca">rates.ca</option>
+              </select>
+            </div>
+
+            {/* Segment Filter */}
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
+              <label className="text-sm font-medium text-[#55514D] whitespace-nowrap">Segment:</label>
+              <select
+                value={selectedSegment}
+                onChange={(e) => setSelectedSegment(e.target.value)}
+                className="min-h-11 rounded-lg border border-[#E5E0D8] bg-white px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[#625FFF]/20 focus:border-[#625FFF] sm:text-sm"
+              >
+                <option value="all">All Segments</option>
+                <option value="alt_private">Alt / Private</option>
+                <option value="prime_rate_shop">Prime Rate Shop</option>
+                <option value="prime_other">Prime Other</option>
+              </select>
+            </div>
+
+            {/* Clear Filters */}
+            {(selectedCohort !== "all" || selectedSource !== "all" || selectedSegment !== "all") && (
+              <button
+                onClick={() => {
+                  setSelectedCohort("all");
+                  setSelectedSource("all");
+                  setSelectedSegment("all");
+                }}
+                className="text-sm text-[#625FFF] hover:text-[#524DD9] font-medium whitespace-nowrap sm:ml-auto"
+              >
+                Clear All Filters
+              </button>
+            )}
           </div>
         </div>
       </div>
 
       <main className="max-w-full mx-auto px-4 py-6 sm:px-6 lg:px-8">
-        {/* Cohort Filter Indicator */}
-        {selectedCohort !== "all" && (
+        {/* Filter Indicator */}
+        {(selectedCohort !== "all" || selectedSource !== "all" || selectedSegment !== "all") && (
           <div className="mb-6 bg-[#625FFF]/10 border border-[#625FFF] rounded-lg p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
-                <span className="text-sm font-semibold text-[#625FFF]">
-                  Viewing: {selectedCohort}
-                </span>
-                <span className="text-xs text-[#55514D]">
-                  All metrics below are filtered to this cohort only
-                </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-semibold text-[#625FFF]">Active Filters:</span>
+                {selectedCohort !== "all" && (
+                  <span className="text-xs bg-white border border-[#625FFF] text-[#625FFF] px-2 py-1 rounded">
+                    Cohort: {selectedCohort}
+                  </span>
+                )}
+                {selectedSource !== "all" && (
+                  <span className="text-xs bg-white border border-[#625FFF] text-[#625FFF] px-2 py-1 rounded">
+                    Source: {selectedSource === "financevine" ? "FinanceVine" : selectedSource === "leads_on_demand" ? "Leads On Demand" : "rates.ca"}
+                  </span>
+                )}
+                {selectedSegment !== "all" && (
+                  <span className="text-xs bg-white border border-[#625FFF] text-[#625FFF] px-2 py-1 rounded">
+                    Segment: {selectedSegment.replace("_", " / ").split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")}
+                  </span>
+                )}
               </div>
-              <button
-                onClick={() => setSelectedCohort("all")}
-                className="text-sm text-[#625FFF] hover:text-[#524DD9] font-medium"
-              >
-                Clear Filter
-              </button>
             </div>
           </div>
         )}
@@ -266,6 +343,76 @@ export default function AnalyticsPage() {
             </div>
           </div>
         </div>
+
+        {/* Section 1.5: FinanceVine vs LOD Comparison (when no source filter applied) */}
+        {selectedSource === "all" && sourceComparison && (
+          <div className="mb-8">
+            <h2 className="mb-4 text-xl font-bold text-[#1C1B1A] sm:text-2xl">FinanceVine vs Leads On Demand</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* FinanceVine Card */}
+              <div className="bg-gradient-to-br from-[#625FFF]/10 to-[#625FFF]/5 rounded-xl shadow-sm border-2 border-[#625FFF]/30 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold text-[#625FFF]">FinanceVine</h3>
+                  <span className="text-sm text-[#55514D]">{sourceComparison.financevine.totalLeads} leads</span>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-[#55514D]">SMS Contacted</span>
+                    <div className="text-right">
+                      <span className="text-lg font-bold text-[#1C1B1A]">{sourceComparison.financevine.contacted}</span>
+                      <span className="text-sm text-[#625FFF] ml-2">({formatPercent(sourceComparison.financevine.contactRate)})</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-[#55514D]">Lead Replied</span>
+                    <div className="text-right">
+                      <span className="text-lg font-bold text-[#1C1B1A]">{sourceComparison.financevine.engaged}</span>
+                      <span className="text-sm text-[#625FFF] ml-2">({formatPercent(sourceComparison.financevine.engagementRate)})</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center pt-2 border-t border-[#625FFF]/20">
+                    <span className="text-sm font-semibold text-[#1C1B1A]">Booked</span>
+                    <div className="text-right">
+                      <span className="text-2xl font-bold text-[#625FFF]">{sourceComparison.financevine.booked}</span>
+                      <span className="text-sm text-[#625FFF] ml-2">({formatPercent(sourceComparison.financevine.bookingRate)} of engaged)</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* LOD Card */}
+              <div className="bg-gradient-to-br from-[#D9F36E]/20 to-[#D9F36E]/10 rounded-xl shadow-sm border-2 border-[#D9F36E] p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold text-[#1C1B1A]">Leads On Demand</h3>
+                  <span className="text-sm text-[#55514D]">{sourceComparison.lod.totalLeads} leads</span>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-[#55514D]">SMS Contacted</span>
+                    <div className="text-right">
+                      <span className="text-lg font-bold text-[#1C1B1A]">{sourceComparison.lod.contacted}</span>
+                      <span className="text-sm text-[#1C1B1A] ml-2">({formatPercent(sourceComparison.lod.contactRate)})</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-[#55514D]">Lead Replied</span>
+                    <div className="text-right">
+                      <span className="text-lg font-bold text-[#1C1B1A]">{sourceComparison.lod.engaged}</span>
+                      <span className="text-sm text-[#1C1B1A] ml-2">({formatPercent(sourceComparison.lod.engagementRate)})</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center pt-2 border-t border-[#D9F36E]">
+                    <span className="text-sm font-semibold text-[#1C1B1A]">Booked</span>
+                    <div className="text-right">
+                      <span className="text-2xl font-bold text-[#1C1B1A]">{sourceComparison.lod.booked}</span>
+                      <span className="text-sm text-[#1C1B1A] ml-2">({formatPercent(sourceComparison.lod.bookingRate)} of engaged)</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Section 2: Conversion Funnel Rates (4 key rates) */}
         <div className="mb-8">
