@@ -31,6 +31,25 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
+// === STATIC SYSTEM PROMPT FOR CONVERSATION HANDLER (byte-stable) ===
+// Contains ONLY static role definition and tool guidance, no per-lead logic.
+// Dynamic content (appointment status, lead profile, availability, YouTube) goes in user message.
+const STATIC_CONVERSATION_SYSTEM_PROMPT = `You are Holly, the scheduling and lead nurturing specialist for Inspired Mortgage, a Canadian mortgage brokerage.
+
+# YOUR CORE ROLE
+You are NOT a mortgage advisor. You cannot give advice, discuss rates, or provide mortgage recommendations.
+Your job is to:
+1. Nurture leads with helpful information about our programs
+2. Build curiosity and trust
+3. Book discovery calls with our mortgage advisors (Greg Williamson or Jakub Huncik) OR confirm existing appointments
+
+# RESPONSE PRINCIPLES
+- Be warm, natural, and conversational
+- Reference specific details from their form to show you read it
+- Ask diagnostic questions to understand their situation
+- Use tools appropriately based on context
+- Focus on conversion and show-up rate, not just activity`;
+
 interface LeadContext {
   lead: any;
   leadId: string;
@@ -1455,14 +1474,41 @@ Remember: The goal of message #1 is NOT to book them. It's to demonstrate you re
     },
   ];
 
+  // Move per-lead briefing (appointment, profile, slots, YouTube) to user message
+  const perLeadBriefing = `# 📋 PER-LEAD BRIEFING\n\n${systemPrompt}\n\n---\n\n`;
+  const fullUserContent = perLeadBriefing + userContent;
+
   const response = await anthropic.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 1536,
-    system: systemPrompt,
-    messages: [{ role: "user", content: userContent }],
+    system: [
+      {
+        type: "text",
+        text: STATIC_CONVERSATION_SYSTEM_PROMPT,
+        cache_control: { type: "ephemeral" }
+      }
+    ],
+    messages: [{ role: "user", content: fullUserContent }],
     tools: claudeTools,
     tool_choice: { type: "any" },
   });
+
+  // Log cache performance (no PII)
+  const usage = response.usage;
+  if (usage) {
+    const cacheCreation = (usage as any).cache_creation_input_tokens || 0;
+    const cacheRead = (usage as any).cache_read_input_tokens || 0;
+    const uncached = usage.input_tokens || 0;
+    
+    if (cacheCreation > 0 || cacheRead > 0) {
+      const leadName = context.leadData?.name || context.leadData?.first_name || 'Unknown';
+      console.log(
+        `[Conversation Handler Cache] ${leadName}: ` +
+        `cache_creation=${cacheCreation} cache_read=${cacheRead} uncached=${uncached} ` +
+        `(${cacheRead > 0 ? `${Math.round((cacheRead / (cacheRead + uncached)) * 100)}% cached` : 'cache miss'})`
+      );
+    }
+  }
 
   // Parse AI response
   const toolUse = response.content.find(block => block.type === 'tool_use');
