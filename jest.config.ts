@@ -13,7 +13,7 @@ const config: Config.InitialOptions = {
     '!lib/**/*.d.ts',
     '!lib/generated/**',
   ],
-  setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
+  setupFiles: ['<rootDir>/tests/setup.ts'],
 };
 
 export default config;

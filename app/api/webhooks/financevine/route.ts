@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { processLeadWithAutonomousAgent } from "@/lib/holly/agent";
 import { sendSlackNotification, sendErrorAlert } from "@/lib/slack";
 import { correctNames } from "@/lib/name-correction";
 import { deriveLeadSegment, formatPhoneE164 } from "@/lib/lead-segmentation";

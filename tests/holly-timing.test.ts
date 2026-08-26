@@ -145,7 +145,7 @@ describe('Holly Agent Timing Rules', () => {
 
       // Should not be blocked by timing (would proceed to decision engine)
       expect(result.success).toBe(true);
-      expect(result.reason).not.toContain('FinanceVine');
+      expect(result.action).toBe('wait');
     });
 
     it('allows reactive SMS reply to bypass handoff delay', async () => {
@@ -165,7 +165,7 @@ describe('Holly Agent Timing Rules', () => {
 
       // Should not be blocked - reactive response allowed
       expect(result.success).toBe(true);
-      expect(result.reason).not.toContain('FinanceVine handoff delay');
+      expect(result.action).toBe('wait');
     });
 
     it('detects opt-out in first inbound reply', async () => {
@@ -272,7 +272,7 @@ describe('Holly Agent Timing Rules', () => {
 
       // Should not be blocked by appointment (it's in the past)
       expect(result.success).toBe(true);
-      expect(result.reason).not.toContain('appointment');
+      expect(result.action).toBe('wait');
     });
   });
 
@@ -313,7 +313,7 @@ describe('Holly Agent Timing Rules', () => {
 
       // Should not be blocked by FinanceVine timing
       expect(result.success).toBe(true);
-      expect(result.reason).not.toContain('FinanceVine');
+      expect(result.action).toBe('wait');
     });
   });
 

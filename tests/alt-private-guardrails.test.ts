@@ -83,7 +83,7 @@ describe('Alt-Private Guardrails', () => {
         thinking: 'Using alt_private playbook',
         action: 'send_sms',
         message:
-          'Banks can be tricky with income situations. We work these files all the time. Quick call so the team can understand what's going on and see if there's a path. Sound good?',
+          'Banks can be tricky with income situations. We work these files all the time. Quick call so the team can understand what\'s going on and see if there\'s a path. Sound good?',
         confidence: 'high',
       };
 
