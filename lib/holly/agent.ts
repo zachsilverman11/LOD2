@@ -628,6 +628,7 @@ export async function processLeadWithAutonomousAgent(
 
 /**
  * Main agent loop - run this on a schedule (e.g., every 15 minutes)
+ * Queries leads due for review and processes each through the unified agent logic
  */
 export async function runHollyAgentLoop() {
   if (!ENABLE_AUTONOMOUS_AGENT) {
@@ -639,6 +640,8 @@ export async function runHollyAgentLoop() {
   console.log(`[Holly Agent] Mode: ${DRY_RUN_MODE ? 'DRY RUN (logging only)' : 'LIVE'}`);
   console.log(`[Holly Agent] Testing: ${AUTONOMOUS_LEAD_PERCENTAGE}% of leads`);
 
+  const startTime = Date.now();
+  const MAX_EXECUTION_TIME_MS = 240 * 1000; // 240 seconds (4 minutes) to leave buffer before 300s limit
   const now = new Date();
 
   try {
@@ -678,21 +681,13 @@ export async function runHollyAgentLoop() {
           },
         ],
       },
-      include: {
-        communications: {
-          orderBy: { createdAt: 'desc' },
-          take: 20,
-        },
-        appointments: {
-          where: { status: { in: [...ACTIVE_APPOINTMENT_STATUSES] } },
-        },
-        callOutcomes: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-        },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
       },
       orderBy: { nextReviewAt: 'asc' }, // Prioritize overdue reviews
-      take: 50, // Process max 50 leads per cycle (increased from 15 to clear backlog faster)
+      take: 100, // Fetch more leads than we might process (time budget will limit actual processing)
     });
 
     console.log(`[Holly Agent] 📊 Found ${leadsToReview.length} leads due for review at ${now.toISOString()}...`);
@@ -702,279 +697,55 @@ export async function runHollyAgentLoop() {
       waited: 0,
       escalated: 0,
       skipped: 0,
+      timeLimit: 0,
     };
 
     for (const lead of leadsToReview) {
-      try {
-        // 🔒 RACE CONDITION PREVENTION: Try to claim this lead before processing
-        const PROCESSING_LOCK_TIMEOUT_MS = 60000; // 60 seconds
-        const claimResult = await prisma.lead.updateMany({
-          where: {
-            id: lead.id,
-            OR: [
-              { processingStartedAt: null },
-              { processingStartedAt: { lt: new Date(now.getTime() - PROCESSING_LOCK_TIMEOUT_MS) } }
-            ]
-          },
-          data: { processingStartedAt: now }
-        });
-
-        if (claimResult.count === 0) {
-          console.log(`[Holly Agent] ⏸️  ${lead.firstName} ${lead.lastName}: Already being processed, skipping`);
-          results.skipped++;
-          continue;
-        }
-
-        // === ANALYZE DEAL HEALTH ===
-        const signals = analyzeDealHealth(lead);
-
-        // === DETECT CONVERSATION STAGE ===
-        const conversationStage = detectConversationStage({
-          lead: {
-            status: lead.status,
-            applicationStartedAt: lead.applicationStartedAt || null,
-            applicationCompletedAt: lead.applicationCompletedAt || null,
-          },
-          appointments: (lead.appointments || []) as any[],
-          callOutcomes: (lead.callOutcomes || []) as any[],
-          communications: (lead.communications || []) as any[],
-        });
-
+      // Check time budget before processing next lead
+      const elapsedMs = Date.now() - startTime;
+      if (elapsedMs >= MAX_EXECUTION_TIME_MS) {
+        const remaining = leadsToReview.length - leadsToReview.indexOf(lead);
         console.log(
-          `[Holly Agent] 🔍 ${lead.firstName} ${lead.lastName}: ${signals.temperature} (${signals.engagementTrend}) | Stage: ${conversationStage}`
+          `[Holly Agent] ⏱️  Time budget exhausted (${(elapsedMs / 1000).toFixed(1)}s). Stopping with ${remaining} leads remaining for next cycle.`
+        );
+        results.timeLimit = remaining;
+        break;
+      }
+
+      try {
+        console.log(
+          `[Holly Agent] 🔍 Processing ${lead.firstName} ${lead.lastName} (${leadsToReview.indexOf(lead) + 1}/${leadsToReview.length})...`
         );
 
-        // === ASK HOLLY TO DECIDE ===
-        const decision = await askHollyToDecide(lead, signals);
+        // Use the unified agent logic with 'cron' trigger source
+        // This applies all safety checks: FV timing, appointment skip, etc.
+        const result = await processLeadWithAutonomousAgent(lead.id, 'cron');
 
-        // === VALIDATE DECISION ===
-        const validation = validateDecision(decision, {
-          lead,
-          signals,
-          conversationStage,
-          availabilitySlotsProvided: decision._availabilitySlotsProvided,
-        });
-
-        // Log warnings
-        if (validation.warnings.length > 0) {
-          console.warn(`[Holly Agent] ⚠️  ${lead.firstName}: ${validation.warnings.join(', ')}`);
-        }
-
-        if (!validation.isValid) {
-          console.log(
-            `[Holly Agent] ❌ ${lead.firstName}: Blocked - ${validation.errors.join(', ')}`
-          );
-
-          // Schedule retry in 1 hour
-          await prisma.lead.update({
-            where: { id: lead.id },
-            data: { nextReviewAt: new Date(now.getTime() + 60 * 60 * 1000) },
-          });
-
-          results.skipped++;
-          continue;
-        }
-
-        // === CHECK FOR REPETITION (if sending message) ===
-        if (decision.message) {
-          const recentMsgs = (lead.communications || []).map((c: any) => ({
-            role: c.direction === 'OUTBOUND' ? 'assistant' : 'user',
-            content: c.content,
-          }));
-          const repetitionCheck = detectMessageRepetition(decision.message, recentMsgs);
-
-          if (repetitionCheck.isRepetitive) {
-            console.log(
-              `[Holly Agent] 🔁 ${lead.firstName}: Repetitive message blocked - ${repetitionCheck.suggestion}`
-            );
-
-            // Log the blocked repetition
-            await prisma.leadActivity.create({
-              data: {
-                leadId: lead.id,
-                type: 'NOTE_ADDED',
-                channel: 'SYSTEM',
-                content: `🔁 Repetitive message blocked by safety guardrails: "${repetitionCheck.suggestion}"\n\nBlocked message: "${decision.message}"`,
-                metadata: { automated: true, autonomous: true },
-              },
-            });
-
-            // Wait longer before trying again
-            await prisma.lead.update({
-              where: { id: lead.id },
-              data: { nextReviewAt: new Date(now.getTime() + 6 * 60 * 60 * 1000) }, // 6 hours
-            });
-
-            results.skipped++;
-            continue;
-          }
-        }
-
-        // === EXECUTE DECISION ===
-        if (decision.action === 'escalate') {
-          console.log(`[Holly Agent] 🚨 ${lead.firstName}: ESCALATED - ${decision.thinking}`);
-
-          if (!DRY_RUN_MODE) {
-            // Create alert for human review
-            await prisma.leadActivity.create({
-              data: {
-                leadId: lead.id,
-                type: 'NOTE_ADDED',
-                channel: 'SYSTEM',
-                subject: '🚨 ESCALATED BY HOLLY',
-                content: `${decision.thinking}\n\nSuggested action: ${decision.suggestedAction || 'Review needed'}`,
-                metadata: {
-                  automated: true,
-                  autonomous: true,
-                  escalation: true,
-                  leadPhone: lead.phone,
-                  leadEmail: lead.email,
-                },
-              },
-            });
-
-            // Send Slack alert with actionable information
-            const advisorInfo = lead.appointments?.[0]?.advisorName || 'Jakub or Greg';
-            const slackDetails = [
-              decision.thinking,
-              '',
-              `*Suggested Action:* ${decision.suggestedAction || 'Review needed'}`,
-              `*Lead Contact:* ${lead.phone}${lead.email ? ` • ${lead.email}` : ''}`,
-              `*Advisor:* ${advisorInfo}`,
-              `*Status:* ${lead.status}`,
-            ].join('\n');
-
-            await sendSlackNotification({
-              type: 'lead_escalated',
-              leadName: `${lead.firstName} ${lead.lastName}`,
-              leadId: lead.id,
-              details: slackDetails,
-            });
-
-            // Don't auto-review for 48 hours (human will handle)
-            await prisma.lead.update({
-              where: { id: lead.id },
-              data: { nextReviewAt: new Date(now.getTime() + 48 * 60 * 60 * 1000) },
-            });
+        if (result.success) {
+          if (result.action === 'escalated') {
+            results.escalated++;
+          } else if (result.action === 'wait') {
+            results.waited++;
           } else {
-            // Dry run: just log
-            await prisma.leadActivity.create({
-              data: {
-                leadId: lead.id,
-                type: 'NOTE_ADDED',
-                channel: 'SYSTEM',
-                content: `[DRY RUN] Would escalate: ${decision.thinking}`,
-                metadata: { dryRun: true, autonomous: true },
-              },
-            });
+            results.acted++;
           }
-
-          results.escalated++;
-        } else if (decision.action === 'wait') {
-          console.log(
-            `[Holly Agent] ⏸️  ${lead.firstName}: WAITING ${decision.waitHours}h - ${decision.thinking}`
-          );
-
-          const nextReview = new Date(
-            now.getTime() + (decision.waitHours || signals.nextReviewHours) * 60 * 60 * 1000
-          );
-
-          if (!DRY_RUN_MODE) {
-            await prisma.lead.update({
-              where: { id: lead.id },
-              data: { nextReviewAt: nextReview },
-            });
-          } else {
-            // Dry run: just log
-            await prisma.leadActivity.create({
-              data: {
-                leadId: lead.id,
-                type: 'NOTE_ADDED',
-                channel: 'SYSTEM',
-                content: `[DRY RUN] Would wait ${decision.waitHours}h: ${decision.thinking}`,
-                metadata: { dryRun: true, autonomous: true },
-              },
-            });
-          }
-
-          results.waited++;
+          console.log(`[Holly Agent] ✅ ${lead.firstName}: ${result.action || 'success'}`);
         } else {
-          // Send message (or book directly)
-          console.log(
-            `[Holly Agent] ✅ ${lead.firstName}: ${decision.action.toUpperCase()} - ${decision.thinking}`
-          );
-
-          if (!DRY_RUN_MODE) {
-            // Map book_directly (from Claude decision engine) to book_appointment_directly (executeDecision format)
-            const executionAction = decision.action === 'book_directly' ? 'book_appointment_directly' : decision.action;
-
-            // Real execution
-            await executeDecision(lead.id, {
-              action: executionAction,
-              message: decision.message,
-              reasoning: decision.thinking,
-              intent: decision.action,
-              availabilitySlotsProvided: decision._availabilitySlotsProvided === true,
-              ...(decision.action === 'book_directly' && {
-                bookingStartTime: (decision as any).bookingStartTime,
-                bookingLeadName: (decision as any).bookingLeadName,
-                bookingLeadEmail: (decision as any).bookingLeadEmail,
-                bookingLeadTimezone: getTimezoneForProvince((lead.rawData as any)?.province),
-              }),
-            });
-
-            const inboundCount =
-              lead.communications?.filter((c: any) => c.direction === 'INBOUND').length ?? 0;
-            const outboundBefore =
-              lead.communications?.filter((c: any) => c.direction === 'OUTBOUND').length ?? 0;
-            const reviewHours = resolveNextReviewHoursAfterOutbound({
-              signals,
-              inboundCount,
-              outboundCountBeforeThisSend: outboundBefore,
-            });
-            const nextReview = new Date(now.getTime() + reviewHours * 60 * 60 * 1000);
-            await prisma.lead.update({
-              where: { id: lead.id },
-              data: {
-                nextReviewAt: nextReview,
-                lastContactedAt: now,
-              },
-            });
-          } else {
-            // Dry run: just log what would happen
-            await prisma.leadActivity.create({
-              data: {
-                leadId: lead.id,
-                type: 'NOTE_ADDED',
-                channel: 'SYSTEM',
-                content: `[DRY RUN] Would ${decision.action}: "${decision.message}"\n\nReasoning: ${decision.thinking}`,
-                metadata: { dryRun: true, autonomous: true },
-              },
-            });
-          }
-
-          results.acted++;
+          results.skipped++;
+          console.log(`[Holly Agent] ⏭️  ${lead.firstName}: ${result.reason || 'skipped'}`);
         }
       } catch (error) {
         console.error(`[Holly Agent] ❌ Error with ${lead.firstName}:`, error);
+        results.skipped++;
 
         // Schedule retry in 2 hours
-        await prisma.lead.update({
-          where: { id: lead.id },
-          data: { nextReviewAt: new Date(now.getTime() + 2 * 60 * 60 * 1000) },
-        });
-
-        results.skipped++;
-      } finally {
-        // 🔓 Always release the processing lock
         try {
           await prisma.lead.update({
             where: { id: lead.id },
-            data: { processingStartedAt: null },
+            data: { nextReviewAt: new Date(now.getTime() + 2 * 60 * 60 * 1000) },
           });
-        } catch (unlockError) {
-          // Don't fail if unlock fails - lock will auto-expire
-          console.error(`[Holly Agent] ⚠️  Failed to release lock for ${lead.firstName}:`, unlockError);
+        } catch (updateError) {
+          console.error(`[Holly Agent] ⚠️  Failed to schedule retry for ${lead.firstName}:`, updateError);
         }
       }
 
@@ -984,8 +755,9 @@ export async function runHollyAgentLoop() {
       }
     }
 
+    const totalDuration = ((Date.now() - startTime) / 1000).toFixed(2);
     console.log(
-      `[Holly Agent] ✨ Cycle complete - acted: ${results.acted}, waited: ${results.waited}, escalated: ${results.escalated}, skipped: ${results.skipped}`
+      `[Holly Agent] ✨ Cycle complete in ${totalDuration}s - acted: ${results.acted}, waited: ${results.waited}, escalated: ${results.escalated}, skipped: ${results.skipped}${results.timeLimit > 0 ? `, deferred: ${results.timeLimit}` : ''}`
     );
     console.log(`[Holly Agent] 📊 Next cycle in 15 minutes`);
 
@@ -1033,8 +805,14 @@ export async function runHollyAgentLoop() {
         },
       });
     }
+
+    return {
+      ...results,
+      duration: totalDuration,
+    };
   } catch (error) {
     console.error('[Holly Agent] 💥 Critical error in agent loop:', error);
+    throw error;
   }
 }
 
