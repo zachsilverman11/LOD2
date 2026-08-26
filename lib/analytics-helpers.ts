@@ -265,6 +265,54 @@ export function groupByCohort(leads: Lead[]): Record<string, Lead[]> {
 }
 
 /**
+ * SOURCE FILTERING
+ * Filter leads by their source (financevine, leads_on_demand, rates_ca, etc.)
+ */
+
+export function filterBySource(leads: Lead[], source: string | null): Lead[] {
+  if (!source || source === 'all') return leads;
+  return leads.filter((lead) => lead.source === source);
+}
+
+export function groupBySource(leads: Lead[]): Record<string, Lead[]> {
+  return leads.reduce(
+    (acc, lead) => {
+      const source = lead.source || 'unknown';
+      if (!acc[source]) {
+        acc[source] = [];
+      }
+      acc[source].push(lead);
+      return acc;
+    },
+    {} as Record<string, Lead[]>
+  );
+}
+
+/**
+ * SEGMENT FILTERING
+ * Filter leads by their segment (alt_private, prime_rate_shop, prime_other, etc.)
+ */
+
+export function filterBySegment(leads: Lead[], segment: string | null): Lead[] {
+  if (!segment || segment === 'all') return leads;
+  return leads.filter((lead) => lead.segment === segment);
+}
+
+export function groupBySegment(leads: Lead[]): Record<string, Lead[]> {
+  return leads.reduce(
+    (acc, lead) => {
+      const segment = lead.segment || 'unknown';
+      if (!acc[segment]) {
+        acc[segment] = [];
+      }
+      acc[segment].push(lead);
+      return acc;
+    },
+    {} as Record<string, Lead[]>
+  );
+}
+
+/**
  * DATE RANGE FILTERING
  */
 
