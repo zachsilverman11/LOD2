@@ -25,6 +25,10 @@ export function validateTwilioSignature({
   params,
   authToken,
 }: TwilioSignatureValidationParams): boolean {
+  // Trim auth token to handle trailing newlines/whitespace from env vars
+  // Twilio signs with the actual 32-char token (no whitespace)
+  const trimmedAuthToken = authToken.trim();
+
   // Build the string to sign: URL + sorted params
   let data = url;
 
@@ -35,7 +39,7 @@ export function validateTwilioSignature({
   }
 
   // Compute HMAC-SHA1
-  const hmac = createHmac("sha1", authToken);
+  const hmac = createHmac("sha1", trimmedAuthToken);
   hmac.update(data);
   const expectedSignature = hmac.digest("base64");
 

@@ -13,7 +13,7 @@ import { validateTwilioSignature } from "@/lib/twilio-signature";
 export async function POST(request: NextRequest) {
   try {
     // ✅ SECURITY: Validate Twilio signature before processing
-    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    const authToken = process.env.TWILIO_AUTH_TOKEN?.trim();
     if (!authToken) {
       console.error("[Twilio] Missing TWILIO_AUTH_TOKEN - rejecting unsigned request");
       return NextResponse.json(
