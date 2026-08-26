@@ -273,13 +273,12 @@ export async function processLeadWithAutonomousAgent(
       );
 
       // === SPECIAL CASE: send_booking_link blocked → rewrite to offer times or ask preference ===
-      // (Harper Test issue #1)
-      const isBookingLinkBlocked = validation.errors.some(e => 
-        e.includes('send_booking_link') && 
-        !e.includes('lead did not ask for it') // Don't rewrite if URL is in send_sms
-      );
+      // (Harper Test issue #1: empty-slots, first-touch, or live-slots)
+      const isBookingLinkBlocked = 
+        decision.action === 'send_booking_link' && 
+        validation.errors.some(e => e.includes('Holly chose send_booking_link'));
 
-      if (isBookingLinkBlocked && decision.action === 'send_booking_link' && decision.message) {
+      if (isBookingLinkBlocked && decision.message) {
         console.log(
           `[Holly Agent] 🔄 ${lead.firstName}: Rewriting send_booking_link to send_sms`
         );
