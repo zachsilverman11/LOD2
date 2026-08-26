@@ -200,6 +200,97 @@ describe('Twilio Signature Validation', () => {
         authToken,
       })).toBe(false);
     });
+
+    test('accepts signature computed with trimmed token when env has trailing newline', () => {
+      // Real-world scenario: Vercel env var has trailing newline
+      const cleanToken = 'abcd1234efgh5678ijkl90mnopqrstuv';
+      const tokenWithNewline = cleanToken + '\n';
+      
+      const params = {
+        From: '+12345678900',
+        To: '+12345678901',
+        Body: 'Hello from real Twilio',
+        MessageSid: 'SM123',
+      };
+
+      // Twilio signs with the clean token (no whitespace)
+      const twilioSignature = computeSignature(url, params, cleanToken);
+
+      // validateTwilioSignature receives the token with newline from env
+      const isValid = validateTwilioSignature({
+        signature: twilioSignature,
+        url,
+        params,
+        authToken: tokenWithNewline,
+      });
+
+      expect(isValid).toBe(true);
+    });
+
+    test('accepts signature computed with trimmed token when env has trailing spaces', () => {
+      const cleanToken = 'abcd1234efgh5678ijkl90mnopqrstuv';
+      const tokenWithSpaces = cleanToken + '  ';
+      
+      const params = {
+        From: '+12345678900',
+        Body: 'Hello',
+      };
+
+      const twilioSignature = computeSignature(url, params, cleanToken);
+
+      const isValid = validateTwilioSignature({
+        signature: twilioSignature,
+        url,
+        params,
+        authToken: tokenWithSpaces,
+      });
+
+      expect(isValid).toBe(true);
+    });
+
+    test('accepts signature computed with trimmed token when env has leading whitespace', () => {
+      const cleanToken = 'abcd1234efgh5678ijkl90mnopqrstuv';
+      const tokenWithLeadingSpace = ' ' + cleanToken;
+      
+      const params = {
+        From: '+12345678900',
+        Body: 'Hello',
+      };
+
+      const twilioSignature = computeSignature(url, params, cleanToken);
+
+      const isValid = validateTwilioSignature({
+        signature: twilioSignature,
+        url,
+        params,
+        authToken: tokenWithLeadingSpace,
+      });
+
+      expect(isValid).toBe(true);
+    });
+
+    test('rejects signature when tokens completely differ (even with trimming)', () => {
+      const correctToken = 'abcd1234efgh5678ijkl90mnopqrstuv';
+      const wrongToken = 'wrong_token_xyz_different_value1';
+      
+      const params = {
+        From: '+12345678900',
+        Body: 'Hello',
+      };
+
+      // Sign with correct token
+      const signature = computeSignature(url, params, correctToken);
+
+      // Validate with wrong token (even with trailing newline)
+      const isValid = validateTwilioSignature({
+        signature,
+        url,
+        params,
+        authToken: wrongToken + '\n',
+      });
+
+      expect(isValid).toBe(false);
+    });
   });
 
   describe('Signature computation matches Twilio spec', () => {
