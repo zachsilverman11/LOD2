@@ -4,6 +4,7 @@ import { normalizePhoneNumber } from "@/lib/sms";
 import { ActivityType, CommunicationChannel } from "@/app/generated/prisma";
 import { inngest } from "@/lib/inngest";
 import { sendErrorAlert } from "@/lib/slack";
+import { validateTwilioSignature } from "@/lib/twilio-signature";
 
 /**
  * Handle incoming SMS messages from Twilio
@@ -11,10 +12,68 @@ import { sendErrorAlert } from "@/lib/slack";
  */
 export async function POST(request: NextRequest) {
   try {
+    // ✅ SECURITY: Validate Twilio signature before processing
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    if (!authToken) {
+      console.error("[Twilio] Missing TWILIO_AUTH_TOKEN - rejecting unsigned request");
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 403 }
+      );
+    }
+
+    const signature = request.headers.get("X-Twilio-Signature");
+    if (!signature) {
+      console.error("[Twilio] Missing X-Twilio-Signature header");
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 403 }
+      );
+    }
+
+    // Parse form data to extract all parameters
     const formData = await request.formData();
-    const from = formData.get("From") as string;
-    const body = formData.get("Body") as string;
-    const messageSid = formData.get("MessageSid") as string;
+    const params: Record<string, string> = {};
+    formData.forEach((value, key) => {
+      params[key] = value.toString();
+    });
+
+    // Build the full URL that Twilio signed
+    // On Vercel/Next.js, use x-forwarded-proto and host headers
+    const protocol = request.headers.get("x-forwarded-proto") || "https";
+    const host = request.headers.get("host");
+    if (!host) {
+      console.error("[Twilio] Missing host header");
+      return NextResponse.json(
+        { error: "Bad Request" },
+        { status: 400 }
+      );
+    }
+
+    // Construct the full URL (path + query string)
+    const { pathname, search } = new URL(request.url);
+    const fullUrl = `${protocol}://${host}${pathname}${search}`;
+
+    // Validate signature
+    const isValid = validateTwilioSignature({
+      signature,
+      url: fullUrl,
+      params,
+      authToken,
+    });
+
+    if (!isValid) {
+      console.error("[Twilio] Invalid signature");
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 403 }
+      );
+    }
+
+    // Extract required fields after validation
+    const from = params.From;
+    const body = params.Body;
+    const messageSid = params.MessageSid;
 
     if (!from || !body) {
       return NextResponse.json(
