@@ -243,27 +243,28 @@ export async function POST(req: NextRequest) {
 
     // 🚀 AUTONOMOUS HOLLY CONTACT - Only for new leads
     // FinanceVine timing: 5-min opt-out window + 30-min handoff delay
-    // The agent will enforce this timing internally
+    // Set nextReviewAt to ~30 minutes from now so the cron will pick it up after the handoff delay
     if (!existingLead && lead.consentSms) {
-      console.log(`[Autonomous Holly] Scheduling FinanceVine lead for contact: ${lead.id}`);
+      console.log(`[Autonomous Holly] Scheduling FinanceVine lead for first contact in ~30 minutes: ${lead.id}`);
 
       try {
-        // The agent will check the ingestTimestamp and enforce timing
-        const result = await processLeadWithAutonomousAgent(lead.id);
+        const FINANCEVINE_HANDOFF_DELAY_MINUTES = 30;
+        const nextReviewAt = new Date(Date.now() + FINANCEVINE_HANDOFF_DELAY_MINUTES * 60 * 1000);
 
-        if (result.success) {
-          console.log(`[Autonomous Holly] ✅ FinanceVine lead processed: ${result.action}`);
-        } else {
-          console.log(`[Autonomous Holly] ⏭️  FinanceVine lead deferred: ${result.reason}`);
-        }
+        await prisma.lead.update({
+          where: { id: lead.id },
+          data: { nextReviewAt },
+        });
+
+        console.log(`[Autonomous Holly] ✅ FinanceVine lead scheduled for review at ${nextReviewAt.toISOString()}`);
       } catch (error) {
-        console.error("[Autonomous Holly] Failed to process FinanceVine lead:", error);
+        console.error("[Autonomous Holly] Failed to schedule FinanceVine lead:", error);
 
         // Send error alert to Slack
         await sendErrorAlert({
           error: error instanceof Error ? error : new Error(String(error)),
           context: {
-            location: "webhooks/financevine - Autonomous Holly processing",
+            location: "webhooks/financevine - Autonomous Holly scheduling",
             leadId: lead.id,
             details: { firstName: correctedFirstName, lastName: correctedLastName, phone: lead.phone },
           },
@@ -274,7 +275,7 @@ export async function POST(req: NextRequest) {
           data: {
             leadId: lead.id,
             type: "NOTE_ADDED",
-            content: `Failed to process with autonomous agent: ${error instanceof Error ? error.message : "Unknown error"}`,
+            content: `Failed to schedule with autonomous agent: ${error instanceof Error ? error.message : "Unknown error"}`,
           },
         });
       }
