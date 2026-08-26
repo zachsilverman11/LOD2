@@ -358,7 +358,7 @@ async function handleBookingRescheduled(payload: any) {
 
   try {
     // Format the new appointment time in the lead's timezone
-    const leadTimezone = getTimezoneForProvince(lead.rawData?.province);
+    const leadTimezone = getTimezoneForProvince((lead.rawData as any)?.province);
     const newTime = new Date(startTime).toLocaleString("en-US", {
       weekday: "long",
       month: "short",
@@ -463,9 +463,11 @@ async function handleBookingCancelled(payload: any) {
     details: `Appointment cancelled ${cancelledByAdvisor ? "by advisor" : "by lead"}${cancellationReason ? `\nReason: ${cancellationReason}` : ""}\nHolly will reach out to re-engage${lead.hollyDisabled ? " (when re-enabled)" : ""}.`,
   });
 
-  // Skip SMS if Holly is disabled for this lead
-  if (lead.hollyDisabled) {
-    console.log(`[Cal.com] Skipping cancellation SMS - Holly disabled for lead ${lead.id}`);
+  // Skip SMS if Holly is disabled, no SMS consent, or no phone
+  if (lead.hollyDisabled || !lead.consentSms || !lead.phone) {
+    console.log(
+      `[Cal.com] Skipping cancellation SMS - hollyDisabled: ${lead.hollyDisabled}, consentSms: ${lead.consentSms}, hasPhone: ${!!lead.phone}`
+    );
     return;
   }
 
