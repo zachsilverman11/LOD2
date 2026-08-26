@@ -156,6 +156,48 @@ export function getTimezoneForProvince(province?: string): string {
   }
 }
 
+/**
+ * Get human-friendly timezone name for speaking to leads.
+ * Returns the short timezone abbreviation (PT, MT, CT, ET, AT) regardless of DST.
+ * Examples: BC → "PT", Alberta → "MT"
+ */
+export function getTimezoneNameForProvince(province?: string): string {
+  if (!province) return "PT";
+  const p = province.toUpperCase().trim();
+  switch (p) {
+    case "AB":
+    case "ALBERTA":
+      return "MT";
+    case "SK":
+    case "SASKATCHEWAN":
+      return "CT";
+    case "MB":
+    case "MANITOBA":
+      return "CT";
+    case "ON":
+    case "ONTARIO":
+    case "QC":
+    case "QUEBEC":
+      return "ET";
+    case "NS":
+    case "NOVA SCOTIA":
+    case "NB":
+    case "NEW BRUNSWICK":
+    case "PE":
+    case "PEI":
+    case "PRINCE EDWARD ISLAND":
+      return "AT";
+    case "NL":
+    case "NEWFOUNDLAND":
+    case "NEWFOUNDLAND AND LABRADOR":
+      return "NT";
+    case "BC":
+    case "BRITISH COLUMBIA":
+    default:
+      return "PT";
+  }
+}
+
 // ─── V2: Available Slots ────────────────────────────────────────────────────
 
 /** Default horizon for Holly slot pre-fetch (sync prompts with `getAvailabilityWindow()`). */

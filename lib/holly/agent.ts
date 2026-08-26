@@ -10,7 +10,7 @@ import { askHollyToDecide } from './decision-engine';
 import { validateDecision, detectMessageRepetition } from './guardrails';
 import { detectConversationStage } from './stage';
 import { executeDecision } from './conversation-handler';
-import { getTimezoneForProvince } from '../calcom';
+import { getTimezoneForProvince, getTimezoneNameForProvince } from '../calcom';
 import { sendSlackNotification } from '../slack';
 import { trackConversationOutcome } from '../conversation-outcome-tracker';
 import { getNext8AM, getLocalTimeString } from '../timezone-utils';
@@ -299,43 +299,53 @@ export async function processLeadWithAutonomousAgent(
             const rawData = lead.rawData as any;
             const province = rawData?.province || 'British Columbia';
             const tz = getTimezoneForProvince(province);
+            const tzName = getTimezoneNameForProvince(province);
             const { start, end } = getAvailabilityWindow();
             const slots = await getAvailableSlots(start, end, tz);
             
             if (slots.length >= 2) {
-              // Pick 2-3 representative times
-              const time1 = new Date(slots[0].time).toLocaleString('en-US', {
-                timeZone: tz,
-                weekday: 'short',
-                hour: 'numeric',
-                minute: slots[0].time.includes(':00') ? undefined : '2-digit',
-                hour12: true,
-              });
-              const time2 = new Date(slots[1].time).toLocaleString('en-US', {
-                timeZone: tz,
-                weekday: 'short',
-                hour: 'numeric',
-                minute: slots[1].time.includes(':00') ? undefined : '2-digit',
-                hour12: true,
-              });
+              // Filter out past slots
+              const now = new Date();
+              const futureSlots = slots.filter(slot => new Date(slot.time) > now);
               
-              let timesOffer = `${time1} or ${time2}`;
-              if (slots.length >= 3) {
-                const time3 = new Date(slots[2].time).toLocaleString('en-US', {
+              if (futureSlots.length >= 2) {
+                // Pick 2-3 representative times
+                const time1 = new Date(futureSlots[0].time).toLocaleString('en-US', {
                   timeZone: tz,
                   weekday: 'short',
                   hour: 'numeric',
-                  minute: slots[2].time.includes(':00') ? undefined : '2-digit',
+                  minute: futureSlots[0].time.includes(':00') ? undefined : '2-digit',
                   hour12: true,
                 });
-                timesOffer = `${time1}, ${time2}, or ${time3}`;
+                const time2 = new Date(futureSlots[1].time).toLocaleString('en-US', {
+                  timeZone: tz,
+                  weekday: 'short',
+                  hour: 'numeric',
+                  minute: futureSlots[1].time.includes(':00') ? undefined : '2-digit',
+                  hour12: true,
+                });
+                
+                let timesOffer = `${time1} or ${time2} ${tzName}`;
+                if (futureSlots.length >= 3) {
+                  const time3 = new Date(futureSlots[2].time).toLocaleString('en-US', {
+                    timeZone: tz,
+                    weekday: 'short',
+                    hour: 'numeric',
+                    minute: futureSlots[2].time.includes(':00') ? undefined : '2-digit',
+                    hour12: true,
+                  });
+                  timesOffer = `${time1}, ${time2}, or ${time3} ${tzName}`;
+                }
+                
+                // Strip any existing URL from message
+                const cleanMessage = decision.message.replace(/https?:\/\/cal\.com[^\s]*/gi, '').trim();
+                rewrittenMessage = cleanMessage.length > 20 
+                  ? `${cleanMessage} Greg or Jakub have openings at ${timesOffer}. Which works?`
+                  : `When works better - ${timesOffer}?`;
+              } else {
+                // Fallback if not enough future slots
+                rewrittenMessage = `What day and time works best for you? I can book you in with Greg or Jakub.`;
               }
-              
-              // Strip any existing URL from message
-              const cleanMessage = decision.message.replace(/https?:\/\/cal\.com[^\s]*/gi, '').trim();
-              rewrittenMessage = cleanMessage.length > 20 
-                ? `${cleanMessage} Greg or Jakub have openings at ${timesOffer}. Which works?`
-                : `When works better - ${timesOffer}?`;
             } else {
               // Fallback if slots fetch fails in rewrite
               rewrittenMessage = `What day and time works best for you? I can book you in with Greg or Jakub.`;
