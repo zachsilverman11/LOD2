@@ -8,6 +8,7 @@ import {
   getAvailableSlots,
   getAvailabilityWindow,
   getTimezoneForProvince,
+  getTimezoneNameForProvince,
   CALCOM_AVAILABILITY_DEFAULT_DAYS_AHEAD,
   type TimeSlot,
 } from "../calcom";
@@ -194,11 +195,16 @@ export async function buildLeadContext(leadId: string): Promise<LeadContext> {
 /**
  * Generate enhanced system prompt with Inspired Mortgage training
  */
-function buildRepresentativeSlotList(slots: TimeSlot[]): TimeSlot[] {
+function buildRepresentativeSlotList(slots: TimeSlot[], timeZone: string): TimeSlot[] {
+  const now = new Date();
   const representativeSlots: TimeSlot[] = [];
   const slotsPerDay = new Map<string, number>();
 
   for (const slot of slots) {
+    // Skip slots that are already in the past in the lead's local timezone
+    const slotDate = new Date(slot.time);
+    if (slotDate <= now) continue;
+
     const dayKey = slot.time.slice(0, 10);
     const dayCount = slotsPerDay.get(dayKey) || 0;
 
@@ -215,7 +221,7 @@ function buildRepresentativeSlotList(slots: TimeSlot[]): TimeSlot[] {
   return representativeSlots;
 }
 
-function buildAvailabilityPromptBlock(timeZone: string, slots: TimeSlot[]): string {
+function buildAvailabilityPromptBlock(timeZone: string, slots: TimeSlot[], province?: string): string {
   if (slots.length === 0) {
     return `# LIVE CALENDAR AVAILABILITY
 Availability data is unavailable right now (fetch failed or returned no slots).
@@ -227,23 +233,24 @@ When the lead is ready to book:
 - Only use \`send_booking_link\` if (1) they explicitly ask for a link, OR (2) multiple attempts still cannot find a workable time`;
   }
 
-  const representativeSlots = buildRepresentativeSlotList(slots);
+  const timeZoneName = province ? getTimezoneNameForProvince(province) : "PT";
+  const representativeSlots = buildRepresentativeSlotList(slots, timeZone);
   const slotLines = representativeSlots
     .map(
       (slot, index) =>
-        `${index + 1}. ${slot.displayTime} (${timeZone}) | ${slot.time}`
+        `${index + 1}. Local time: ${slot.displayTime} (${timeZoneName}) | bookingStartTime: ${slot.time}`
     )
     .join("\n");
 
   return `# LIVE CALENDAR AVAILABILITY
 These are REAL live Cal.com slots for the next ${CALCOM_AVAILABILITY_DEFAULT_DAYS_AHEAD} days.
 
-Use this timezone when speaking to the lead: ${timeZone}
+When speaking to the lead, use ${timeZoneName} (${province || "British Columbia"} time).
 
 🚨 DIRECT BOOKING RULES:
 - Your default booking behavior is to OFFER 2-3 specific times from this list and book the lead directly
 - When the lead clearly chooses one of these times, use \`book_appointment_directly\`
-- \`bookingStartTime\` MUST be one exact ISO time from the list below
+- \`bookingStartTime\` MUST be one exact ISO time from the "bookingStartTime" column below
 - Only use \`send_booking_link\` as a fallback when:
   1. availability is unavailable
   2. they want a time outside this prefetched window (~${CALCOM_AVAILABILITY_DEFAULT_DAYS_AHEAD} days)
@@ -293,7 +300,7 @@ async function getBookingAvailabilityContext(
     return {
       timeZone,
       slots,
-      promptBlock: buildAvailabilityPromptBlock(timeZone, slots),
+      promptBlock: buildAvailabilityPromptBlock(timeZone, slots, province),
     };
   } catch (error) {
     console.error("[Cal.com] Failed to load booking availability:", error);
@@ -301,7 +308,7 @@ async function getBookingAvailabilityContext(
     return {
       timeZone,
       slots: [],
-      promptBlock: buildAvailabilityPromptBlock(timeZone, []),
+      promptBlock: buildAvailabilityPromptBlock(timeZone, [], province),
     };
   }
 }
@@ -313,6 +320,7 @@ function generateSystemPrompt(
 ): string {
   const data = context.leadData;
   const daysInStage = context.pipelineStatus.daysInStage;
+  const province = data?.province || (context.lead.rawData as { province?: string } | null)?.province;
 
   // Determine urgency level and guidance
   let urgencyLevel: string;
@@ -420,7 +428,7 @@ This call is where they'll:
 Your job: Get them curious enough to book the call. Don't try to answer everything via SMS.
 `}
 
-${!existingAppointment ? `${bookingAvailability?.promptBlock || buildAvailabilityPromptBlock("America/Vancouver", [])}
+${!existingAppointment ? `${bookingAvailability?.promptBlock || buildAvailabilityPromptBlock(getTimezoneForProvince(province), [], province)}
 ` : ""}
 
 # 📊 LEAD PROFILE
