@@ -302,8 +302,8 @@ export async function askHollyToDecide(
     : null;
   const unansweredFollowUps = inboundCount > 0 ? outboundCount - inboundCount : 0;
 
-  // Determine lead type
-  const loanType = (rawData?.loanType || rawData?.lead_type || '').toLowerCase();
+  // Determine lead type - map FinanceVine's mortgage_type field
+  const loanType = (rawData?.loanType || rawData?.lead_type || rawData?.mortgage_type || '').toLowerCase();
   const leadType = loanType.includes('purchase')
     ? 'purchase'
     : loanType.includes('refinance')
@@ -316,9 +316,17 @@ export async function askHollyToDecide(
   const youtubeLink = await fetchYouTubeLinkForBriefing();
   const youtubeSharedInConversation = recentMessages.includes('youtube.com');
 
-  // Build rich context briefing
+  // Build rich context briefing - pass Lead schema fields (segment, intent, source) for FinanceVine leads
   const hollyBriefing = buildHollyBriefing({
-    leadData: rawData,
+    leadData: {
+      ...rawData,
+      // Override with Lead schema fields when available (FinanceVine writes these)
+      segment: lead.segment || rawData?.segment,
+      intent: lead.intent || rawData?.intent,
+      source: lead.source || rawData?.source,
+      // Map FinanceVine mortgage_type to loanType
+      loanType: rawData?.loanType || rawData?.lead_type || rawData?.mortgage_type,
+    },
     conversationContext: {
       touchNumber: outboundCount + 1,
       hasReplied: inboundCount > 0,

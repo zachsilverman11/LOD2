@@ -218,9 +218,13 @@ function buildRepresentativeSlotList(slots: TimeSlot[]): TimeSlot[] {
 function buildAvailabilityPromptBlock(timeZone: string, slots: TimeSlot[]): string {
   if (slots.length === 0) {
     return `# LIVE CALENDAR AVAILABILITY
-Availability data is unavailable right now.
+Availability data is unavailable right now (fetch failed or returned no slots).
 
-If the lead is ready to book, use \`send_booking_link\` as the fallback.`;
+When the lead is ready to book:
+- DO NOT use \`send_booking_link\` as an automatic fallback — it's last resort only
+- Instead use \`send_sms\` to ask what day and time work best (e.g. "What day and time works best for you?")
+- When they reply with a specific day/time, use \`book_directly\` with that time
+- Only use \`send_booking_link\` if (1) they explicitly ask for a link, OR (2) multiple attempts still cannot find a workable time`;
   }
 
   const representativeSlots = buildRepresentativeSlotList(slots);

@@ -272,6 +272,154 @@ export async function processLeadWithAutonomousAgent(
         `[Holly Agent] ❌ ${lead.firstName}: Blocked - ${validation.errors.join(', ')}`
       );
 
+      // === SPECIAL CASE: send_booking_link with live slots → rewrite to offer times ===
+      // (Harper Test issue #1)
+      const isBookingLinkWithSlots = validation.errors.some(e => 
+        e.includes('send_booking_link but live calendar availability was provided')
+      );
+      const isBookingLinkFirstTouch = validation.errors.some(e =>
+        e.includes('send_booking_link on the first touch')
+      );
+
+      if (isBookingLinkWithSlots && decision._availabilitySlotsProvided && decision.message) {
+        console.log(
+          `[Holly Agent] 🔄 ${lead.firstName}: Rewriting send_booking_link to send_sms with times offer`
+        );
+
+        // Rewrite: Strip any Cal.com URL from the message, add instruction to offer times
+        let rewrittenMessage = decision.message.replace(/https?:\/\/cal\.com[^\s]*/gi, '').trim();
+        
+        // If the message is now too short, replace with a generic times offer
+        if (rewrittenMessage.length < 20) {
+          rewrittenMessage = `When works better for you - today or tomorrow? I can book you in with Greg or Jakub.`;
+        } else {
+          // Append times instruction if not already asking about timing
+          if (!/when|what time|which (day|time)/i.test(rewrittenMessage)) {
+            rewrittenMessage += ` When works better for you?`;
+          }
+        }
+
+        const rewrittenDecision = {
+          action: 'send_sms' as const,
+          message: rewrittenMessage,
+          reasoning: `Rewritten from send_booking_link: ${decision.thinking}`,
+          intent: 'offer_times_rewrite',
+          availabilitySlotsProvided: true,
+        };
+
+        // Execute the rewritten decision
+        const result = await executeDecision(lead.id, rewrittenDecision, triggerSource);
+        
+        if (result.success) {
+          console.log(
+            `[Holly Agent] ✅ ${lead.firstName}: Rewrite successful - offered times via SMS`
+          );
+          
+          // Log the rewrite for debugging
+          await prisma.leadActivity.create({
+            data: {
+              leadId: lead.id,
+              type: 'NOTE_ADDED',
+              channel: 'SYSTEM',
+              content: `🔄 Booking Link Rewritten to Times Offer\n\nHolly tried to send booking link but live slots existed. Automatically rewritten to offer specific times via SMS instead.\n\nOriginal: "${decision.message}"\nRewritten: "${rewrittenMessage}"`,
+              metadata: {
+                automated: true,
+                autonomous: true,
+                rewrite: true,
+                originalAction: 'send_booking_link',
+                rewrittenAction: 'send_sms',
+              },
+            },
+          });
+
+          // Advance timing like a normal send
+          const inboundCount = lead.communications?.filter((c: any) => c.direction === 'INBOUND').length ?? 0;
+          const outboundBefore = lead.communications?.filter((c: any) => c.direction === 'OUTBOUND').length ?? 0;
+          const reviewHours = resolveNextReviewHoursAfterOutbound({
+            signals,
+            inboundCount,
+            outboundCountBeforeThisSend: outboundBefore,
+          });
+          const nextReview = new Date(now.getTime() + reviewHours * 60 * 60 * 1000);
+          await prisma.lead.update({
+            where: { id: lead.id },
+            data: {
+              nextReviewAt: nextReview,
+              lastContactedAt: now,
+            },
+          });
+
+          return { success: true, action: 'send_sms', rewritten: true };
+        } else {
+          console.warn(
+            `[Holly Agent] ⚠️  ${lead.firstName}: Rewrite failed - ${result.skipReason || result.error}`
+          );
+          // Fall through to normal retry logic below
+        }
+      } else if (isBookingLinkFirstTouch && decision.message) {
+        console.log(
+          `[Holly Agent] 🔄 ${lead.firstName}: Rewriting first-touch booking link attempt`
+        );
+
+        // Rewrite: Remove any booking language, replace with a diagnostic question
+        const firstName = lead.firstName || (lead.rawData as any)?.first_name || 'there';
+        const rewrittenMessage = `Hi ${firstName}! Holly from Inspired Mortgage. Quick question - what's prompting your ${(lead.rawData as any)?.loanType || 'mortgage'} search right now?`;
+
+        const rewrittenDecision = {
+          action: 'send_sms' as const,
+          message: rewrittenMessage,
+          reasoning: `Rewritten from send_booking_link on first touch: ${decision.thinking}`,
+          intent: 'first_touch_rewrite',
+          availabilitySlotsProvided: false,
+        };
+
+        const result = await executeDecision(lead.id, rewrittenDecision, triggerSource);
+        
+        if (result.success) {
+          console.log(
+            `[Holly Agent] ✅ ${lead.firstName}: First-touch rewrite successful`
+          );
+          
+          await prisma.leadActivity.create({
+            data: {
+              leadId: lead.id,
+              type: 'NOTE_ADDED',
+              channel: 'SYSTEM',
+              content: `🔄 First-Touch Booking Link Blocked & Rewritten\n\nHolly tried to send booking link on first touch. Automatically rewritten to diagnostic question.\n\nRewritten: "${rewrittenMessage}"`,
+              metadata: {
+                automated: true,
+                autonomous: true,
+                rewrite: true,
+                originalAction: 'send_booking_link',
+                rewrittenAction: 'send_sms',
+              },
+            },
+          });
+
+          const inboundCount = lead.communications?.filter((c: any) => c.direction === 'INBOUND').length ?? 0;
+          const outboundBefore = lead.communications?.filter((c: any) => c.direction === 'OUTBOUND').length ?? 0;
+          const reviewHours = resolveNextReviewHoursAfterOutbound({
+            signals,
+            inboundCount,
+            outboundCountBeforeThisSend: outboundBefore,
+          });
+          const nextReview = new Date(now.getTime() + reviewHours * 60 * 60 * 1000);
+          await prisma.lead.update({
+            where: { id: lead.id },
+            data: {
+              nextReviewAt: nextReview,
+              lastContactedAt: now,
+            },
+          });
+
+          return { success: true, action: 'send_sms', rewritten: true };
+        } else {
+          console.warn(
+            `[Holly Agent] ⚠️  ${lead.firstName}: First-touch rewrite failed - ${result.skipReason || result.error}`
+          );
+        }
+      }
+
       // Log the guardrail block to database for visibility
       if (!DRY_RUN_MODE) {
         await prisma.leadActivity.create({

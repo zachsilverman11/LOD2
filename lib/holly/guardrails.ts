@@ -376,6 +376,8 @@ export function validateDecision(
       /\bpull\s+(your\s+)?credit/i,               // "pull your credit" / "pull credit"
       /\bsee\s+if\s+you\s+qualify/i,              // "see if you qualify"
       /\bcheck\s+if\s+you\s+qualify/i,            // "check if you qualify"
+      /\bshopping\s+for\s+rates?\b/i,             // "shopping for rates" (Harper Test issue #2)
+      /\byour\s+rate\s+is\s+on\s+(its|the)\s+way/i, // "your rate is on its way" (Harper Test issue #2)
     ];
 
     const violations = altPrivateBannedPatterns.filter(pattern => pattern.test(message));
@@ -383,9 +385,30 @@ export function validateDecision(
       errors.push(
         'CRITICAL: alt_private segment violation. This lead is private/alternative (NOT bankable). ' +
         'Message contains banned phrase(s) for alt_private: low rates, ultra-low, reserved rates, no penalties, ' +
-        'guaranteed approval, cash back, best rate, pull credit, or see if you qualify. ' +
+        'guaranteed approval, cash back, best rate, pull credit, see if you qualify, shopping for rates, or your rate is on its way. ' +
         'Use the alt_private playbook: focus on understanding their situation, normalizing that banks have a box, ' +
         'and getting them to a short call with the team.'
+      );
+    }
+  }
+
+  // === HARD RULE: Outcome-promise timing bans (all segments) ===
+  // Ban claims like "approved within X hours/days" (Harper Test issue #3)
+  if (decision.message) {
+    const message = decision.message.toLowerCase();
+    
+    const outcomePromisePatterns = [
+      /\bapproved\s+within\s+\d+\s*(hours?|days?)\b/i,     // "approved within X hours/days"
+      /\bapproved\s+in\s+\d+\s*(hours?|days?)\b/i,         // "approved in X hours/days"
+      /\bget\s+approved\s+(within|in)\s+\d+\s*(hours?|days?)\b/i, // "get approved within/in X hours/days"
+    ];
+
+    const violations = outcomePromisePatterns.filter(pattern => pattern.test(message));
+    if (violations.length > 0) {
+      errors.push(
+        'CRITICAL: Outcome-promise timing ban. Message contains a specific approval timing promise ' +
+        '(e.g., "approved within X hours/days"). Do not promise approval timelines - these are outside Holly\'s control ' +
+        'and create false expectations. Focus on booking the discovery call instead.'
       );
     }
   }
