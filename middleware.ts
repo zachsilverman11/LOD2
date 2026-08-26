@@ -7,12 +7,13 @@ export default auth((req) => {
   // Public routes that don't require authentication
   const isLoginPage = pathname === "/login" || pathname.startsWith("/login/");
   const isAuthRoute = pathname.startsWith("/api/auth");
-  const isWebhook = pathname.startsWith("/api/webhook");
+  const isWebhook = pathname.startsWith("/api/webhooks");
+  const isInngest = pathname.startsWith("/api/inngest");
   const isPublicApi = pathname.startsWith("/api/cron"); // Cron jobs
   const isAdminSeed = pathname === "/api/admin/seed-users"; // Temporary: seed users
 
   // Allow public routes
-  if (isAuthRoute || isWebhook || isPublicApi || isAdminSeed) {
+  if (isAuthRoute || isWebhook || isInngest || isPublicApi || isAdminSeed) {
     return;
   }
 
