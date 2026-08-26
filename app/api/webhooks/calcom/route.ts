@@ -4,6 +4,7 @@ import { ActivityType, CommunicationChannel, LeadStatus } from "@/app/generated/
 import { sendSlackNotification } from "@/lib/slack";
 import { handleConversation, executeDecision } from "@/lib/holly/conversation-handler";
 import { findLeadByPhone } from "@/lib/phone-matching";
+import { getTimezoneForProvince } from "@/lib/calcom";
 
 /**
  * Handle Cal.com webhook events
@@ -307,7 +308,7 @@ async function handleBookingCreated(payload: any) {
 }
 
 async function handleBookingRescheduled(payload: any) {
-  const { uid, startTime, endTime } = payload;
+  const { uid, startTime, endTime, organizer } = payload;
 
   const appointment = await prisma.appointment.findUnique({
     where: { calComBookingUid: uid },
@@ -319,6 +320,8 @@ async function handleBookingRescheduled(payload: any) {
     return;
   }
 
+  const lead = appointment.lead;
+
   // Update appointment
   await prisma.appointment.update({
     where: { id: appointment.id },
@@ -328,6 +331,8 @@ async function handleBookingRescheduled(payload: any) {
       duration: Math.round((new Date(endTime).getTime() - new Date(startTime).getTime()) / 60000),
       reminder24hSent: false, // Reset reminders when rescheduled
       reminder1hSent: false,
+      advisorName: organizer?.name || appointment.advisorName,
+      advisorEmail: organizer?.email || appointment.advisorEmail,
     },
   });
 
@@ -342,12 +347,52 @@ async function handleBookingRescheduled(payload: any) {
     },
   });
 
-  // Don't send Holly message for reschedules - advisor will communicate directly
-  console.log(`[Cal.com] Appointment rescheduled - advisor will follow up directly`);
+  // Send SMS notification of the new time to the borrower
+  // Skip if Holly is disabled, no SMS consent, or no phone
+  if (lead.hollyDisabled || !lead.consentSms || !lead.phone) {
+    console.log(
+      `[Cal.com] Skipping reschedule SMS - hollyDisabled: ${lead.hollyDisabled}, consentSms: ${lead.consentSms}, hasPhone: ${!!lead.phone}`
+    );
+    return;
+  }
+
+  try {
+    // Format the new appointment time in the lead's timezone
+    const leadTimezone = getTimezoneForProvince(lead.rawData?.province);
+    const newTime = new Date(startTime).toLocaleString("en-US", {
+      weekday: "long",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+      timeZone: leadTimezone,
+    });
+
+    const advisorName = organizer?.name || appointment.advisorName || "your advisor";
+
+    // Use Holly's conversational system to notify about the reschedule
+    const rescheduleContext = `The discovery call has been rescheduled to a new time. Appointment details:
+- New time: ${newTime}
+- Advisor: ${advisorName}
+
+Send a SHORT SMS confirming the new appointment time. Let them know the call has been moved and confirm the new date/time. Keep it warm and concise (under 160 chars).
+
+IMPORTANT: Use the advisor name above ONLY when it's a specific person (e.g. Greg, Jakub). If Advisor is "your advisor", do NOT guess a name - just say "your call" or "your discovery call".
+
+Use the send_sms tool.`;
+
+    const decision = await handleConversation(lead.id, undefined, rescheduleContext);
+    await executeDecision(lead.id, decision);
+    console.log(`[Cal.com] Sent reschedule notification SMS to lead ${lead.id}`);
+  } catch (error) {
+    console.error("Failed to send reschedule notification via Holly:", error);
+    // Don't throw - appointment is already updated, this is just a nice-to-have
+  }
 }
 
 async function handleBookingCancelled(payload: any) {
-  const { uid } = payload;
+  const { uid, cancelledBy, cancellationReason, organizer, attendees } = payload;
 
   const appointment = await prisma.appointment.findUnique({
     where: { calComBookingUid: uid },
@@ -357,6 +402,33 @@ async function handleBookingCancelled(payload: any) {
   if (!appointment) {
     console.log("Appointment not found for cancellation:", uid);
     return;
+  }
+
+  const lead = appointment.lead;
+
+  // Determine who cancelled the appointment
+  // Compare cancelledBy email to organizer and attendee emails
+  let cancelledByAdvisor = false;
+  let cancelledByLead = false;
+
+  if (cancelledBy) {
+    const cancellerEmail = cancelledBy.toLowerCase();
+    const organizerEmail = (organizer?.email || appointment.advisorEmail || "").toLowerCase();
+    const attendeeEmail = (attendees?.[0]?.email || lead.email || "").toLowerCase();
+
+    if (organizerEmail && cancellerEmail === organizerEmail) {
+      cancelledByAdvisor = true;
+    } else if (attendeeEmail && cancellerEmail === attendeeEmail) {
+      cancelledByLead = true;
+    }
+  }
+
+  // If we can't determine who cancelled, treat as advisor cancellation (safer than accusing the lead)
+  if (!cancelledByAdvisor && !cancelledByLead) {
+    console.log(
+      `[Cal.com] Unable to determine who cancelled booking ${uid} - treating as advisor cancellation (fallback)`
+    );
+    cancelledByAdvisor = true;
   }
 
   // Update appointment status
@@ -378,24 +450,35 @@ async function handleBookingCancelled(payload: any) {
       type: ActivityType.APPOINTMENT_CANCELLED,
       channel: CommunicationChannel.SYSTEM,
       subject: "Call cancelled",
-      content: "Discovery call was cancelled",
+      content: `Discovery call was cancelled${cancellationReason ? `: ${cancellationReason}` : ""}${cancelledByAdvisor ? " (by advisor)" : cancelledByLead ? " (by lead)" : ""}`,
+      metadata: { cancelledBy, cancellationReason, payload },
     },
   });
 
   // Send Slack notification about cancellation
   await sendSlackNotification({
     type: "lead_rotting",
-    leadName: `${appointment.lead.firstName} ${appointment.lead.lastName}`,
+    leadName: `${lead.firstName} ${lead.lastName}`,
     leadId: appointment.leadId,
-    details: `Appointment cancelled. Holly will reach out to re-engage.`,
+    details: `Appointment cancelled ${cancelledByAdvisor ? "by advisor" : "by lead"}${cancellationReason ? `\nReason: ${cancellationReason}` : ""}\nHolly will reach out to re-engage${lead.hollyDisabled ? " (when re-enabled)" : ""}.`,
   });
 
-  // Have Holly reach out to re-engage and try to rebook
+  // Skip SMS if Holly is disabled for this lead
+  if (lead.hollyDisabled) {
+    console.log(`[Cal.com] Skipping cancellation SMS - Holly disabled for lead ${lead.id}`);
+    return;
+  }
+
+  // Have Holly reach out with context-appropriate messaging
   try {
-    const cancellationContext = `The lead just cancelled their scheduled discovery call. They had booked the appointment but then cancelled it.
+    let cancellationContext: string;
+
+    if (cancelledByLead) {
+      // Lead cancelled - acknowledge they cancelled, ask if we can help
+      cancellationContext = `The lead cancelled their scheduled discovery call. They had booked the appointment but then cancelled it.
 
 Your job is to:
-1. Acknowledge the cancellation empathetically (don't ignore it happened)
+1. Acknowledge the cancellation empathetically (be honest that they cancelled)
 2. Ask if there's anything we can help with or if they have questions
 3. Offer to help them rebook if they're still interested
 4. Be understanding - maybe the time didn't work, or they're not ready yet
@@ -403,10 +486,30 @@ Your job is to:
 DO NOT just pitch the same "ultra-low rates" message. This is about understanding what happened and being helpful.
 
 Keep it SHORT (under 160 chars), conversational, and human. Use the send_sms tool.`;
+    } else {
+      // Advisor cancelled - apologize and offer to rebook
+      const advisorName = organizer?.name || appointment.advisorName || "your advisor";
+      cancellationContext = `The advisor had to cancel the scheduled discovery call. This was NOT the lead's fault - the advisor/team had to cancel.
 
-    const decision = await handleConversation(appointment.leadId, undefined, cancellationContext);
-    await executeDecision(appointment.leadId, decision);
-    console.log(`[Cal.com] Holly reaching out to re-engage after cancellation`);
+Appointment was with: ${advisorName}
+
+Your job is to:
+1. Let them know the advisor had to cancel that time slot (be apologetic, this is on us)
+2. Offer to help them pick a new time that works for them
+3. Keep it brief and action-oriented
+
+DO NOT say the lead cancelled. DO NOT blame them. This was an advisor-initiated cancellation.
+
+IMPORTANT: Use the advisor name above ONLY when it's a specific person (e.g. Greg, Jakub). If Advisor is "your advisor", do NOT guess a name - just say "we" or "the team".
+
+Keep it SHORT (under 160 chars), warm and helpful. Use the send_sms tool.`;
+    }
+
+    const decision = await handleConversation(lead.id, undefined, cancellationContext);
+    await executeDecision(lead.id, decision);
+    console.log(
+      `[Cal.com] Holly reaching out after ${cancelledByAdvisor ? "advisor" : "lead"} cancellation`
+    );
   } catch (error) {
     console.error("Failed to send re-engagement message via Holly:", error);
     // Still notify in Slack even if Holly message fails
