@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
     // Parse query parameters for filtering
     const { searchParams } = new URL(request.url);
     const cohort = searchParams.get("cohort");
+    const segment = searchParams.get("segment");
     const startDateParam = searchParams.get("startDate");
     const endDateParam = searchParams.get("endDate");
 
@@ -34,9 +35,10 @@ export async function GET(request: NextRequest) {
       },
     })) as LeadWithRelations[];
 
-    // Apply date and cohort filters
+    // Apply date, cohort, and segment filters before splitting by source
     let filteredLeads = filterByDateRange(allLeads, startDate, endDate);
     filteredLeads = filterByCohort(filteredLeads, cohort);
+    filteredLeads = filterBySegment(filteredLeads, segment);
 
     // Split into FinanceVine and LOD groups
     // LOD includes both null source and leads_on_demand
@@ -74,6 +76,7 @@ export async function GET(request: NextRequest) {
         },
         filters: {
           cohort: cohort || "all",
+          segment: segment || "all",
           startDate: startDateParam,
           endDate: endDateParam,
         },

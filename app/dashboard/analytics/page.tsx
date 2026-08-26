@@ -118,12 +118,18 @@ export default function AnalyticsPage() {
       if (selectedSegment !== "all") params.append("segment", selectedSegment);
       const queryString = params.toString() ? `?${params.toString()}` : "";
 
+      // Build comparison query params (cohort and segment)
+      const compParams = new URLSearchParams();
+      if (selectedCohort !== "all") compParams.append("cohort", selectedCohort);
+      if (selectedSegment !== "all") compParams.append("segment", selectedSegment);
+      const compQueryString = compParams.toString() ? `?${compParams.toString()}` : "";
+
       const [overviewRes, cohortRes, loanTypeRes, bookingSourceRes, sourceCompRes] = await Promise.all([
         fetch(`/api/analytics/overview${queryString}`),
         fetch("/api/analytics/cohort-comparison"),
         fetch(`/api/analytics/loan-types${queryString}`),
         fetch(`/api/analytics/booking-sources${selectedCohort !== "all" ? `?cohort=${selectedCohort}` : ""}`),
-        fetch(`/api/analytics/source-comparison${selectedCohort !== "all" ? `?cohort=${selectedCohort}` : ""}`),
+        fetch(`/api/analytics/source-comparison${compQueryString}`),
       ]);
 
       const overviewData = await overviewRes.json();

@@ -271,6 +271,14 @@ export function groupByCohort(leads: Lead[]): Record<string, Lead[]> {
 
 export function filterBySource(leads: Lead[], source: string | null): Lead[] {
   if (!source || source === 'all') return leads;
+  
+  // Special handling for leads_on_demand: include both null and leads_on_demand
+  // to match historical leads that have no source set
+  if (source === 'leads_on_demand') {
+    return leads.filter((lead) => !lead.source || lead.source === 'leads_on_demand');
+  }
+  
+  // Exact match for other sources (financevine, rates_ca, etc.)
   return leads.filter((lead) => lead.source === source);
 }
 
