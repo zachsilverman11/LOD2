@@ -596,6 +596,15 @@ async function processAppointmentReminders() {
   for (const appointment of appointments24h) {
     try {
       const lead = appointment.lead;
+
+      // Skip if Holly is disabled, no SMS consent, or no phone (same checks as PR #16)
+      if (lead.hollyDisabled || !lead.consentSms || !lead.phone) {
+        console.log(
+          `[Automation] Skipping 24h reminder for appointment ${appointment.id} - hollyDisabled: ${lead.hollyDisabled}, consentSms: ${lead.consentSms}, hasPhone: ${!!lead.phone}`
+        );
+        continue;
+      }
+
       const appointmentTime = (appointment.scheduledFor || appointment.scheduledAt).toLocaleString('en-US', {
         weekday: 'long',
         month: 'long',
@@ -610,7 +619,7 @@ async function processAppointmentReminders() {
       const reminderMessage = `Hey ${lead.firstName || "there"}! Just a friendly reminder - your mortgage discovery call${advisorPhrase} is tomorrow at ${appointmentTime} PT. Looking forward to it!`;
 
       await sendSms({
-        to: lead.phone || '',
+        to: lead.phone,
         body: reminderMessage,
       });
 
@@ -647,6 +656,15 @@ async function processAppointmentReminders() {
   for (const appointment of appointments1h) {
     try {
       const lead = appointment.lead;
+
+      // Skip if Holly is disabled, no SMS consent, or no phone (same checks as PR #16)
+      if (lead.hollyDisabled || !lead.consentSms || !lead.phone) {
+        console.log(
+          `[Automation] Skipping 1h reminder for appointment ${appointment.id} - hollyDisabled: ${lead.hollyDisabled}, consentSms: ${lead.consentSms}, hasPhone: ${!!lead.phone}`
+        );
+        continue;
+      }
+
       const aptDate = appointment.scheduledFor || appointment.scheduledAt;
       const appointmentTime = aptDate.toLocaleString('en-US', {
         hour: 'numeric',
@@ -674,7 +692,7 @@ async function processAppointmentReminders() {
       const reminderMessage = `Quick reminder - your mortgage discovery call${advisorPhrase} is ${timePhrase} at ${appointmentTime} PT. See you soon!`;
 
       await sendSms({
-        to: lead.phone || '',
+        to: lead.phone,
         body: reminderMessage,
       });
 
