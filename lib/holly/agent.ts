@@ -95,6 +95,11 @@ export async function processLeadWithAutonomousAgent(
           orderBy: { createdAt: 'desc' },
           take: 1,
         },
+        activities: {
+          where: { type: 'APPOINTMENT_CANCELLED' },
+          orderBy: { createdAt: 'desc' },
+          take: 5,
+        },
       },
     });
 

@@ -210,6 +210,7 @@ export async function askHollyToDecide(
     communications?: any[];
     appointments?: any[];
     callOutcomes?: any[];
+    activities?: any[];
   },
   signals: DealSignals
 ): Promise<HollyDecision> {
@@ -342,6 +343,7 @@ export async function askHollyToDecide(
     },
     youtubeLink,
     youtubeSharedInConversation,
+    leadActivities: lead.activities || [],
   });
 
   // === CONVERSATION STAGE DETECTION ===

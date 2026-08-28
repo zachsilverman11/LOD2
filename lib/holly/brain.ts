@@ -11,6 +11,7 @@
  */
 
 import { getLatestYouTubeVideoUrl } from '../youtube-utils';
+import { getRelativeDatePhrase } from '../timezone-utils';
 
 // ============================================================================
 // Section 1: Interfaces & Types
@@ -838,8 +839,9 @@ export function buildHollyBriefing(params: {
   applicationStatus?: { started?: Date; completed?: Date };
   youtubeLink?: string | null;
   youtubeSharedInConversation?: boolean;
+  leadActivities?: any[];
 }): string {
-  const { leadData, conversationContext, appointments, callOutcome, applicationStatus, youtubeLink, youtubeSharedInConversation } = params;
+  const { leadData, conversationContext, appointments, callOutcome, applicationStatus, youtubeLink, youtubeSharedInConversation, leadActivities } = params;
 
   // Check segment (alt_private vs prime)
   const segment = leadData.segment || 'prime_other';
@@ -1117,7 +1119,7 @@ This lead ALREADY BOOKED an appointment. It is scheduled for THE FUTURE and has 
 `;
     }
 
-    // Show past appointments for context - CHECK FOR NO-SHOWS
+    // Show past appointments for context - CHECK FOR NO-SHOWS AND CANCELLATIONS
     if (pastAppointments.length > 0) {
       const lastPastAppt = pastAppointments[0];
       const scheduledDate = lastPastAppt.scheduledFor || lastPastAppt.scheduledAt;
@@ -1126,6 +1128,33 @@ This lead ALREADY BOOKED an appointment. It is scheduled for THE FUTURE and has 
       // Check if this was a no-show (appointment time passed but no call outcome, or call outcome is NO_ANSWER)
       const hasCallOutcome = callOutcome && callOutcome.appointmentId === lastPastAppt.id;
       const isNoShow = !hasCallOutcome || (callOutcome?.outcome === 'NO_ANSWER' && callOutcome?.reached === false);
+      
+      // Check if this appointment was cancelled and find the cancellation activity
+      const isCancelled = lastPastAppt.status === 'cancelled';
+      let cancellationActivity = null;
+      let cancellationRelativeDate = '';
+      
+      if (isCancelled && leadActivities) {
+        // Find the APPOINTMENT_CANCELLED activity for this appointment
+        // Look for activities created after the appointment was scheduled
+        cancellationActivity = leadActivities.find((activity: any) => 
+          activity.type === 'APPOINTMENT_CANCELLED' &&
+          activity.createdAt >= lastPastAppt.createdAt
+        );
+        
+        if (cancellationActivity) {
+          // Get the lead's timezone
+          const province = leadData.province || 'British Columbia';
+          const leadTimezone = require('../calcom').getTimezoneForProvince(province);
+          
+          // Compute relative date phrase (today, yesterday, etc.)
+          cancellationRelativeDate = getRelativeDatePhrase(
+            cancellationActivity.createdAt,
+            leadTimezone,
+            now
+          );
+        }
+      }
 
       briefing += `
 ### 📅 PREVIOUS APPOINTMENT (${daysAgo} days ago)
@@ -1136,7 +1165,23 @@ This lead ALREADY BOOKED an appointment. It is scheduled for THE FUTURE and has 
 
 This call was ${daysAgo} days ago (not yesterday, not recently - ${daysAgo} DAYS AGO).
 
-${isNoShow ? `
+${isCancelled && cancellationRelativeDate ? `
+🚨 **CANCELLATION DETECTED:**
+This appointment was cancelled ${cancellationRelativeDate}. ${cancellationActivity ? `The cancellation happened ${cancellationRelativeDate}, NOT yesterday (unless it literally was yesterday).` : ''}
+
+**CRITICAL DATE AWARENESS:**
+When referencing the cancellation, you MUST say "${cancellationRelativeDate}", not "yesterday" unless it literally was yesterday.
+- Cancellation was: ${cancellationRelativeDate}
+- Use this exact phrase or a close variant: "${cancellationRelativeDate}"
+
+**RECOVERY APPROACH:**
+- Own the miss if it was advisor-side ("${lastPastAppt.advisorName || 'the team'} had to cancel" or "that cancellation ${cancellationRelativeDate}")
+- Acknowledge the trust hit: name that cancellations are frustrating
+- Offer specific available slots (don't send a link yet)
+- Keep tone: apologetic but forward-looking, brief
+- Example: "${leadData.first_name || 'Hey'}, totally understand if we lost some trust with that cancellation ${cancellationRelativeDate} — that was on us and I'm sorry. If you're still open to it, the team has spots tomorrow morning at 9:00 AM or 9:20 AM BC time. Short call, no pressure. Just let me know."
+
+` : isNoShow ? `
 🚨 **NO-SHOW DETECTED:**
 This lead booked an appointment but ${hasCallOutcome ? 'didn\'t answer when the advisor called' : 'the appointment time passed'}.
 

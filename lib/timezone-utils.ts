@@ -1,164 +1,172 @@
-/**
- * Timezone utilities for Canadian provinces
- * Used to enforce 8am-9pm SMS hours in lead's local time
- */
+import { getTimezoneForProvince } from './calcom';
 
 /**
- * Calculate if DST is active for a given date in North America
- * DST runs from 2nd Sunday of March at 2 AM to 1st Sunday of November at 2 AM
+ * Get local time in a specific timezone
  */
-function isDSTActive(date: Date): boolean {
-  const year = date.getUTCFullYear();
-  const month = date.getUTCMonth(); // 0-11
-  const day = date.getUTCDate();
-
-  // Find second Sunday of March
-  const marchFirst = new Date(Date.UTC(year, 2, 1)); // March 1st
-  const marchFirstDay = marchFirst.getUTCDay(); // 0 = Sunday
-  const secondSundayMarch = marchFirstDay === 0 ? 8 : (7 - marchFirstDay + 8);
-
-  // Find first Sunday of November
-  const novemberFirst = new Date(Date.UTC(year, 10, 1)); // November 1st
-  const novemberFirstDay = novemberFirst.getUTCDay();
-  const firstSundayNovember = novemberFirstDay === 0 ? 1 : (7 - novemberFirstDay + 1);
-
-  // Check if current date is within DST period
-  if (month < 2 || month > 10) {
-    // January, February, December - no DST
-    return false;
-  } else if (month > 2 && month < 10) {
-    // April through October - always DST
-    return true;
-  } else if (month === 2) {
-    // March - check if past second Sunday
-    return day >= secondSundayMarch;
-  } else {
-    // November - check if before first Sunday
-    return day < firstSundayNovember;
-  }
-}
-
 export function getLocalTime(province: string): Date {
+  const timezone = getTimezoneForProvince(province);
   const now = new Date();
+  
+  // Create a formatter for the target timezone
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
 
-  // Map Canadian provinces to timezones (UTC offsets in hours)
-  const timezoneOffsets: Record<string, number> = {
-    'British Columbia': -8,  // PST
-    'Alberta': -7,           // MST
-    'Saskatchewan': -6,      // CST (no DST)
-    'Manitoba': -6,          // CST
-    'Ontario': -5,           // EST
-    'Quebec': -5,            // EST
-    'New Brunswick': -4,     // AST
-    'Nova Scotia': -4,       // AST
-    'Prince Edward Island': -4,  // AST
-    'Newfoundland and Labrador': -3.5,  // NST
-  };
+  const parts = formatter.formatToParts(now);
+  const year = parts.find(p => p.type === 'year')!.value;
+  const month = parts.find(p => p.type === 'month')!.value;
+  const day = parts.find(p => p.type === 'day')!.value;
+  const hour = parts.find(p => p.type === 'hour')!.value;
+  const minute = parts.find(p => p.type === 'minute')!.value;
+  const second = parts.find(p => p.type === 'second')!.value;
 
-  const offset = timezoneOffsets[province] || -8; // Default to PST (BC)
-
-  // Adjust for DST (add 1 hour from second Sunday of March to first Sunday of November)
-  // Saskatchewan doesn't observe DST
-  const isDST = isDSTActive(now);
-  const finalOffset = province === 'Saskatchewan' ? offset : offset + (isDST ? 1 : 0);
-
-  // Calculate local time from UTC
-  // Get current UTC time in milliseconds
-  const utcTime = now.getTime();
-
-  // Apply timezone offset (convert hours to milliseconds)
-  const localTime = new Date(utcTime + (finalOffset * 3600000));
-
-  return localTime;
+  return new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`);
 }
 
 /**
- * Check if current time is within acceptable SMS hours (8am-9pm local)
- */
-export function isWithinSMSHours(province: string): boolean {
-  const localTime = getLocalTime(province);
-  const hour = localTime.getUTCHours(); // Use UTC hours since localTime is stored in UTC
-
-  return hour >= 8 && hour < 21;
-}
-
-/**
- * Get formatted local time string for logging
+ * Get local time string in a specific timezone
  */
 export function getLocalTimeString(province: string): string {
-  const localTime = getLocalTime(province);
-  const hour = localTime.getUTCHours();
-  const minute = localTime.getUTCMinutes();
-  const ampm = hour >= 12 ? 'PM' : 'AM';
-  const hour12 = hour % 12 || 12; // Convert 0 to 12, keep 1-11 as is
-
-  // Determine timezone abbreviation
-  const timezoneOffsets: Record<string, number> = {
-    'British Columbia': -8,
-    'Alberta': -7,
-    'Saskatchewan': -6,
-    'Manitoba': -6,
-    'Ontario': -5,
-    'Quebec': -5,
-    'New Brunswick': -4,
-    'Nova Scotia': -4,
-    'Prince Edward Island': -4,
-    'Newfoundland and Labrador': -3.5,
-  };
-
-  const offset = timezoneOffsets[province] || -8;
-  const isDST = isDSTActive(localTime);
-
-  const timezoneName = province === 'British Columbia' ? (isDST ? 'PDT' : 'PST') :
-                       province === 'Alberta' ? (isDST ? 'MDT' : 'MST') :
-                       province === 'Saskatchewan' ? 'CST' :
-                       province === 'Ontario' || province === 'Quebec' ? (isDST ? 'EDT' : 'EST') :
-                       (isDST ? 'ADT' : 'AST');
-
-  return `${hour12}:${minute.toString().padStart(2, '0')} ${ampm} ${timezoneName}`;
+  const timezone = getTimezoneForProvince(province);
+  const now = new Date();
+  
+  return now.toLocaleString('en-US', {
+    timeZone: timezone,
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZoneName: 'short'
+  });
 }
 
 /**
- * Calculate the next 8 AM in the lead's local timezone
- * Used for smart retry scheduling when blocked outside SMS hours
+ * Get next 8 AM in lead's timezone for scheduling
  */
 export function getNext8AM(province: string): Date {
-  const localTime = getLocalTime(province);
-  const hour = localTime.getUTCHours();
+  const timezone = getTimezoneForProvince(province);
+  const now = new Date();
 
-  // Create a date for 8 AM today in local time
-  const next8AM = new Date(localTime);
-  next8AM.setUTCHours(8, 0, 0, 0);
+  // Get current time in lead's timezone
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
 
-  // If it's already past 8 AM today (or we're in the 8am-9pm window),
-  // schedule for 8 AM tomorrow
+  const parts = formatter.formatToParts(now);
+  const year = parseInt(parts.find(p => p.type === 'year')!.value);
+  const month = parseInt(parts.find(p => p.type === 'month')!.value);
+  const day = parseInt(parts.find(p => p.type === 'day')!.value);
+  const hour = parseInt(parts.find(p => p.type === 'hour')!.value);
+
+  // Create 8 AM today in their timezone
+  let targetDate = new Date(`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T08:00:00`);
+
+  // If it's already past 8 AM in their timezone, go to next day
   if (hour >= 8) {
-    next8AM.setUTCDate(next8AM.getUTCDate() + 1);
+    targetDate.setDate(targetDate.getDate() + 1);
   }
 
-  // Convert back to UTC for database storage
-  const timezoneOffsets: Record<string, number> = {
-    'British Columbia': -8,
-    'Alberta': -7,
-    'Saskatchewan': -6,
-    'Manitoba': -6,
-    'Ontario': -5,
-    'Quebec': -5,
-    'New Brunswick': -4,
-    'Nova Scotia': -4,
-    'Prince Edward Island': -4,
-    'Newfoundland and Labrador': -3.5,
-  };
+  // Convert back to UTC for storage
+  const targetInTZ = new Date(targetDate.toLocaleString('en-US', { timeZone: timezone }));
+  const targetInUTC = new Date(targetDate.toLocaleString('en-US', { timeZone: 'UTC' }));
+  const offset = targetInUTC.getTime() - targetInTZ.getTime();
+  
+  return new Date(targetDate.getTime() + offset);
+}
 
-  const offset = timezoneOffsets[province] || -8;
+/**
+ * Get relative date phrase for a past timestamp in the lead's timezone
+ * Examples: "today", "yesterday", "earlier today", "this morning", "this afternoon"
+ * 
+ * @param eventTime - The timestamp of the event (e.g., when cancellation happened)
+ * @param leadTimezone - The lead's timezone (e.g., "America/Vancouver")
+ * @param referenceTime - Optional reference time (defaults to now)
+ * @returns A human-readable relative date phrase
+ */
+export function getRelativeDatePhrase(
+  eventTime: Date,
+  leadTimezone: string,
+  referenceTime: Date = new Date()
+): string {
+  // Get calendar dates in the lead's timezone
+  const eventDateStr = eventTime.toLocaleDateString('en-US', {
+    timeZone: leadTimezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  
+  const referenceDateStr = referenceTime.toLocaleDateString('en-US', {
+    timeZone: leadTimezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
 
-  // Check if DST is active for the target date
-  const isDST = isDSTActive(next8AM);
-  const finalOffset = province === 'Saskatchewan' ? offset : offset + (isDST ? 1 : 0);
+  // Get hour for time-of-day context
+  const eventHour = parseInt(
+    eventTime.toLocaleTimeString('en-US', {
+      timeZone: leadTimezone,
+      hour: '2-digit',
+      hour12: false,
+    }).split(':')[0]
+  );
 
-  // Convert local 8 AM back to UTC
-  // next8AM is currently in "local time" representation, subtract the offset to get UTC
-  const utcTime = next8AM.getTime() - (finalOffset * 3600000);
+  // Same calendar day
+  if (eventDateStr === referenceDateStr) {
+    // More specific if it was earlier in the day
+    if (eventHour < 12) {
+      return 'this morning';
+    } else if (eventHour < 17) {
+      return 'this afternoon';
+    } else {
+      return 'earlier today';
+    }
+  }
 
-  return new Date(utcTime);
+  // Yesterday
+  const yesterday = new Date(referenceTime);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayDateStr = yesterday.toLocaleDateString('en-US', {
+    timeZone: leadTimezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+
+  if (eventDateStr === yesterdayDateStr) {
+    return 'yesterday';
+  }
+
+  // 2-6 days ago
+  const daysDiff = Math.floor(
+    (referenceTime.getTime() - eventTime.getTime()) / (1000 * 60 * 60 * 24)
+  );
+
+  if (daysDiff === 2) return '2 days ago';
+  if (daysDiff === 3) return '3 days ago';
+  if (daysDiff >= 4 && daysDiff <= 6) return `${daysDiff} days ago`;
+
+  // A week or more
+  if (daysDiff === 7) return 'last week';
+  if (daysDiff < 14) return 'over a week ago';
+  if (daysDiff < 30) return 'a few weeks ago';
+
+  return 'last month';
 }
