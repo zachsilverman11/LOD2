@@ -55,7 +55,7 @@ async function getHollyDecision(leadId: string): Promise<{
   intent?: string;
   availabilitySlotsProvided?: boolean;
 }> {
-  // 1. Load lead with full context (communications, appointments, callOutcomes)
+  // 1. Load lead with full context (communications, appointments, callOutcomes, activities)
   const lead = await prisma.lead.findUnique({
     where: { id: leadId },
     include: {
@@ -67,6 +67,11 @@ async function getHollyDecision(leadId: string): Promise<{
         orderBy: { createdAt: "desc" },
       },
       callOutcomes: {
+        orderBy: { createdAt: "desc" },
+        take: 5,
+      },
+      activities: {
+        where: { type: "APPOINTMENT_CANCELLED" },
         orderBy: { createdAt: "desc" },
         take: 5,
       },
