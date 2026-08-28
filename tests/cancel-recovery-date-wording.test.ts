@@ -10,7 +10,7 @@
  * relative date context (e.g., "this afternoon", "earlier today", "yesterday") in lead's timezone.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from '@jest/globals';
 import { getRelativeDatePhrase } from '../lib/timezone-utils';
 
 describe('Cancel Recovery Date Wording', () => {

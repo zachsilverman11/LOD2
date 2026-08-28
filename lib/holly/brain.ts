@@ -12,6 +12,7 @@
 
 import { getLatestYouTubeVideoUrl } from '../youtube-utils';
 import { getRelativeDatePhrase } from '../timezone-utils';
+import { getTimezoneForProvince } from '../calcom';
 
 // ============================================================================
 // Section 1: Interfaces & Types
@@ -1131,21 +1132,26 @@ This lead ALREADY BOOKED an appointment. It is scheduled for THE FUTURE and has 
       
       // Check if this appointment was cancelled and find the cancellation activity
       const isCancelled = lastPastAppt.status === 'cancelled';
-      let cancellationActivity = null;
       let cancellationRelativeDate = '';
       
       if (isCancelled && leadActivities) {
         // Find the APPOINTMENT_CANCELLED activity for this appointment
-        // Look for activities created after the appointment was scheduled
-        cancellationActivity = leadActivities.find((activity: any) => 
-          activity.type === 'APPOINTMENT_CANCELLED' &&
-          activity.createdAt >= lastPastAppt.createdAt
-        );
+        // Try to match by appointment ID in metadata, fall back to recent activity
+        const cancellationActivity = leadActivities.find((activity) => {
+          if (activity.type !== 'APPOINTMENT_CANCELLED') return false;
+          
+          // Check if metadata links to this appointment
+          const metadata = activity.metadata as Record<string, unknown> | null;
+          if (metadata?.appointmentId === lastPastAppt.id) return true;
+          
+          // Fallback: find the most recent cancellation activity after this appointment was created
+          return activity.createdAt >= lastPastAppt.createdAt;
+        });
         
         if (cancellationActivity) {
           // Get the lead's timezone
           const province = leadData.province || 'British Columbia';
-          const leadTimezone = require('../calcom').getTimezoneForProvince(province);
+          const leadTimezone = getTimezoneForProvince(province);
           
           // Compute relative date phrase (today, yesterday, etc.)
           cancellationRelativeDate = getRelativeDatePhrase(
@@ -1167,7 +1173,7 @@ This call was ${daysAgo} days ago (not yesterday, not recently - ${daysAgo} DAYS
 
 ${isCancelled && cancellationRelativeDate ? `
 🚨 **CANCELLATION DETECTED:**
-This appointment was cancelled ${cancellationRelativeDate}. ${cancellationActivity ? `The cancellation happened ${cancellationRelativeDate}, NOT yesterday (unless it literally was yesterday).` : ''}
+This appointment was cancelled ${cancellationRelativeDate}. The cancellation happened ${cancellationRelativeDate}, NOT yesterday (unless it literally was yesterday).
 
 **CRITICAL DATE AWARENESS:**
 When referencing the cancellation, you MUST say "${cancellationRelativeDate}", not "yesterday" unless it literally was yesterday.
@@ -1179,7 +1185,6 @@ When referencing the cancellation, you MUST say "${cancellationRelativeDate}", n
 - Acknowledge the trust hit: name that cancellations are frustrating
 - Offer specific available slots (don't send a link yet)
 - Keep tone: apologetic but forward-looking, brief
-- Example: "${leadData.first_name || 'Hey'}, totally understand if we lost some trust with that cancellation ${cancellationRelativeDate} — that was on us and I'm sorry. If you're still open to it, the team has spots tomorrow morning at 9:00 AM or 9:20 AM BC time. Short call, no pressure. Just let me know."
 
 ` : isNoShow ? `
 🚨 **NO-SHOW DETECTED:**
