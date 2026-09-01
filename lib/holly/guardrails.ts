@@ -9,6 +9,37 @@ import { getLocalTime } from '../timezone-utils';
 import { ConversationStage, getDiscoveryQuestionPatterns } from './stage';
 
 /**
+ * Minimum gap between two Holly outbounds when the lead has not replied in
+ * between. One touch per day, never two. Replies reset this (conversational
+ * mode below). Was 4h; that gap became the de facto cadence for silent leads
+ * (two messages a day after a cancelled call, notes/post-cancellation-diagnosis.md).
+ */
+export const MIN_HOURS_BETWEEN_UNANSWERED_OUTBOUND = 24;
+
+/**
+ * Phrases that promise the lead a final or last message. Holly cannot keep
+ * that promise (scheduled automation may message again), so the promise is
+ * never made. The prompt already forbids it; this makes it unsendable.
+ */
+const FINALITY_PATTERNS: RegExp[] = [
+  /\blast (one|text|message|note|nudge|check[- ]?in)\b/i,
+  /\bfinal (one|text|message|note|nudge|check[- ]?in)\b/i,
+  /\b(won'?t|will not|not going to) (reach out|message|text|bug|bother|follow up|contact)( you)? (again|anymore|any more)\b/i,
+  /\b(i'?ll|i will|going to) (stop|quit) (reaching out|messaging|texting|following up|bugging|bothering)\b/i,
+  /\bleave you (be|alone)\b/i,
+  /\b(closing|archiving|close|archive) (out )?(your|the|this) file\b/i,
+  /\bwon'?t hear from me\b/i,
+];
+
+export function detectFinalityPromise(message: string): string | null {
+  for (const pattern of FINALITY_PATTERNS) {
+    const match = message.match(pattern);
+    if (match) return match[0];
+  }
+  return null;
+}
+
+/**
  * Did the lead's own words explicitly ask for a booking link (or to book online
  * themselves)? This is the ONLY exception to the send_booking_link guardrails
  * (live slots → offer times; empty slots → ask preference; first touch → never).
@@ -156,12 +187,24 @@ export function validateDecision(
       if (repliedSinceLastContact) {
         // CONVERSATIONAL MODE: Lead replied, allow immediate response
         // No time restriction - natural conversation flow
-      } else if (hoursSinceLastOutbound < 4) {
-        // BROADCAST MODE: No reply yet, enforce 4-hour anti-spam
+      } else if (hoursSinceLastOutbound < MIN_HOURS_BETWEEN_UNANSWERED_OUTBOUND) {
+        // BROADCAST MODE: No reply yet. One outbound per day to a silent lead, never two.
         errors.push(
-          `Too soon - last message ${hoursSinceLastOutbound.toFixed(1)}h ago, lead hasn't replied (4h minimum for follow-ups)`
+          `Too soon - last message ${hoursSinceLastOutbound.toFixed(1)}h ago, lead hasn't replied (${MIN_HOURS_BETWEEN_UNANSWERED_OUTBOUND}h minimum between unanswered follow-ups)`
         );
       }
+    }
+  }
+
+  // === HARD RULE: Never promise a "last" or "final" message ===
+  // Automation may message again, so the promise would be broken (it was, on
+  // 2026-08-31: "last one from me for a while" followed by another text 6h later).
+  if (decision.message && decision.action !== 'wait' && decision.action !== 'escalate') {
+    const finality = detectFinalityPromise(decision.message);
+    if (finality) {
+      errors.push(
+        `Finality promise - message says "${finality}", which Holly cannot guarantee. Give space without announcing cadence.`
+      );
     }
   }
 

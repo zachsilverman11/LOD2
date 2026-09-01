@@ -21,6 +21,7 @@ import { getLeadJourneyIntro, getValueProposition, LEAD_JOURNEY } from './brain'
 import { analyzeReply, isImmediateBooking, BEHAVIORAL_INTELLIGENCE } from './brain';
 import { getConversationGuidance, SALES_PSYCHOLOGY } from './brain';
 import { TRAINING_EXAMPLES, LEARNED_EXAMPLES } from './examples';
+import { buildReportPreSellSection, buildCashBackSection, buildBookingHookLines } from './playbook-sections';
 import { getLocalTime, getLocalTimeString } from '../timezone-utils';
 import {
   getAvailableSlots,
@@ -212,9 +213,13 @@ export async function askHollyToDecide(
     callOutcomes?: any[];
     activities?: any[];
   },
-  signals: DealSignals
+  signals: DealSignals,
+  options: { extraContext?: string } = {}
 ): Promise<HollyDecision> {
   const rawData = lead.rawData as any;
+  // Segment gate, same predicate as buildHollyBriefing (brain.ts): alt_private
+  // leads get no bankable hooks anywhere in this prompt, not just in the briefing.
+  const isAltPrivate = (lead.segment || rawData?.segment) === 'alt_private';
   const firstName = lead.firstName || rawData?.first_name || rawData?.name?.split(' ')[0] || 'there';
 
   // Get current date/time context
@@ -403,7 +408,7 @@ export async function askHollyToDecide(
   const urgentBooking = isImmediateBooking(rawData);
 
   // === LAYER 3: SALES PSYCHOLOGY ===
-  const conversationGuidance = getConversationGuidance(outboundCount + 1, inboundCount > 0);
+  const conversationGuidance = getConversationGuidance(outboundCount + 1, inboundCount > 0, isAltPrivate);
 
   // === LAYER 4: TRAINING EXAMPLES ===
   // Calculate appointment context for better example selection
@@ -734,24 +739,7 @@ This is NOT an active conversation. ${firstName} has gone silent.
 
   return '';
 })()}
-${outboundCount >= 3 && inboundCount === 0 ? `
-## 💰 CASH BACK RE-ENGAGEMENT HOOK (AVAILABLE — USE WITH CARE)
-
-This lead has received ${outboundCount} messages with ZERO replies. A pattern interrupt is needed.
-
-You MAY introduce the cash back angle to create curiosity. Example phrasings:
-- "One more thing worth mentioning: depending on your situation there may be a cash back piece. Quick chat to see if it applies."
-- "Quick note, some clients in your situation qualify for cash back. Our team can say in 5 minutes if you might."
-
-**Rules:**
-- NEVER guarantee eligibility. Always qualify with "depending on your situation" or "some clients qualify"
-- NEVER explain how the program works over SMS. The details are in the Mortgage Strategy Report
-- Create curiosity, earn the call. That's it.
-` : outboundCount < 3 ? `
-## 🚫 CASH BACK RESTRICTION
-
-**FORBIDDEN before touch 3:** Any mention of cash back, cash back program, or cash back eligibility. This lead has only received ${outboundCount} message${outboundCount !== 1 ? 's' : ''}. Cash back is a late-stage re-engagement tool only. Violations of this rule risk misleading leads about offers they may not qualify for.
-` : ''}
+${buildCashBackSection({ isAltPrivate, outboundCount, inboundCount })}
 
 ---
 
@@ -819,17 +807,8 @@ ${psychologySection}
 
 ## 🎯 YOUR DECISION TASK FOR THIS LEAD
 
-${!hasUpcomingAppointment ? `**🚨 THIS LEAD HAS NOT BOOKED A CALL YET.**
-
-You MUST reference the personalised Mortgage Strategy Report in at least one message per conversation thread. This is not optional and not a suggestion.
-
-Frame it as something built specifically for THEIR situation: their lender, their balance, their timeline. Not a generic document or calculator. The report is the concrete deliverable that makes booking the call worthwhile. Without it, you are asking them to give up 15 minutes for nothing tangible.
-
-**Example framings (adapt to their situation):**
-- "The strategy report shows your options with your current balance: rate comparisons, penalty calcs, the works. That's what the call walks through."
-- "Before the call our team builds a personalised report for your situation, not a generic calculator. Most people say it's the first time they've seen the full picture."
-- "You get a Mortgage Strategy Report before any big decisions. The call walks through what it shows, not a sales pitch."
-` : `This lead already has a booked call. The report pre-sell is not required. Focus on preparation and excitement.`}
+${buildReportPreSellSection({ isAltPrivate, hasUpcomingAppointment: !!hasUpcomingAppointment })}
+${options.extraContext ?? ''}
 
 ---
 
@@ -844,8 +823,7 @@ ${signals.reasoningContext}
 **Relevant value proposition for this lead:**
 ${valueProp}
 
-**Booking hook selected for this lead:** "${selectedHook.name}"
-Use this angle when pushing for a booking: ${selectedHook.angle}
+${buildBookingHookLines({ isAltPrivate, hookName: selectedHook.name, hookAngle: selectedHook.angle })}
 
 ---
 
@@ -934,6 +912,7 @@ Your job ends at WAITING_FOR_APPLICATION. Make it count!
    - Don't move to LOST prematurely - try nurturing first
    - Don't let engaged leads go cold - keep momentum
    - Trust your judgment based on the conversation
+   - This lead is currently in **${lead.status}**. Never choose move_stage to the stage the lead is already in; if you want to leave them where they are and give space, use action "wait" with a long waitHours instead
 
 6. **Never promise a "last" or "final" SMS**
    - Do not tell the lead you will never follow up, are archiving or closing their file, or that this is your last message. Scheduled automation may contact them again. If you want to give space, say you'll check in less often, or say nothing about future cadence.
