@@ -5,7 +5,7 @@
 
 import { prisma } from '../db';
 import { LeadStatus } from '@/app/generated/prisma';
-import { analyzeDealHealth, resolveNextReviewHoursAfterOutbound } from '../deal-intelligence';
+import { analyzeDealHealth, resolveNextReviewHoursAfterOutbound, countUnansweredOutbound } from '../deal-intelligence';
 import { askHollyToDecide } from './decision-engine';
 import { validateDecision, detectMessageRepetition } from './guardrails';
 import { detectConversationStage } from './stage';
@@ -406,6 +406,7 @@ export async function processLeadWithAutonomousAgent(
                 signals,
                 inboundCount,
                 outboundCountBeforeThisSend: outboundBefore,
+                unansweredOutboundBeforeThisSend: countUnansweredOutbound(lead.communications),
               });
               const nextReview = new Date(now.getTime() + reviewHours * 60 * 60 * 1000);
               await prisma.lead.update({
@@ -767,6 +768,7 @@ export async function processLeadWithAutonomousAgent(
             signals,
             inboundCount,
             outboundCountBeforeThisSend: outboundBefore,
+            unansweredOutboundBeforeThisSend: countUnansweredOutbound(lead.communications),
           });
           const nextReview = new Date(now.getTime() + reviewHours * 60 * 60 * 1000);
           await prisma.lead.update({
