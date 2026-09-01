@@ -6,7 +6,12 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  // Pooled (pgbouncer) endpoint — used by the app at runtime.
+  url       = env("DATABASE_URL")
+  // Non-pooled endpoint — used by migrations only. DDL must not run through
+  // the connection pooler: pgbouncer in transaction mode breaks the session
+  // state and advisory locks that `prisma migrate` relies on.
+  directUrl = env("DIRECT_URL")
 }
 
 model Lead {
