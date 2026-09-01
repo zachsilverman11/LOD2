@@ -58,7 +58,21 @@ export async function bookLeadAppointmentDirectly(
     decision.bookingLeadName ||
     `${lead.firstName || ""} ${lead.lastName || ""}`.trim() ||
     "Lead";
-  const attendeeEmail = decision.bookingLeadEmail || lead.email || "";
+  // The Lead row is the system of record for the attendee email. The model's
+  // `bookingLeadEmail` is a relay of a value it was shown (or, before the
+  // briefing printed it, a value it was never shown) — it must not override
+  // the record, or a transcription slip sends the Cal.com invite to the wrong
+  // address. Only use it when the record genuinely has no email.
+  const attendeeEmail = lead.email || decision.bookingLeadEmail || "";
+  if (
+    decision.bookingLeadEmail &&
+    lead.email &&
+    decision.bookingLeadEmail.trim().toLowerCase() !== lead.email.trim().toLowerCase()
+  ) {
+    console.warn(
+      `[Direct Booking] Lead ${leadId}: model-supplied bookingLeadEmail differs from the Lead record; using the record`
+    );
+  }
   const attendeeTimezone = decision.bookingLeadTimezone || "America/Vancouver";
 
   if (!attendeeEmail) {
