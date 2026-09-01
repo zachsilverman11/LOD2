@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { processLeadWithAutonomousAgent } from "@/lib/holly/agent";
 import { sendSlackNotification, sendErrorAlert } from "@/lib/slack";
 import { correctNames } from "@/lib/name-correction";
+import { deriveLeadSegment } from "@/lib/lead-segmentation";
 
 /**
  * Webhook endpoint for Leads on Demand
@@ -12,7 +13,7 @@ export async function POST(req: NextRequest) {
   try {
     const payload = await req.json();
 
-    console.log("[Leads on Demand] Received lead:", payload);
+    console.log("[Leads on Demand] Received lead - processing");
 
     // Log the webhook
     await prisma.webhookEvent.create({
@@ -83,6 +84,12 @@ export async function POST(req: NextRequest) {
       phone = `+${phone}`; // Assume it's formatted correctly
     }
 
+    // Derive segment, intent, bankability
+    const segmentation = deriveLeadSegment({
+      source: "leads_on_demand",
+      rawData: payload,
+    });
+
     // Check if lead already exists
     const existingLead = await prisma.lead.findFirst({
       where: {
@@ -101,11 +108,14 @@ export async function POST(req: NextRequest) {
           lastName,
           phone,
           email: payload.email,
+          source: "leads_on_demand",
+          segment: segmentation.segment,
+          intent: segmentation.intent,
+          bankability: segmentation.bankability,
           rawData: payload,
           consentSms: payload.consent === "TRUE" || payload.consent === true,
           consentEmail: payload.consent === "TRUE" || payload.consent === true,
           consentCall: payload.consent === "TRUE" || payload.consent === true,
-          source: "leads_on_demand",
           updatedAt: new Date(),
         },
       });
@@ -119,7 +129,7 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      console.log(`[Leads on Demand] Updated existing lead: ${lead.id}`);
+      console.log(`[Leads on Demand] Updated existing lead: ${lead.id}, source: leads_on_demand`);
     } else {
       // Get current cohort config
       const cohortConfig = await prisma.cohortConfig.findFirst({
@@ -135,6 +145,9 @@ export async function POST(req: NextRequest) {
           phone,
           status: "NEW",
           source: "leads_on_demand",
+          segment: segmentation.segment,
+          intent: segmentation.intent,
+          bankability: segmentation.bankability,
           rawData: payload,
           consentSms: payload.consent === "TRUE" || payload.consent === true,
           consentEmail: payload.consent === "TRUE" || payload.consent === true,
@@ -172,7 +185,7 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      console.log(`[Leads on Demand] Created new lead: ${lead.id}`);
+      console.log(`[Leads on Demand] Created new lead: ${lead.id}, source: leads_on_demand`);
 
       // Send Slack notification for new lead
       const loanInfo = payload.loanType === "purchase"

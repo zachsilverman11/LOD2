@@ -11,6 +11,8 @@
  */
 
 import { getLatestYouTubeVideoUrl } from '../youtube-utils';
+import { getRelativeDatePhrase } from '../timezone-utils';
+import { getTimezoneForProvince } from '../calcom';
 
 // ============================================================================
 // Section 1: Interfaces & Types
@@ -839,9 +841,14 @@ export function buildHollyBriefing(params: {
   applicationStatus?: { started?: Date; completed?: Date };
   youtubeLink?: string | null;
   youtubeSharedInConversation?: boolean;
+  leadActivities?: any[];
 }): string {
-  const { leadData, leadEmail, conversationContext, appointments, callOutcome, applicationStatus, youtubeLink, youtubeSharedInConversation } = params;
+  const { leadData, leadEmail, conversationContext, appointments, callOutcome, applicationStatus, youtubeLink, youtubeSharedInConversation, leadActivities } = params;
   const resolvedEmail = leadEmail ?? leadData?.email ?? null;
+
+  // Check segment (alt_private vs prime)
+  const segment = leadData.segment || 'prime_other';
+  const isAltPrivate = segment === 'alt_private';
 
   // Determine lead type and relevant program
   const loanType = leadData.loanType || leadData.lead_type || 'unknown';
@@ -849,15 +856,22 @@ export function buildHollyBriefing(params: {
   const isRefinance = loanType.toLowerCase().includes('refinance');
   const isRenewal = loanType.toLowerCase().includes('renewal');
 
+  // CRITICAL: alt_private leads get NO bankable programs
   let suggestedPrograms: string[] = [];
-  if (isPurchase) {
-    suggestedPrograms = ['Guaranteed Approvals Certificate', 'Reserved Ultra-Low Rates'];
-  } else if (isRefinance) {
-    suggestedPrograms = ['No Bank Penalties Program', 'Reserved Ultra-Low Rates'];
-  } else if (isRenewal) {
-    suggestedPrograms = ['Reserved Ultra-Low Rates', 'No Bank Penalties Program'];
+  if (isAltPrivate) {
+    // Empty programs for alt_private (private/alternative playbook)
+    suggestedPrograms = [];
   } else {
-    suggestedPrograms = ['Reserved Ultra-Low Rates'];
+    // Prime leads get bankable programs
+    if (isPurchase) {
+      suggestedPrograms = ['Guaranteed Approvals Certificate', 'Reserved Ultra-Low Rates'];
+    } else if (isRefinance) {
+      suggestedPrograms = ['No Bank Penalties Program', 'Reserved Ultra-Low Rates'];
+    } else if (isRenewal) {
+      suggestedPrograms = ['Reserved Ultra-Low Rates', 'No Bank Penalties Program'];
+    } else {
+      suggestedPrograms = ['Reserved Ultra-Low Rates'];
+    }
   }
 
   let briefing = `## 🧠 YOUR KNOWLEDGE BASE
@@ -869,6 +883,49 @@ You're Holly, Inspired Mortgage's AI sales agent. You can:
 - Build trust and curiosity
 
 You CANNOT give mortgage advice, discuss specific rates, or make recommendations (that's the advisor's job).
+
+${isAltPrivate ? `
+---
+
+## 🚨 CRITICAL: PRIVATE/ALTERNATIVE LEAD PLAYBOOK
+
+**This is a ${segment.toUpperCase()} lead (source: ${leadData.source || 'unknown'}).**
+
+This is NOT a bankable client. They typically have:
+- Income issues (self-employed, irregular, hard to prove)
+- Bruised credit
+- Need funds ASAP (urgency, cash flow)
+- Construction/unusual property conditions
+- Bank said no or borrower unsure about bank approval
+
+**YOUR JOB ON SMS:**
+- Make them feel cared for and not judged
+- Show we work these files (income, credit, speed, construction, bank said no) all the time
+- Get them to a short call with the team so the humans can understand the real blocker
+- Frame the call as an honest look at their situation, not "see if you qualify" and not "we definitely have a lender"
+
+**HARD BANS (guardrails will block these):**
+- ❌ No specific rates or percents (existing global ban)
+- ❌ No "low rates", "ultra-low", "reserved rates", "no penalties", "guaranteed approval"
+- ❌ No "cash back", "best rate", "what rate is your bank at"
+- ❌ No "pull your credit", "see if you qualify"
+- ❌ Do NOT ask credit score or income over SMS
+- ❌ Do NOT name current lender in opener (existing rule)
+- ❌ Do NOT use cash-back hook or rate-vs-cost reframe as primary angle
+- ❌ suggestedPrograms for this segment: EMPTY (no bankable programs)
+
+**VOICE:**
+- Name the situation they already typed (debt consol, funds this month, construction, bank wasn't an option)
+- Normalize: banks have a box, lots of files don't fit, that's common
+- Then offer two real Cal.com times via book_directly, not a calendar link as first resort
+- Identify as Holly with Inspired Mortgage on first Inspired-number message if they haven't talked to us yet
+
+**GOOD EXAMPLE (alt_private):**
+"Hey ${leadData.first_name || leadData.name?.split(' ')[0] || 'there'}! Holly from Inspired Mortgage. Saw you're looking at [their situation]. Banks can be tricky with [income/credit/construction/etc] - we work these files all the time. Quick call so the team can understand what's going on and see if there's a path. Sound good?"
+
+**BAD EXAMPLE (DO NOT USE):**
+"We have reserved ultra-low rates and no penalties! Cash back available. Let's see if you qualify!"
+` : ''}
 
 ---
 
@@ -1068,7 +1125,7 @@ This lead ALREADY BOOKED an appointment. It is scheduled for THE FUTURE and has 
 `;
     }
 
-    // Show past appointments for context - CHECK FOR NO-SHOWS
+    // Show past appointments for context - CHECK FOR NO-SHOWS AND CANCELLATIONS
     if (pastAppointments.length > 0) {
       const lastPastAppt = pastAppointments[0];
       const scheduledDate = lastPastAppt.scheduledFor || lastPastAppt.scheduledAt;
@@ -1077,6 +1134,38 @@ This lead ALREADY BOOKED an appointment. It is scheduled for THE FUTURE and has 
       // Check if this was a no-show (appointment time passed but no call outcome, or call outcome is NO_ANSWER)
       const hasCallOutcome = callOutcome && callOutcome.appointmentId === lastPastAppt.id;
       const isNoShow = !hasCallOutcome || (callOutcome?.outcome === 'NO_ANSWER' && callOutcome?.reached === false);
+      
+      // Check if this appointment was cancelled and find the cancellation activity
+      const isCancelled = lastPastAppt.status === 'cancelled';
+      let cancellationRelativeDate = '';
+      
+      if (isCancelled && leadActivities) {
+        // Find the APPOINTMENT_CANCELLED activity for this appointment
+        // Try to match by appointment ID in metadata, fall back to recent activity
+        const cancellationActivity = leadActivities.find((activity) => {
+          if (activity.type !== 'APPOINTMENT_CANCELLED') return false;
+          
+          // Check if metadata links to this appointment
+          const metadata = activity.metadata as Record<string, unknown> | null;
+          if (metadata?.appointmentId === lastPastAppt.id) return true;
+          
+          // Fallback: find the most recent cancellation activity after this appointment was created
+          return activity.createdAt >= lastPastAppt.createdAt;
+        });
+        
+        if (cancellationActivity) {
+          // Get the lead's timezone
+          const province = leadData.province || 'British Columbia';
+          const leadTimezone = getTimezoneForProvince(province);
+          
+          // Compute relative date phrase (today, yesterday, etc.)
+          cancellationRelativeDate = getRelativeDatePhrase(
+            cancellationActivity.createdAt,
+            leadTimezone,
+            now
+          );
+        }
+      }
 
       briefing += `
 ### 📅 PREVIOUS APPOINTMENT (${daysAgo} days ago)
@@ -1087,7 +1176,22 @@ This lead ALREADY BOOKED an appointment. It is scheduled for THE FUTURE and has 
 
 This call was ${daysAgo} days ago (not yesterday, not recently - ${daysAgo} DAYS AGO).
 
-${isNoShow ? `
+${isCancelled && cancellationRelativeDate ? `
+🚨 **CANCELLATION DETECTED:**
+This appointment was cancelled ${cancellationRelativeDate}. The cancellation happened ${cancellationRelativeDate}, NOT yesterday (unless it literally was yesterday).
+
+**CRITICAL DATE AWARENESS:**
+When referencing the cancellation, you MUST say "${cancellationRelativeDate}", not "yesterday" unless it literally was yesterday.
+- Cancellation was: ${cancellationRelativeDate}
+- Use this exact phrase or a close variant: "${cancellationRelativeDate}"
+
+**RECOVERY APPROACH:**
+- Own the miss if it was advisor-side ("${lastPastAppt.advisorName || 'the team'} had to cancel" or "that cancellation ${cancellationRelativeDate}")
+- Acknowledge the trust hit: name that cancellations are frustrating
+- Offer specific available slots (don't send a link yet)
+- Keep tone: apologetic but forward-looking, brief
+
+` : isNoShow ? `
 🚨 **NO-SHOW DETECTED:**
 This lead booked an appointment but ${hasCallOutcome ? 'didn\'t answer when the advisor called' : 'the appointment time passed'}.
 
@@ -1213,8 +1317,9 @@ They completed their mortgage application and are now a customer.
 `;
   }
 
-  // Add relevant programs
-  briefing += `
+  // Add relevant programs (empty for alt_private)
+  if (suggestedPrograms.length > 0) {
+    briefing += `
 ---
 
 ## 🎁 PROGRAMS YOU CAN MENTION (use naturally, not robotically)
@@ -1232,10 +1337,29 @@ ${suggestedPrograms
 
 **Note:** Only mention if RELEVANT to their situation. Don't force it.
 `;
+  } else if (isAltPrivate) {
+    briefing += `
+---
 
-  // Add booking hook based on conversation signals
-  const selectedHook = selectBookingHook(conversationContext.messageHistory);
-  briefing += `
+## 🎁 PROGRAMS FOR THIS SEGMENT: NONE
+
+**This is an alt_private lead. Do NOT mention any bankable programs:**
+- ❌ No Reserved Ultra-Low Rates
+- ❌ No Bank Penalties Program
+- ❌ No Guaranteed Approvals Certificate
+- ❌ No cash back hooks
+
+**Instead, focus on:**
+- Understanding their actual circumstance and core blocker
+- Getting them to a short call (not a qualification pitch)
+- Normalizing that many files don't fit the bank box
+`;
+  }
+
+  // Add booking hook based on conversation signals (SKIP for alt_private)
+  if (!isAltPrivate) {
+    const selectedHook = selectBookingHook(conversationContext.messageHistory);
+    briefing += `
 ---
 
 ## 🪝 BOOKING HOOK: "${selectedHook.name}"
@@ -1250,6 +1374,30 @@ ${selectedHook.followUpNudge}
 
 **Remember:** Adapt this to the conversation. Don't copy-paste. The hook is the ANGLE, not a script.
 `;
+  } else {
+    // Alt_private: solutions-track CTA (no rate/qualify/cash-back language)
+    briefing += `
+---
+
+## 📞 CALL-TO-ACTION FOR ALT_PRIVATE
+
+**The call is to understand the real blocker and see if a path exists.**
+
+**Good CTAs:**
+- "Quick call so the team can understand what's going on and see if there's a path. Sound good?"
+- "The team works these files all the time. Short call to understand your situation and see what's possible. Does this afternoon work?"
+- "Let's get you on a quick call with the team. They can understand the full picture and see if they can help. When works for you?"
+
+**Avoid:**
+- ❌ "See if you qualify"
+- ❌ "Get your rate"
+- ❌ "Access our reserved rates"
+- ❌ "Cash back available"
+- ❌ "Best rate comparison"
+
+**Frame it as:** An honest conversation, not a sales pitch or qualification test.
+`;
+  }
 
   // Add YouTube show hook (trust-building, NOT a booking pitch)
   if (youtubeLink) {

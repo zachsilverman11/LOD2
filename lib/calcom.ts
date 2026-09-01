@@ -100,6 +100,48 @@ export function getTimezoneForProvince(province?: string): string {
   }
 }
 
+/**
+ * Get human-friendly timezone name for speaking to leads.
+ * Returns the short timezone abbreviation (PT, MT, CT, ET, AT) regardless of DST.
+ * Examples: BC → "PT", Alberta → "MT"
+ */
+export function getTimezoneNameForProvince(province?: string): string {
+  if (!province) return "PT";
+  const p = province.toUpperCase().trim();
+  switch (p) {
+    case "AB":
+    case "ALBERTA":
+      return "MT";
+    case "SK":
+    case "SASKATCHEWAN":
+      return "CT";
+    case "MB":
+    case "MANITOBA":
+      return "CT";
+    case "ON":
+    case "ONTARIO":
+    case "QC":
+    case "QUEBEC":
+      return "ET";
+    case "NS":
+    case "NOVA SCOTIA":
+    case "NB":
+    case "NEW BRUNSWICK":
+    case "PE":
+    case "PEI":
+    case "PRINCE EDWARD ISLAND":
+      return "AT";
+    case "NL":
+    case "NEWFOUNDLAND":
+    case "NEWFOUNDLAND AND LABRADOR":
+      return "NT";
+    case "BC":
+    case "BRITISH COLUMBIA":
+    default:
+      return "PT";
+  }
+}
+
 // ─── V2: Available Slots ────────────────────────────────────────────────────
 
 /** Default horizon for Holly slot pre-fetch (sync prompts with `getAvailabilityWindow()`). */
@@ -117,8 +159,79 @@ export function getAvailabilityWindow(
   return { start: start.toISOString(), end: end.toISOString() };
 }
 
+// ─── In-process slot cache ──────────────────────────────────────────────────
+//
+// Slot lookups are read-only and identical for every lead in the same timezone,
+// but Holly calls getAvailableSlots once per lead per tick (decision-engine and
+// conversation-handler both pre-fetch the same ~21-day grid). A cron pass over
+// N leads therefore fired N identical requests at Cal.com.
+//
+// The cache lives for the life of the process — one serverless / cron
+// invocation — so a warm Lambda reuses it across a batch and a cold start
+// begins empty. It is deliberately NOT shared or persisted: entries expire
+// after a short TTL, so a slot list can never be more than TTL stale, and
+// createDirectBooking still validates against Cal.com at booking time.
+
+/** Default TTL for cached slot lists. Override with CALCOM_SLOT_CACHE_TTL_MS (0 disables). */
+export const CALCOM_SLOT_CACHE_TTL_MS = 90_000;
+
+/**
+ * Cache keys quantize the window to 5-minute buckets. Callers derive `start`
+ * from `new Date()` (see `getAvailabilityWindow`), so two leads processed in
+ * the same tick ask for windows that differ by milliseconds — without
+ * quantization every key would be unique and nothing would ever hit.
+ * A bucket boundary landing between two calls just costs one extra fetch.
+ */
+const SLOT_CACHE_KEY_BUCKET_MS = 5 * 60_000;
+
+interface SlotCacheEntry {
+  expiresAt: number;
+  slots: Promise<TimeSlot[]>;
+}
+
+const slotCache = new Map<string, SlotCacheEntry>();
+
+function getSlotCacheTtlMs(): number {
+  const raw = process.env.CALCOM_SLOT_CACHE_TTL_MS;
+  if (raw === undefined) return CALCOM_SLOT_CACHE_TTL_MS;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : CALCOM_SLOT_CACHE_TTL_MS;
+}
+
+/** Bucket an ISO date/datetime for the cache key; non-parseable values are used verbatim. */
+function bucketWindowBound(value: string): string {
+  const ms = Date.parse(value);
+  return Number.isFinite(ms) ? String(Math.floor(ms / SLOT_CACHE_KEY_BUCKET_MS)) : value;
+}
+
+function slotCacheKey(
+  startDate: string,
+  endDate: string,
+  timeZone: string,
+  eventTypeId?: number
+): string {
+  // Mirrors the request built in fetchAvailableSlots: either an explicit event
+  // type id, or the team/event slug pair.
+  const event = eventTypeId
+    ? `id:${eventTypeId}`
+    : `slug:${process.env.CALCOM_TEAM_SLUG || "inspired-mortgage"}/${
+        process.env.CALCOM_EVENT_SLUG || "mortgage-discovery-call"
+      }`;
+
+  return [event, timeZone, bucketWindowBound(startDate), bucketWindowBound(endDate)].join("|");
+}
+
+/** Drop every cached slot list. Exported for tests. */
+export function clearSlotCache(): void {
+  slotCache.clear();
+}
+
 /**
  * Get available time slots for a given date range (Cal.com v2).
+ *
+ * Results are memoized per process for `CALCOM_SLOT_CACHE_TTL_MS`, keyed by
+ * event type + timezone + (bucketed) window. Concurrent callers share the
+ * in-flight request; failures are never cached.
  *
  * @param startDate - Start date (ISO 8601 date or datetime)
  * @param endDate - End date (ISO 8601 date or datetime)
@@ -130,6 +243,40 @@ export async function getAvailableSlots(
   startDate: string,
   endDate: string,
   timeZone: string = "America/Vancouver",
+  eventTypeId?: number
+): Promise<TimeSlot[]> {
+  const ttlMs = getSlotCacheTtlMs();
+  if (ttlMs === 0) {
+    return fetchAvailableSlots(startDate, endDate, timeZone, eventTypeId);
+  }
+
+  const key = slotCacheKey(startDate, endDate, timeZone, eventTypeId);
+  const now = Date.now();
+  const cached = slotCache.get(key);
+
+  if (cached && cached.expiresAt > now) {
+    // Copy so a caller can never mutate the shared list for everyone else.
+    return (await cached.slots).slice();
+  }
+
+  const inFlight = fetchAvailableSlots(startDate, endDate, timeZone, eventTypeId);
+  slotCache.set(key, { expiresAt: now + ttlMs, slots: inFlight });
+
+  // A transient Cal.com error must not blank Holly's availability for the rest
+  // of the invocation, so evict on rejection instead of caching the failure.
+  inFlight.catch(() => {
+    if (slotCache.get(key)?.slots === inFlight) {
+      slotCache.delete(key);
+    }
+  });
+
+  return (await inFlight).slice();
+}
+
+async function fetchAvailableSlots(
+  startDate: string,
+  endDate: string,
+  timeZone: string,
   eventTypeId?: number
 ): Promise<TimeSlot[]> {
   // Use slug-based approach (no auth required) as primary, fall back to eventTypeId

@@ -4,6 +4,8 @@ import { normalizePhoneNumber } from "@/lib/sms";
 import { ActivityType, CommunicationChannel } from "@/app/generated/prisma";
 import { inngest } from "@/lib/inngest";
 import { sendErrorAlert } from "@/lib/slack";
+import { validateTwilioSignature } from "@/lib/twilio-signature";
+import { findLeadByPhone } from "@/lib/phone-matching";
 
 /**
  * Handle incoming SMS messages from Twilio
@@ -11,10 +13,68 @@ import { sendErrorAlert } from "@/lib/slack";
  */
 export async function POST(request: NextRequest) {
   try {
+    // ✅ SECURITY: Validate Twilio signature before processing
+    const authToken = process.env.TWILIO_AUTH_TOKEN?.trim();
+    if (!authToken) {
+      console.error("[Twilio] Missing TWILIO_AUTH_TOKEN - rejecting unsigned request");
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 403 }
+      );
+    }
+
+    const signature = request.headers.get("X-Twilio-Signature");
+    if (!signature) {
+      console.error("[Twilio] Missing X-Twilio-Signature header");
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 403 }
+      );
+    }
+
+    // Parse form data to extract all parameters
     const formData = await request.formData();
-    const from = formData.get("From") as string;
-    const body = formData.get("Body") as string;
-    const messageSid = formData.get("MessageSid") as string;
+    const params: Record<string, string> = {};
+    formData.forEach((value, key) => {
+      params[key] = value.toString();
+    });
+
+    // Build the full URL that Twilio signed
+    // On Vercel/Next.js, use x-forwarded-proto and host headers
+    const protocol = request.headers.get("x-forwarded-proto") || "https";
+    const host = request.headers.get("host");
+    if (!host) {
+      console.error("[Twilio] Missing host header");
+      return NextResponse.json(
+        { error: "Bad Request" },
+        { status: 400 }
+      );
+    }
+
+    // Construct the full URL (path + query string)
+    const { pathname, search } = new URL(request.url);
+    const fullUrl = `${protocol}://${host}${pathname}${search}`;
+
+    // Validate signature
+    const isValid = validateTwilioSignature({
+      signature,
+      url: fullUrl,
+      params,
+      authToken,
+    });
+
+    if (!isValid) {
+      console.error("[Twilio] Invalid signature");
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 403 }
+      );
+    }
+
+    // Extract required fields after validation
+    const from = params.From;
+    const body = params.Body;
+    const messageSid = params.MessageSid;
 
     if (!from || !body) {
       return NextResponse.json(
@@ -26,14 +86,10 @@ export async function POST(request: NextRequest) {
     // Normalize phone number
     const normalizedPhone = normalizePhoneNumber(from);
 
-    // Find lead by phone number
-    const lead = await prisma.lead.findFirst({
-      where: {
-        phone: {
-          contains: normalizedPhone.replace("+", "").slice(-10), // Match last 10 digits
-        },
-      },
-    });
+    // Find lead by phone number using deterministic matching
+    // This prevents inbound SMS from attaching to the wrong lead when multiple leads
+    // share the same last-10 digits (incident 2026-08-26: Harper Test collision)
+    const lead = await findLeadByPhone(from);
 
     if (lead) {
       // Handle opt-out (CASL compliance)
@@ -136,6 +192,20 @@ export async function POST(request: NextRequest) {
           },
         });
       }
+
+      // 🔄 CRON FALLBACK: Set nextReviewAt to now
+      // This ensures the 15-min autonomous-holly cron picks up this lead immediately
+      // if Inngest fails to process the reply (incident 2026-08-26: Harper Test never got reply)
+      // 
+      // Important: We set nextReviewAt but NOT lastContactedAt, because:
+      // - nextReviewAt = when Holly should review the lead (now = immediate)
+      // - lastContactedAt = when we last sent an outbound message (unchanged, this is inbound)
+      await prisma.lead.update({
+        where: { id: lead.id },
+        data: {
+          nextReviewAt: new Date(),
+        },
+      });
     }
 
     // Log webhook event

@@ -20,8 +20,7 @@ import { buildHollyBriefing, selectBookingHook, fetchYouTubeLinkForBriefing } fr
 import { getLeadJourneyIntro, getValueProposition, LEAD_JOURNEY } from './brain';
 import { analyzeReply, isImmediateBooking, BEHAVIORAL_INTELLIGENCE } from './brain';
 import { getConversationGuidance, SALES_PSYCHOLOGY } from './brain';
-import { getRelevantExamples } from './examples';
-import { LEARNED_EXAMPLES } from './examples';
+import { TRAINING_EXAMPLES, LEARNED_EXAMPLES } from './examples';
 import { getLocalTime, getLocalTimeString } from '../timezone-utils';
 import {
   getAvailableSlots,
@@ -40,11 +39,178 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
+// === STATIC CACHED SYSTEM PROMPT (byte-stable across all leads) ===
+// This module-level constant contains ONLY static instructions with ZERO per-lead logic.
+// It is cached by Anthropic's prompt caching (cache_control: ephemeral) to reduce costs ~90%.
+// DO NOT put getRelevantExamples, per-lead data, timestamps, or conversation in here.
+const STATIC_SYSTEM_PROMPT = `# 💭 HOLLY'S CORE INTELLIGENCE
+
+You are Holly, an expert mortgage sales agent for Inspired Mortgage, a Canadian mortgage brokerage.
+
+## 📚 ALL TRAINING EXAMPLES (Static Bank - Learn From These)
+
+${TRAINING_EXAMPLES.map((ex, i) => `
+### Example ${i + 1}: ${ex.scenario}
+
+**Lead context pattern:**
+- Type: ${ex.leadContext.type}
+${ex.leadContext.urgency ? `- Urgency: ${ex.leadContext.urgency}` : ''}
+${ex.leadContext.objection ? `- Objection: ${ex.leadContext.objection}` : ''}
+${ex.leadContext.engagement ? `- Engagement: ${ex.leadContext.engagement}` : ''}
+
+**✅ GOOD APPROACH:**
+\`\`\`
+${ex.goodApproach.message}
+\`\`\`
+
+**Why it works:**
+${ex.goodApproach.whyItWorks.map(w => `  - ${w}`).join('\n')}
+
+**❌ BAD APPROACH (avoid):**
+\`\`\`
+${ex.badApproach.message}
+\`\`\`
+
+**Why it fails:**
+${ex.badApproach.whyItFails.map(w => `  - ${w}`).join('\n')}
+`).join('\n\n')}
+
+---
+
+## 📊 LEARNED EXAMPLES (Real Conversation Outcomes)
+
+${LEARNED_EXAMPLES.map(ex => `
+### ${ex.scenario} (${ex.sampleSize} conversations)
+
+✅ **What WORKED** (${ex.whatWorked.bookingRate}% booking, ${ex.whatWorked.engagementRate}% engagement):
+"${ex.whatWorked.message}"
+
+**Why:**
+${ex.whatWorked.whyItWorked.map(w => `  - ${w}`).join('\n')}
+
+❌ **What DIDN'T** (${ex.whatDidntWork.bookingRate}% booking, ${ex.whatDidntWork.engagementRate}% engagement):
+"${ex.whatDidntWork.message}"
+
+**Why:**
+${ex.whatDidntWork.whyItFailed.map(f => `  - ${f}`).join('\n')}
+`).join('\n\n')}
+
+---
+
+## 🎯 SALES PSYCHOLOGY FRAMEWORK
+
+**Trust-building principles:**
+${SALES_PSYCHOLOGY.trustBuilding.principles.map(p => `  - ${p}`).join('\n')}
+
+**Friction-reducing language:**
+${SALES_PSYCHOLOGY.frictionReduction.replacements.map(r => `  - Instead of "${r.instead}" → use "${r.use}" (${r.why})`).join('\n')}
+
+---
+
+## 🚦 STAGE MOVEMENT RULES
+
+You have the power to move leads between stages using \`move_stage\`.
+
+### STAGE FLOW:
+\`\`\`
+NEW → CONTACTED → ENGAGED → CALL_SCHEDULED → WAITING_FOR_APPLICATION → [FINMO TAKES OVER]
+                       ↓           ↓                    ↓
+                  NURTURING → NURTURING → NURTURING
+                       ↓           ↓                    ↓
+                    LOST ←──────────────────────────────
+\`\`\`
+
+### STAGE DEFINITIONS:
+
+**CONTACTED** → ENGAGED (replies positively) | NURTURING (no reply 3-5 touches) | LOST (explicit decline)
+
+**ENGAGED** → CALL_SCHEDULED (books) | NURTURING (6+ months out) | LOST (hostile/declined)
+
+**CALL_SCHEDULED** → Stay until call, then system moves to WAITING_FOR_APPLICATION
+
+**WAITING_FOR_APPLICATION** → Read call outcome: send app (qualified) | NURTURING (unsure) | LOST (declined)
+
+**NURTURING** → ENGAGED (re-engages) | CALL_SCHEDULED (books) | LOST (declines)
+
+**LOST** → Terminal
+
+### CRITICAL RULES:
+
+1. Never message after APPLICATION_STARTED or CONVERTED (Finmo handles)
+2. Move CONTACTED → NURTURING after 3-5 messages over 5-7 days with no reply
+3. Always include farewell message with move_stage to LOST or NURTURING
+4. Never promise "last message" or "closing file" (automation may follow up)
+5. Move to LOST immediately for: "not interested", "stop texting", "remove me", hostile
+
+---
+
+## 📄 MORTGAGE STRATEGY REPORT PRE-SELL
+
+Frame as built for THEIR situation (lender, balance, timeline), not generic.
+
+**Example framings:**
+- "The strategy report shows your options with your current balance: rate comparisons, penalty calcs, the works."
+- "Before the call our team builds a personalised report for your situation, not a generic calculator."
+
+---
+
+## ⏰ TEMPORAL INTERPRETATION RULES
+
+When lead uses relative time ("tonight", "tomorrow"), anchor to THEIR message timestamp, not current time.
+
+**Process:**
+1. Find their message timestamp
+2. Calculate what they meant when they said it
+3. Translate to what that means NOW
+4. Never guess - anchor to timestamp
+
+---
+
+## 📤 JSON RESPONSE FORMAT
+
+\`\`\`json
+{
+  "thinking": "Step-by-step: customer psychology, patterns, value strategy, message craft, decision (3-5 sentences)",
+  "customerMindset": "One sentence: what they're feeling/thinking now",
+  "action": "send_sms" | "send_booking_link" | "send_application_link" | "book_directly" | "move_stage" | "wait" | "escalate",
+  "newStage": "ENGAGED" | "NURTURING" | "WAITING_FOR_APPLICATION" | "LOST",  // ONLY if action is move_stage
+  "message": "Natural message. Use their name. Sound human.",
+  "bookingStartTime": "ISO 8601 UTC from availability",  // ONLY if action is book_directly
+  "bookingLeadName": "Full name",  // ONLY if action is book_directly
+  "bookingLeadEmail": "Email",  // ONLY if action is book_directly
+  "waitHours": 24,
+  "nextCheckCondition": "What triggers next review",
+  "confidence": "high" | "medium" | "low"
+}
+\`\`\`
+
+**CRITICAL:** Never write URLs in messages! Use action "send_booking_link" or "send_application_link" - URLs added automatically.
+
+**Direct booking preferred:** When lead picks specific time and you have live availability, use \`book_directly\` with exact ISO time.
+
+---
+
+## 🗓️ DIRECT BOOKING WORKFLOW
+
+DEFAULT: offer specific times and book directly. Link is LAST RESORT.
+
+**Use book_directly when:**
+- Lead confirms specific time ("2pm works", "tomorrow morning")
+- You have live availability slots  
+- Lead has email
+
+**Use send_booking_link (last resort) when:**
+- Lead asks for link ("just send me the link")
+- Multiple attempts, still no workable time
+
+**Focus on conversion, not activity. Quality over quantity.**`;
+
 export async function askHollyToDecide(
   lead: Lead & {
     communications?: any[];
     appointments?: any[];
     callOutcomes?: any[];
+    activities?: any[];
   },
   signals: DealSignals
 ): Promise<HollyDecision> {
@@ -137,8 +303,8 @@ export async function askHollyToDecide(
     : null;
   const unansweredFollowUps = inboundCount > 0 ? outboundCount - inboundCount : 0;
 
-  // Determine lead type
-  const loanType = (rawData?.loanType || rawData?.lead_type || '').toLowerCase();
+  // Determine lead type - map FinanceVine's mortgage_type field
+  const loanType = (rawData?.loanType || rawData?.lead_type || rawData?.mortgage_type || '').toLowerCase();
   const leadType = loanType.includes('purchase')
     ? 'purchase'
     : loanType.includes('refinance')
@@ -151,9 +317,19 @@ export async function askHollyToDecide(
   const youtubeLink = await fetchYouTubeLinkForBriefing();
   const youtubeSharedInConversation = recentMessages.includes('youtube.com');
 
-  // Build rich context briefing
+  // Build rich context briefing - pass Lead schema fields (segment, intent, source) for FinanceVine leads
   const hollyBriefing = buildHollyBriefing({
-    leadData: rawData,
+    leadData: {
+      ...rawData,
+      // Override with Lead schema fields when available (FinanceVine writes these)
+      segment: lead.segment || rawData?.segment,
+      intent: lead.intent || rawData?.intent,
+      source: lead.source || rawData?.source,
+      // Map FinanceVine mortgage_type to loanType
+      loanType: rawData?.loanType || rawData?.lead_type || rawData?.mortgage_type,
+    },
+    // Pass the Lead row's email explicitly: the briefing gates `book_directly`
+    // on an email being on file, and rawData may not carry one.
     leadEmail: lead.email,
     conversationContext: {
       touchNumber: outboundCount + 1,
@@ -170,6 +346,7 @@ export async function askHollyToDecide(
     },
     youtubeLink,
     youtubeSharedInConversation,
+    leadActivities: lead.activities || [],
   });
 
   // === CONVERSATION STAGE DETECTION ===
@@ -240,60 +417,6 @@ export async function askHollyToDecide(
   });
   const hasRepliedAfterBooking = inboundCount > 0 && lead.appointments && lead.appointments.length > 0;
 
-  const relevantExamples = getRelevantExamples(
-    leadType,
-    rawData?.motivation_level,
-    lastReply,
-    outboundCount + 1,
-    {
-      hasUpcomingAppointment,
-      hasPastNoShow,
-      hasRepliedAfterBooking,
-    }
-  );
-
-  // Build training examples section
-  const examplesSection = relevantExamples.length > 0
-    ? `
-## 📚 LEARN FROM THESE EXAMPLES
-
-These are real (anonymized) conversations showing how top mortgage sales reps handle similar situations.
-Use these as INSPIRATION and GUIDANCE, not rigid scripts. Adapt the principles to THIS specific lead.
-
-${relevantExamples
-  .map(
-    (ex, i) => `
-### Example ${i + 1}: ${ex.scenario}
-
-**Similar lead context:**
-- Type: ${ex.leadContext.type}
-${ex.leadContext.urgency ? `- Urgency: ${ex.leadContext.urgency}` : ''}
-${ex.leadContext.objection ? `- Objection: ${ex.leadContext.objection}` : ''}
-${ex.leadContext.engagement ? `- Engagement: ${ex.leadContext.engagement}` : ''}
-
-**✅ GOOD APPROACH:**
-\`\`\`
-${ex.goodApproach.message}
-\`\`\`
-
-**Why it works:**
-${ex.goodApproach.whyItWorks.map(w => `  - ${w}`).join('\n')}
-
-**❌ BAD APPROACH (don't do this):**
-\`\`\`
-${ex.badApproach.message}
-\`\`\`
-
-**Why it fails:**
-${ex.badApproach.whyItFails.map(w => `  - ${w}`).join('\n')}
-`
-  )
-  .join('\n\n')}
-
----
-`
-    : '';
-
   // Build behavioral intelligence section (with temporal staleness context)
   const behavioralSection = replyAnalysis
     ? (() => {
@@ -334,11 +457,11 @@ ${replyAnalysis.exampleResponse ? `**Example response:**\n\`\`\`\n${replyAnalysi
       })()
     : '';
 
-  // Build sales psychology section
+  // Per-lead sales psychology guidance for this specific touch
   const psychologySection = `
-## 🎯 SALES PSYCHOLOGY GUIDANCE (Touch #${outboundCount + 1})
+## 🎯 SALES PSYCHOLOGY FOR THIS TOUCH (#${outboundCount + 1})
 
-**Your goal for this touch:**
+**Your goal:**
 ${conversationGuidance.goal}
 
 **Recommended approach:**
@@ -347,46 +470,10 @@ ${conversationGuidance.approach}
 **What to avoid:**
 ${conversationGuidance.avoid.map(a => `  - ${a}`).join('\n')}
 
-**Key trust-building principles:**
-${SALES_PSYCHOLOGY.trustBuilding.principles.slice(0, 3).map(p => `  - ${p}`).join('\n')}
-
-**Friction-reducing language tips:**
-- Instead of "schedule a consultation" → use "quick 10-15 min call"
-- Instead of "see what you qualify for" → use "get your exact rate"
-- Instead of "our rates" → use "rates we can get you"
-
 ---
 `;
 
-  // === LAYER 5: LEARNED EXAMPLES (from real conversation data) ===
-  const learnedSection = LEARNED_EXAMPLES.length > 0 ? `
-## 📊 REAL CONVERSATION LEARNINGS (MOST IMPORTANT!)
-
-These patterns come from ACTUAL conversations in the past 7 days - not theory, REAL DATA.
-Pay close attention to what worked vs what didn't.
-
-${LEARNED_EXAMPLES.map(ex => `
-### ${ex.scenario} (${ex.sampleSize} conversations analyzed)
-
-✅ **What WORKED** (${ex.whatWorked.bookingRate}% booking rate, ${ex.whatWorked.engagementRate}% engagement):
-"${ex.whatWorked.message}"
-
-**Why it worked:**
-${ex.whatWorked.whyItWorked.map(w => `  - ${w}`).join('\n')}
-
-❌ **What DIDN'T WORK** (${ex.whatDidntWork.bookingRate}% booking rate, ${ex.whatDidntWork.engagementRate}% engagement):
-"${ex.whatDidntWork.message}"
-
-**Why it failed:**
-${ex.whatDidntWork.whyItFailed.map(f => `  - ${f}`).join('\n')}
-`).join('\n')}
-
-**KEY TAKEAWAY:** Learn from these REAL outcomes. If a pattern has 80% booking rate vs 20%, use the 80% approach!
-
----
-` : '';
-
-  // === LAYER 6: ENHANCED PROMPT WITH EXTENDED THINKING ===
+  // === BUILD PER-LEAD USER PROMPT ===
 
   // Add CONVERTED lead special instructions
   const convertedLeadInstructions =
@@ -434,45 +521,64 @@ Supportive, helpful, customer-service oriented. NOT sales-y.
       : '';
 
   // Pre-fetch live availability (shared window with conversation-handler via getAvailabilityWindow)
+  //
+  // Skipped on the very first outbound: touch 1 is an intro + one diagnostic
+  // question — brain.ts `conversationFlow.touch1` forbids pushing booking or
+  // sending a link — so the ~21-day slot grid is built and never used. Every
+  // later tick still pre-fetches (and now shares one HTTP call per process via
+  // the getAvailableSlots cache). `availabilityPrefetchSkipped` below keeps the
+  // guardrail on send_booking_link armed, so the skip cannot make Holly fall
+  // back to the link.
+  const availabilityPrefetchSkipped =
+    Array.isArray(lead.communications) && lead.communications.length === 0;
+
   let availabilitySummary = "";
-  try {
-    const tz = getTimezoneForProvince(province);
-    const { start, end } = getAvailabilityWindow();
+  if (availabilityPrefetchSkipped) {
+    console.log(
+      `[Cal.com] Skipped availability pre-fetch for ${firstName}: first outbound, no conversation yet`
+    );
+  } else {
+    try {
+      const tz = getTimezoneForProvince(province);
+      const { start, end } = getAvailabilityWindow();
 
-    const slots = await getAvailableSlots(start, end, tz);
+      const slots = await getAvailableSlots(start, end, tz);
 
-    if (slots.length > 0) {
-      const slotsByDay: Record<string, TimeSlot[]> = {};
-      for (const slot of slots) {
-        const dayKey = new Date(slot.time).toLocaleDateString("en-US", {
-          timeZone: tz,
-          weekday: "long",
-          month: "short",
-          day: "numeric",
-        });
-        if (!slotsByDay[dayKey]) slotsByDay[dayKey] = [];
-        slotsByDay[dayKey].push(slot);
-      }
-
-      const lines: string[] = [];
-      for (const [day, daySlots] of Object.entries(slotsByDay)) {
-        const times = daySlots.map((s) =>
-          new Date(s.time).toLocaleTimeString("en-US", {
+      if (slots.length > 0) {
+        const slotsByDay: Record<string, TimeSlot[]> = {};
+        for (const slot of slots) {
+          const dayKey = new Date(slot.time).toLocaleDateString("en-US", {
             timeZone: tz,
-            hour: "numeric",
-            minute: "2-digit",
-            hour12: true,
-          })
-        );
-        lines.push(`**${day}:** ${times.join(", ")}`);
+            weekday: "long",
+            month: "short",
+            day: "numeric",
+          });
+          if (!slotsByDay[dayKey]) slotsByDay[dayKey] = [];
+          slotsByDay[dayKey].push(slot);
+        }
+
+        const lines: string[] = [];
+        for (const [day, daySlots] of Object.entries(slotsByDay)) {
+          const times = daySlots.map((s) =>
+            new Date(s.time).toLocaleTimeString("en-US", {
+              timeZone: tz,
+              hour: "numeric",
+              minute: "2-digit",
+              hour12: true,
+            })
+          );
+          lines.push(`**${day}:** ${times.join(", ")}`);
+        }
+        availabilitySummary = lines.join("\n");
       }
-      availabilitySummary = lines.join("\n");
+    } catch (err) {
+      console.error("[Cal.com] Failed to pre-fetch availability for decision engine:", err);
+      // Non-fatal — Holly will ask for preferred time and book directly
     }
-  } catch (err) {
-    console.error("[Cal.com] Failed to pre-fetch availability for decision engine:", err);
-    // Non-fatal — Holly will ask for preferred time and book directly
   }
 
+  // === BUILD UNCACHED USER BLOCK (varies per lead) ===
+  // This block contains all dynamic per-lead data that changes with each request
   const prompt = `${stageEnforcementBlock}${convertedLeadInstructions}# ⏰ CURRENT DATE & TIME (CRITICAL CONTEXT)
 
 **System Time:** ${currentDateFormatted} at ${currentTimeFormatted}
@@ -707,15 +813,11 @@ ${hollyBriefing}
 
 ${journeyContext}
 
-${learnedSection}
-
-${examplesSection}
-
 ${behavioralSection}
 
 ${psychologySection}
 
-## 📄 MANDATORY: MORTGAGE STRATEGY REPORT PRE-SELL
+## 🎯 YOUR DECISION TASK FOR THIS LEAD
 
 ${!hasUpcomingAppointment ? `**🚨 THIS LEAD HAS NOT BOOKED A CALL YET.**
 
@@ -1012,7 +1114,10 @@ If the lead's **last inbound message** is a concrete time or day choice (e.g. "T
 ${availabilitySummary ? `**📅 GREG'S LIVE AVAILABILITY (next ${CALCOM_AVAILABILITY_DEFAULT_DAYS_AHEAD} days):**
 ${availabilitySummary}
 
-You KNOW these times are available RIGHT NOW. Use them proactively.` : `**📅 LIVE CALENDAR DATA:** Open slots for the next ${CALCOM_AVAILABILITY_DEFAULT_DAYS_AHEAD} days are **not** in this prompt right now (the fetch failed, or the API returned no times).
+You KNOW these times are available RIGHT NOW. Use them proactively.` : availabilityPrefetchSkipped ? `**📅 LIVE CALENDAR DATA:** Not loaded for this message. This is your **first touch** — ${firstName} has not replied yet, so the goal is an intro plus one diagnostic question, not a booking ask.
+
+- **Do not** offer specific times, and **do not** use \`send_booking_link\` or \`book_directly\` in this message.
+- The full live slot list is loaded automatically on every later message, so you can offer real times the moment they engage.` : `**📅 LIVE CALENDAR DATA:** Open slots for the next ${CALCOM_AVAILABILITY_DEFAULT_DAYS_AHEAD} days are **not** in this prompt right now (the fetch failed, or the API returned no times).
 
 **Do not** jump to \`send_booking_link\` as your first move.
 
@@ -1071,9 +1176,32 @@ If they say "2pm today" or "tomorrow morning" — find the closest matching slot
   try {
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 1536, // Increased for extended thinking
+      max_tokens: 1536,
+      system: [
+        {
+          type: 'text',
+          text: STATIC_SYSTEM_PROMPT,
+          cache_control: { type: 'ephemeral' }
+        }
+      ],
       messages: [{ role: 'user', content: prompt }],
     });
+
+    // Log cache performance (no PII)
+    const usage = response.usage;
+    if (usage) {
+      const cacheCreation = (usage as any).cache_creation_input_tokens || 0;
+      const cacheRead = (usage as any).cache_read_input_tokens || 0;
+      const uncached = usage.input_tokens || 0;
+      
+      if (cacheCreation > 0 || cacheRead > 0) {
+        console.log(
+          `[Holly Cache] Lead ${firstName}: ` +
+          `cache_creation=${cacheCreation} cache_read=${cacheRead} uncached=${uncached} ` +
+          `(${cacheRead > 0 ? `${Math.round((cacheRead / (cacheRead + uncached)) * 100)}% cached` : 'cache miss'})`
+        );
+      }
+    }
 
     const textContent = response.content.find((c) => c.type === 'text');
     if (!textContent || textContent.type !== 'text') {
@@ -1092,6 +1220,10 @@ If they say "2pm today" or "tomorrow morning" — find the closest matching slot
 
     // Tag the decision with whether live slots were available (used by guardrails)
     decision._availabilitySlotsProvided = availabilitySummary.length > 0;
+    // …and whether they were absent because we deliberately skipped the fetch,
+    // so guardrails can tell "no slots to offer" from "not this lead's turn to
+    // be offered slots" and keep blocking the booking-link fallback.
+    decision._availabilityPrefetchSkipped = availabilityPrefetchSkipped;
 
     // Log decision for debugging
     console.log(

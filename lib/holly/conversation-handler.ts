@@ -8,6 +8,7 @@ import {
   getAvailableSlots,
   getAvailabilityWindow,
   getTimezoneForProvince,
+  getTimezoneNameForProvince,
   CALCOM_AVAILABILITY_DEFAULT_DAYS_AHEAD,
   type TimeSlot,
 } from "../calcom";
@@ -30,6 +31,25 @@ import {
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
+
+// === STATIC SYSTEM PROMPT FOR CONVERSATION HANDLER (byte-stable) ===
+// Contains ONLY static role definition and tool guidance, no per-lead logic.
+// Dynamic content (appointment status, lead profile, availability, YouTube) goes in user message.
+const STATIC_CONVERSATION_SYSTEM_PROMPT = `You are Holly, the scheduling and lead nurturing specialist for Inspired Mortgage, a Canadian mortgage brokerage.
+
+# YOUR CORE ROLE
+You are NOT a mortgage advisor. You cannot give advice, discuss rates, or provide mortgage recommendations.
+Your job is to:
+1. Nurture leads with helpful information about our programs
+2. Build curiosity and trust
+3. Book discovery calls with our mortgage advisors (Greg Williamson or Jakub Huncik) OR confirm existing appointments
+
+# RESPONSE PRINCIPLES
+- Be warm, natural, and conversational
+- Reference specific details from their form to show you read it
+- Ask diagnostic questions to understand their situation
+- Use tools appropriately based on context
+- Focus on conversion and show-up rate, not just activity`;
 
 interface LeadContext {
   lead: any;
@@ -175,11 +195,16 @@ export async function buildLeadContext(leadId: string): Promise<LeadContext> {
 /**
  * Generate enhanced system prompt with Inspired Mortgage training
  */
-function buildRepresentativeSlotList(slots: TimeSlot[]): TimeSlot[] {
+function buildRepresentativeSlotList(slots: TimeSlot[], timeZone: string): TimeSlot[] {
+  const now = new Date();
   const representativeSlots: TimeSlot[] = [];
   const slotsPerDay = new Map<string, number>();
 
   for (const slot of slots) {
+    // Skip slots that are already in the past in the lead's local timezone
+    const slotDate = new Date(slot.time);
+    if (slotDate <= now) continue;
+
     const dayKey = slot.time.slice(0, 10);
     const dayCount = slotsPerDay.get(dayKey) || 0;
 
@@ -196,31 +221,36 @@ function buildRepresentativeSlotList(slots: TimeSlot[]): TimeSlot[] {
   return representativeSlots;
 }
 
-function buildAvailabilityPromptBlock(timeZone: string, slots: TimeSlot[]): string {
+function buildAvailabilityPromptBlock(timeZone: string, slots: TimeSlot[], province?: string): string {
   if (slots.length === 0) {
     return `# LIVE CALENDAR AVAILABILITY
-Availability data is unavailable right now.
+Availability data is unavailable right now (fetch failed or returned no slots).
 
-If the lead is ready to book, use \`send_booking_link\` as the fallback.`;
+When the lead is ready to book:
+- DO NOT use \`send_booking_link\` as an automatic fallback — it's last resort only
+- Instead use \`send_sms\` to ask what day and time work best (e.g. "What day and time works best for you?")
+- When they reply with a specific day/time, use \`book_directly\` with that time
+- Only use \`send_booking_link\` if (1) they explicitly ask for a link, OR (2) multiple attempts still cannot find a workable time`;
   }
 
-  const representativeSlots = buildRepresentativeSlotList(slots);
+  const timeZoneName = province ? getTimezoneNameForProvince(province) : "PT";
+  const representativeSlots = buildRepresentativeSlotList(slots, timeZone);
   const slotLines = representativeSlots
     .map(
       (slot, index) =>
-        `${index + 1}. ${slot.displayTime} (${timeZone}) | ${slot.time}`
+        `${index + 1}. Local time: ${slot.displayTime} (${timeZoneName}) | bookingStartTime: ${slot.time}`
     )
     .join("\n");
 
   return `# LIVE CALENDAR AVAILABILITY
 These are REAL live Cal.com slots for the next ${CALCOM_AVAILABILITY_DEFAULT_DAYS_AHEAD} days.
 
-Use this timezone when speaking to the lead: ${timeZone}
+When speaking to the lead, use ${timeZoneName} (${province || "British Columbia"} time).
 
 🚨 DIRECT BOOKING RULES:
 - Your default booking behavior is to OFFER 2-3 specific times from this list and book the lead directly
 - When the lead clearly chooses one of these times, use \`book_appointment_directly\`
-- \`bookingStartTime\` MUST be one exact ISO time from the list below
+- \`bookingStartTime\` MUST be one exact ISO time from the "bookingStartTime" column below
 - Only use \`send_booking_link\` as a fallback when:
   1. availability is unavailable
   2. they want a time outside this prefetched window (~${CALCOM_AVAILABILITY_DEFAULT_DAYS_AHEAD} days)
@@ -230,9 +260,18 @@ LIVE SLOT LIST:
 ${slotLines}`;
 }
 
+function buildFirstTouchAvailabilityBlock(): string {
+  return `# LIVE CALENDAR AVAILABILITY
+Not loaded for this message. This is the FIRST CONTACT — the lead has not replied yet, so this message is an intro plus one diagnostic question, not a booking ask.
+
+- Do NOT offer specific times, and do NOT use \`send_booking_link\` or \`book_appointment_directly\` here.
+- Real slots are loaded automatically on every later message, so you can offer exact times as soon as they reply.`;
+}
+
 async function getBookingAvailabilityContext(
   context: LeadContext,
-  existingAppointment?: any
+  existingAppointment?: any,
+  options: { skipPrefetch?: boolean } = {}
 ): Promise<BookingAvailabilityContext | null> {
   if (existingAppointment) {
     return null;
@@ -243,6 +282,17 @@ async function getBookingAvailabilityContext(
     (context.lead.rawData as { province?: string } | null)?.province;
   const timeZone = getTimezoneForProvince(province);
 
+  // First outbound: the first-contact playbook below forbids asking for a
+  // meeting, so the ~21-day slot grid would be fetched and never used.
+  if (options.skipPrefetch) {
+    console.log("[Cal.com] Skipped availability pre-fetch: first contact, no conversation yet");
+    return {
+      timeZone,
+      slots: [],
+      promptBlock: buildFirstTouchAvailabilityBlock(),
+    };
+  }
+
   try {
     const { start, end } = getAvailabilityWindow();
     const slots = await getAvailableSlots(start, end, timeZone);
@@ -250,7 +300,7 @@ async function getBookingAvailabilityContext(
     return {
       timeZone,
       slots,
-      promptBlock: buildAvailabilityPromptBlock(timeZone, slots),
+      promptBlock: buildAvailabilityPromptBlock(timeZone, slots, province),
     };
   } catch (error) {
     console.error("[Cal.com] Failed to load booking availability:", error);
@@ -258,7 +308,7 @@ async function getBookingAvailabilityContext(
     return {
       timeZone,
       slots: [],
-      promptBlock: buildAvailabilityPromptBlock(timeZone, []),
+      promptBlock: buildAvailabilityPromptBlock(timeZone, [], province),
     };
   }
 }
@@ -270,6 +320,7 @@ function generateSystemPrompt(
 ): string {
   const data = context.leadData;
   const daysInStage = context.pipelineStatus.daysInStage;
+  const province = data?.province || (context.lead.rawData as { province?: string } | null)?.province;
 
   // Determine urgency level and guidance
   let urgencyLevel: string;
@@ -377,7 +428,7 @@ This call is where they'll:
 Your job: Get them curious enough to book the call. Don't try to answer everything via SMS.
 `}
 
-${!existingAppointment ? `${bookingAvailability?.promptBlock || buildAvailabilityPromptBlock("America/Vancouver", [])}
+${!existingAppointment ? `${bookingAvailability?.promptBlock || buildAvailabilityPromptBlock(getTimezoneForProvince(province), [], province)}
 ` : ""}
 
 # 📊 LEAD PROFILE
@@ -1115,9 +1166,14 @@ export async function handleConversation(
     orderBy: { scheduledAt: "asc" },
   });
 
+  // Nothing inbound, no special context and no history = the very first outbound.
+  const isFirstOutbound =
+    !incomingMessage && !specialContext && context.conversationHistory.length === 0;
+
   const bookingAvailability = await getBookingAvailabilityContext(
     context,
-    existingAppointment
+    existingAppointment,
+    { skipPrefetch: isFirstOutbound }
   );
   let systemPrompt = generateSystemPrompt(
     context,
@@ -1455,14 +1511,41 @@ Remember: The goal of message #1 is NOT to book them. It's to demonstrate you re
     },
   ];
 
+  // Move per-lead briefing (appointment, profile, slots, YouTube) to user message
+  const perLeadBriefing = `# 📋 PER-LEAD BRIEFING\n\n${systemPrompt}\n\n---\n\n`;
+  const fullUserContent = perLeadBriefing + userContent;
+
   const response = await anthropic.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 1536,
-    system: systemPrompt,
-    messages: [{ role: "user", content: userContent }],
+    system: [
+      {
+        type: "text",
+        text: STATIC_CONVERSATION_SYSTEM_PROMPT,
+        cache_control: { type: "ephemeral" }
+      }
+    ],
+    messages: [{ role: "user", content: fullUserContent }],
     tools: claudeTools,
     tool_choice: { type: "any" },
   });
+
+  // Log cache performance (no PII)
+  const usage = response.usage;
+  if (usage) {
+    const cacheCreation = (usage as any).cache_creation_input_tokens || 0;
+    const cacheRead = (usage as any).cache_read_input_tokens || 0;
+    const uncached = usage.input_tokens || 0;
+    
+    if (cacheCreation > 0 || cacheRead > 0) {
+      const leadName = context.leadData?.name || context.leadData?.first_name || 'Unknown';
+      console.log(
+        `[Conversation Handler Cache] ${leadName}: ` +
+        `cache_creation=${cacheCreation} cache_read=${cacheRead} uncached=${uncached} ` +
+        `(${cacheRead > 0 ? `${Math.round((cacheRead / (cacheRead + uncached)) * 100)}% cached` : 'cache miss'})`
+      );
+    }
+  }
 
   // Parse AI response
   const toolUse = response.content.find(block => block.type === 'tool_use');
@@ -1539,12 +1622,24 @@ async function updateLeadAfterContact(leadId: string, currentStatus: string) {
 }
 
 /**
+ * Result of executing a decision
+ */
+export interface ExecuteDecisionResult {
+  success: boolean;
+  action: string;
+  skipped?: boolean;
+  skipReason?: string;
+  error?: string;
+}
+
+/**
  * Execute the AI's decision
  */
 export async function executeDecision(
   leadId: string,
-  decision: AIDecision
-): Promise<void> {
+  decision: AIDecision,
+  triggerSource?: 'cron' | 'sms_reply'
+): Promise<ExecuteDecisionResult> {
   const lead = await prisma.lead.findUnique({ where: { id: leadId } });
   if (!lead || !lead.phone) throw new Error("Lead not found or no phone");
 
@@ -1569,11 +1664,17 @@ export async function executeDecision(
       },
     });
 
-    return; // EXIT - do nothing
+    return { 
+      success: false, 
+      action: decision.action, 
+      skipped: true, 
+      skipReason: 'Holly disabled for this lead' 
+    };
   }
 
   // 🔒 RACE CONDITION PREVENTION: Check for very recent outbound messages
   // This catches duplicate sends that slip through the processing lock
+  // BUT: Don't block reactive responses to inbound SMS - those should always go through
   const RACE_CONDITION_WINDOW_MS = 30000; // 30 seconds
   const recentOutbound = await prisma.communication.findFirst({
     where: {
@@ -1584,7 +1685,7 @@ export async function executeDecision(
     orderBy: { createdAt: 'desc' }
   });
 
-  if (recentOutbound) {
+  if (recentOutbound && triggerSource !== 'sms_reply') {
     const secondsAgo = Math.round((Date.now() - recentOutbound.createdAt.getTime()) / 1000);
     console.log(
       `[Execute Decision] ⏸️ BLOCKED: Race condition detected! Message sent ${secondsAgo}s ago. ` +
@@ -1607,7 +1708,12 @@ export async function executeDecision(
       },
     });
 
-    return; // EXIT - don't send duplicate
+    return { 
+      success: false, 
+      action: decision.action, 
+      skipped: true, 
+      skipReason: `Duplicate blocked - message sent ${secondsAgo}s ago` 
+    };
   }
 
   // 🛡️ COLD INTRO GUARDRAIL: Block Holly from re-introducing herself to leads with existing conversations
@@ -1650,7 +1756,12 @@ export async function executeDecision(
           details: `🚨 Holly tried to re-introduce herself to a lead with ${priorComms} existing messages. Cold intro was BLOCKED. Check the conversation — Holly may have lost context.`,
         });
 
-        return; // EXIT - don't send cold intro to existing lead
+        return { 
+          success: false, 
+          action: decision.action, 
+          skipped: true, 
+          skipReason: `Cold intro blocked - lead has ${priorComms} existing messages` 
+        };
       }
     }
   }
@@ -1679,6 +1790,8 @@ export async function executeDecision(
           });
 
           await updateLeadAfterContact(leadId, lead.status);
+          
+          return { success: true, action: 'send_sms' };
         } catch (error) {
           // Check if this is a Twilio opt-out error (error 21610)
           const err = error as any;
@@ -1705,26 +1818,35 @@ export async function executeDecision(
                 metadata: {
                   twilioError: "21610",
                   errorMessage: err.message,
-                  phone: lead.phone,
+                  // Don't log full phone per security requirements
                 },
               },
             });
 
             // Don't send error alert for opt-outs - this is expected behavior
             console.log(`[AI Conversation] ✅ Lead ${leadId} successfully marked as opted-out`);
-            return; // Exit without throwing - this is handled
+            return { 
+              success: false, 
+              action: 'send_sms', 
+              skipped: true, 
+              skipReason: 'Lead opted out (Twilio 21610)' 
+            };
           }
 
-          // For all other errors, send alert and rethrow
+          // For all other errors, send alert and return error
           await sendErrorAlert({
             error: error instanceof Error ? error : new Error(String(error)),
             context: {
               location: "ai-conversation-enhanced - send_sms",
               leadId,
-              details: { message: decision.message, phone: lead.phone },
+              details: { message: decision.message },
             },
           });
-          throw error;
+          return { 
+            success: false, 
+            action: 'send_sms', 
+            error: error instanceof Error ? error.message : String(error) 
+          };
         }
       }
       break;
@@ -1743,6 +1865,8 @@ export async function executeDecision(
             metadata: { aiReasoning: decision.reasoning },
           },
         });
+        
+        return { success: true, action: 'schedule_followup' };
       }
       break;
 
@@ -1751,7 +1875,12 @@ export async function executeDecision(
         try {
           if (!lead.email) {
             console.warn(`[AI] Cannot send email - no email address for lead ${leadId}`);
-            break;
+            return { 
+              success: false, 
+              action: 'send_email', 
+              skipped: true, 
+              skipReason: 'No email address' 
+            };
           }
 
           await sendEmail({
@@ -1776,16 +1905,21 @@ export async function executeDecision(
           });
 
           await updateLeadAfterContact(leadId, lead.status);
+          return { success: true, action: 'send_email' };
         } catch (error) {
           await sendErrorAlert({
             error: error instanceof Error ? error : new Error(String(error)),
             context: {
               location: "ai-conversation-enhanced - send_email",
               leadId,
-              details: { subject: decision.emailSubject, email: lead.email },
+              details: { subject: decision.emailSubject },
             },
           });
-          throw error;
+          return { 
+            success: false, 
+            action: 'send_email', 
+            error: error instanceof Error ? error.message : String(error) 
+          };
         }
       }
       break;
@@ -1843,7 +1977,44 @@ export async function executeDecision(
           }
 
           await updateLeadAfterContact(leadId, lead.status);
+          return { success: true, action: 'send_both' };
         } catch (error) {
+          // Check for opt-out on SMS
+          const err = error as any;
+          if (err?.isTwilioOptOut && err?.twilioErrorCode === 21610) {
+            console.log(`[AI Conversation] Lead ${leadId} opted out via Twilio (error 21610) - marking as opted-out and LOST`);
+
+            await prisma.lead.update({
+              where: { id: leadId },
+              data: {
+                consentSms: false,
+                status: "LOST",
+                nextReviewAt: new Date("2099-12-31"),
+              },
+            });
+
+            await prisma.leadActivity.create({
+              data: {
+                leadId,
+                type: "NOTE_ADDED",
+                channel: "SYSTEM",
+                subject: "🚫 Lead Opted Out - Twilio Block",
+                content: "Lead has been blocked by Twilio from receiving SMS (Error 21610: Unsubscribed recipient). Lead marked as LOST.",
+                metadata: {
+                  twilioError: "21610",
+                  errorMessage: err.message,
+                },
+              },
+            });
+
+            return { 
+              success: false, 
+              action: 'send_both', 
+              skipped: true, 
+              skipReason: 'Lead opted out (Twilio 21610)' 
+            };
+          }
+
           await sendErrorAlert({
             error: error instanceof Error ? error : new Error(String(error)),
             context: {
@@ -1852,12 +2023,14 @@ export async function executeDecision(
               details: {
                 smsMessage: decision.message,
                 emailSubject: decision.emailSubject,
-                phone: lead.phone,
-                email: lead.email
               },
             },
           });
-          throw error;
+          return { 
+            success: false, 
+            action: 'send_both', 
+            error: error instanceof Error ? error.message : String(error) 
+          };
         }
       }
       break;
@@ -1886,7 +2059,7 @@ export async function executeDecision(
               },
             });
             await updateLeadAfterContact(leadId, lead.status);
-            break;
+            return { success: true, action: 'book_appointment_directly', skipped: true, skipReason: 'Sent booking link fallback (no email)' };
           }
 
           const { booking, startTime } = await bookLeadAppointmentDirectly(
@@ -1941,6 +2114,8 @@ export async function executeDecision(
               metadata: { bookingUid: booking.uid, directBooking: true },
             },
           });
+          
+          return { success: true, action: 'book_appointment_directly' };
         } catch (error) {
           console.error(`[Direct Booking] ❌ Failed for lead ${leadId}:`, error);
 
@@ -1978,6 +2153,8 @@ export async function executeDecision(
                 content: `Holly tried to book directly but Cal.com API returned an error. Sent booking link instead.\n\nError: ${error instanceof Error ? error.message : String(error)}`,
               },
             });
+            
+            return { success: true, action: 'book_appointment_directly', skipped: true, skipReason: 'Sent booking link fallback (booking failed)' };
           } catch (fallbackError) {
             await sendErrorAlert({
               error: fallbackError instanceof Error ? fallbackError : new Error(String(fallbackError)),
@@ -1987,6 +2164,12 @@ export async function executeDecision(
                 details: { originalError: error instanceof Error ? error.message : String(error) },
               },
             });
+            
+            return { 
+              success: false, 
+              action: 'book_appointment_directly', 
+              error: `Booking and fallback both failed: ${error instanceof Error ? error.message : String(error)}` 
+            };
           }
         }
       }
@@ -2030,8 +2213,12 @@ export async function executeDecision(
               },
             });
 
-            // Don't throw error - just skip and continue
-            break;
+            return { 
+              success: false, 
+              action: 'send_booking_link', 
+              skipped: true, 
+              skipReason: `Duplicate blocked - link sent ${minutesAgo} minutes ago` 
+            };
           }
 
           const bookingUrl = process.env.CAL_COM_BOOKING_URL || "https://cal.com/your-link";
@@ -2056,16 +2243,59 @@ export async function executeDecision(
               }),
             },
           });
+          
+          await updateLeadAfterContact(leadId, lead.status);
+          return { success: true, action: 'send_booking_link' };
         } catch (error) {
+          // Check for opt-out
+          const err = error as any;
+          if (err?.isTwilioOptOut && err?.twilioErrorCode === 21610) {
+            console.log(`[Booking Link] Lead ${leadId} opted out via Twilio (error 21610)`);
+
+            await prisma.lead.update({
+              where: { id: leadId },
+              data: {
+                consentSms: false,
+                status: "LOST",
+                nextReviewAt: new Date("2099-12-31"),
+              },
+            });
+
+            await prisma.leadActivity.create({
+              data: {
+                leadId,
+                type: "NOTE_ADDED",
+                channel: "SYSTEM",
+                subject: "🚫 Lead Opted Out - Twilio Block",
+                content: "Lead has been blocked by Twilio from receiving SMS (Error 21610: Unsubscribed recipient). Lead marked as LOST.",
+                metadata: {
+                  twilioError: "21610",
+                  errorMessage: err.message,
+                },
+              },
+            });
+
+            return { 
+              success: false, 
+              action: 'send_booking_link', 
+              skipped: true, 
+              skipReason: 'Lead opted out (Twilio 21610)' 
+            };
+          }
+
           await sendErrorAlert({
             error: error instanceof Error ? error : new Error(String(error)),
             context: {
               location: "ai-conversation-enhanced - send_booking_link",
               leadId,
-              details: { message: decision.message, phone: lead.phone },
+              details: { message: decision.message },
             },
           });
-          throw error;
+          return { 
+            success: false, 
+            action: 'send_booking_link', 
+            error: error instanceof Error ? error.message : String(error) 
+          };
         }
       }
       break;
@@ -2097,16 +2327,57 @@ export async function executeDecision(
           });
 
           await updateLeadAfterContact(leadId, lead.status);
+          return { success: true, action: 'send_application_link' };
         } catch (error) {
+          // Check for opt-out
+          const err = error as any;
+          if (err?.isTwilioOptOut && err?.twilioErrorCode === 21610) {
+            console.log(`[Application Link] Lead ${leadId} opted out via Twilio (error 21610)`);
+
+            await prisma.lead.update({
+              where: { id: leadId },
+              data: {
+                consentSms: false,
+                status: "LOST",
+                nextReviewAt: new Date("2099-12-31"),
+              },
+            });
+
+            await prisma.leadActivity.create({
+              data: {
+                leadId,
+                type: "NOTE_ADDED",
+                channel: "SYSTEM",
+                subject: "🚫 Lead Opted Out - Twilio Block",
+                content: "Lead has been blocked by Twilio from receiving SMS (Error 21610: Unsubscribed recipient). Lead marked as LOST.",
+                metadata: {
+                  twilioError: "21610",
+                  errorMessage: err.message,
+                },
+              },
+            });
+
+            return { 
+              success: false, 
+              action: 'send_application_link', 
+              skipped: true, 
+              skipReason: 'Lead opted out (Twilio 21610)' 
+            };
+          }
+
           await sendErrorAlert({
             error: error instanceof Error ? error : new Error(String(error)),
             context: {
               location: "ai-conversation-enhanced - send_application_link",
               leadId,
-              details: { message: decision.message, phone: lead.phone },
+              details: { message: decision.message },
             },
           });
-          throw error;
+          return { 
+            success: false, 
+            action: 'send_application_link', 
+            error: error instanceof Error ? error.message : String(error) 
+          };
         }
       }
       break;
@@ -2125,6 +2396,8 @@ export async function executeDecision(
             content: `Stage changed to ${decision.newStage}: ${decision.reasoning}`,
           },
         });
+        
+        return { success: true, action: 'move_stage' };
       }
       break;
 
@@ -2136,10 +2409,14 @@ export async function executeDecision(
           content: `🚨 ESCALATED: ${decision.reasoning}`,
         },
       });
-      break;
+      
+      return { success: true, action: 'escalate' };
 
     case "do_nothing":
       console.log(`[AI] No action: ${decision.reasoning}`);
-      break;
+      return { success: true, action: 'do_nothing', skipped: true, skipReason: decision.reasoning };
   }
+  
+  // Fallback if no case matched or action didn't return
+  return { success: false, action: decision.action || 'unknown', error: 'Action not handled' };
 }

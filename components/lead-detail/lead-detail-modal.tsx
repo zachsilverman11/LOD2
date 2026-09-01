@@ -11,7 +11,9 @@ const formatSource = (source: string): string => {
 
   // Handle common sources
   const sourceMap: Record<string, string> = {
+    "financevine": "FinanceVine",
     "leads_on_demand": "Leads On Demand",
+    "rates_ca": "rates.ca",
     "facebook": "Facebook",
     "google": "Google Ads",
     "referral": "Referral",
@@ -20,6 +22,22 @@ const formatSource = (source: string): string => {
   };
 
   return sourceMap[source.toLowerCase()] || source
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};
+
+// Helper function to format segment names
+const formatSegment = (segment: string | null): string => {
+  if (!segment) return "—";
+
+  const segmentMap: Record<string, string> = {
+    "alt_private": "Alt / Private",
+    "prime_rate_shop": "Prime Rate Shop",
+    "prime_other": "Prime Other",
+  };
+
+  return segmentMap[segment.toLowerCase()] || segment
     .split('_')
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
@@ -517,6 +535,7 @@ export function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
               {lead.phone && <p><strong className="text-[#1C1B1A]">Phone:</strong> {lead.phone}</p>}
               <p><strong className="text-[#1C1B1A]">Status:</strong> <span className="px-2 py-1 bg-[#625FFF]/10 text-[#625FFF] rounded border border-[#625FFF]/30">{lead.status}</span></p>
               {lead.source && <p><strong className="text-[#1C1B1A]">Source:</strong> {formatSource(lead.source)}</p>}
+              {lead.segment && <p><strong className="text-[#1C1B1A]">Segment:</strong> {formatSegment(lead.segment)}</p>}
             </div>
           </div>
 

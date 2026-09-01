@@ -5,6 +5,8 @@ import {
   calculateKeyMetrics,
   calculateShowUpRate,
   filterByCohort,
+  filterBySource,
+  filterBySegment,
   filterByDateRange,
   getPastAppointments,
   isCallCompleted,
@@ -14,12 +16,14 @@ import {
 /**
  * Analytics Overview API
  * Returns key metrics: total leads, pipeline value, conversion rate, calls booked
- * Supports cohort and date range filtering via query params
+ * Supports cohort, source, segment, and date range filtering via query params
  */
 export async function GET(request: NextRequest) {
   // Parse query parameters for filtering
   const { searchParams } = new URL(request.url);
   const cohort = searchParams.get("cohort");
+  const source = searchParams.get("source");
+  const segment = searchParams.get("segment");
   const startDateParam = searchParams.get("startDate");
   const endDateParam = searchParams.get("endDate");
 
@@ -38,6 +42,8 @@ export async function GET(request: NextRequest) {
     // Apply filters
     let filteredLeads = filterByDateRange(allLeads, startDate, endDate) as LeadWithRelations[];
     filteredLeads = filterByCohort(filteredLeads, cohort) as LeadWithRelations[];
+    filteredLeads = filterBySource(filteredLeads, source) as LeadWithRelations[];
+    filteredLeads = filterBySegment(filteredLeads, segment) as LeadWithRelations[];
 
     // Calculate funnel metrics using standardized helpers
     const funnelMetrics = calculateFunnelMetrics(filteredLeads);
@@ -213,6 +219,8 @@ export async function GET(request: NextRequest) {
         // Filters applied (for UI display)
         filters: {
           cohort: cohort || "all",
+          source: source || "all",
+          segment: segment || "all",
           startDate: startDateParam,
           endDate: endDateParam,
         },

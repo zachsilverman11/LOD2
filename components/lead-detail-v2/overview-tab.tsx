@@ -43,7 +43,9 @@ function formatCurrency(value: unknown): string {
 function formatSource(source: string | null): string {
   if (!source) return "—";
   const sourceMap: Record<string, string> = {
+    financevine: "FinanceVine",
     leads_on_demand: "Leads On Demand",
+    rates_ca: "rates.ca",
     facebook: "Facebook",
     google: "Google Ads",
     referral: "Referral",
@@ -53,6 +55,23 @@ function formatSource(source: string | null): string {
   return (
     sourceMap[source.toLowerCase()] ||
     source
+      .split("_")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ")
+  );
+}
+
+// Format segment names
+function formatSegment(segment: string | null): string {
+  if (!segment) return "—";
+  const segmentMap: Record<string, string> = {
+    alt_private: "Alt / Private",
+    prime_rate_shop: "Prime Rate Shop",
+    prime_other: "Prime Other",
+  };
+  return (
+    segmentMap[segment.toLowerCase()] ||
+    segment
       .split("_")
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(" ")
@@ -313,6 +332,7 @@ export function OverviewTab({ lead, onRefresh, onLogCallOutcome }: OverviewTabPr
             <FieldRow label="Email" value={lead.email || "—"} copyable />
             <FieldRow label="Phone" value={formatPhone(lead.phone)} copyable />
             <FieldRow label="Source" value={formatSource(lead.source)} />
+            <FieldRow label="Segment" value={formatSegment(lead.segment)} />
           </CardContent>
         </Card>
       </section>

@@ -30,6 +30,9 @@ export interface HollyDecision {
   bookingLeadEmail?: string;
   // Internal flag: was live Cal.com availability provided to Holly? (used by guardrails)
   _availabilitySlotsProvided?: boolean;
+  // Internal flag: availability was deliberately NOT pre-fetched (first outbound,
+  // lead has not asked about timing). Distinct from a failed/empty fetch.
+  _availabilityPrefetchSkipped?: boolean;
 }
 
 interface DecisionContext {
@@ -169,14 +172,51 @@ export function validateDecision(
     errors.push('Lead already has an appointment scheduled - cannot double-book');
   }
 
-  // === HARD RULE: Don't send booking link when live availability was provided ===
-  // Holly must attempt to book directly when she has live slots — the link is last resort only
-  if (decision.action === 'send_booking_link' && context.availabilitySlotsProvided) {
-    errors.push(
-      'CRITICAL: Holly chose send_booking_link but live calendar availability was provided. ' +
-      'Offer specific times from the availability list and use book_directly when they pick one. ' +
-      'Only send the link if availability is unavailable or all offered times were rejected.'
+  // === HARD RULE: send_booking_link is last resort only ===
+  // Block unless (1) lead explicitly asked for link, OR (2) multiple booking attempts failed.
+  // Harper Test issue #1: Holly sent link when Cal.com was empty/failed.
+  if (decision.action === 'send_booking_link') {
+    // Check if lead explicitly asked for a link in their last message
+    const lastInbound = context.lead.communications
+      ?.filter((c: any) => c.direction === 'INBOUND')
+      .sort((a: any, b: any) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+    
+    const linkRequestPatterns = [
+      /just send (me )?the link/i,
+      /send me (the |a )?link/i,
+      /give me (the |a )?link/i,
+      /can (you |i )get (the |a )?link/i,
+      /\blink please\b/i,
+      /i'?ll book (it |myself|online)/i,
+    ];
+    
+    const leadAskedForLink = lastInbound && linkRequestPatterns.some(p => 
+      p.test(lastInbound.content)
     );
+
+    // First touch: never send link
+    if (decision._availabilityPrefetchSkipped) {
+      errors.push(
+        'CRITICAL: Holly chose send_booking_link on the first touch. Touch 1 is an intro plus one ' +
+        'diagnostic question — no booking link. Live availability is loaded on every later message.'
+      );
+    } 
+    // Live slots exist: offer times instead
+    else if (context.availabilitySlotsProvided && !leadAskedForLink) {
+      errors.push(
+        'CRITICAL: Holly chose send_booking_link but live calendar availability was provided. ' +
+        'Offer 2-3 specific times from the availability list and use book_directly when they pick one. ' +
+        'Only send the link if the lead explicitly asked for it (e.g., "just send me the link").'
+      );
+    }
+    // Empty/failed slots: ask for preferred time, don't default to link
+    else if (!context.availabilitySlotsProvided && !decision._availabilityPrefetchSkipped && !leadAskedForLink) {
+      errors.push(
+        'CRITICAL: Holly chose send_booking_link but lead did not ask for it. ' +
+        'When availability is unavailable, ask what day/time works best via send_sms. ' +
+        'Only send the link if the lead explicitly requested it or multiple booking attempts have failed.'
+      );
+    }
   }
 
   // === HARD RULE: Don't ask about booking when appointment already exists ===
@@ -287,6 +327,39 @@ export function validateDecision(
     }
   }
 
+  // === HARD RULE: Strip cal.com URLs from send_sms unless lead asked for link ===
+  if (decision.action === 'send_sms' && decision.message) {
+    const hasCalComUrl = /https?:\/\/cal\.com[^\s]*/i.test(decision.message);
+    
+    if (hasCalComUrl) {
+      // Check if lead asked for link
+      const lastInbound = context.lead.communications
+        ?.filter((c: any) => c.direction === 'INBOUND')
+        .sort((a: any, b: any) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+      
+      const linkRequestPatterns = [
+        /just send (me )?the link/i,
+        /send me (the |a )?link/i,
+        /give me (the |a )?link/i,
+        /can (you |i )get (the |a )?link/i,
+        /\blink please\b/i,
+        /i'?ll book (it |myself|online)/i,
+      ];
+      
+      const leadAskedForLink = lastInbound && linkRequestPatterns.some(p => 
+        p.test(lastInbound.content)
+      );
+      
+      if (!leadAskedForLink) {
+        errors.push(
+          'CRITICAL: send_sms contains a cal.com URL but the lead did not ask for a link. ' +
+          'Either use send_booking_link action (which will be validated separately), or strip the URL. ' +
+          'Default: offer specific times and book directly when they choose.'
+        );
+      }
+    }
+  }
+
   // === HARD RULE: Require message for send actions ===
   if (
     (decision.action === 'send_sms' ||
@@ -344,6 +417,64 @@ export function validateDecision(
       errors.push(
         'CRITICAL: Message contains a specific rate percentage. Holly CANNOT quote mortgage rates. ' +
         'Remove any rate numbers (e.g. "4.5%", "0.20%") and instead say the advisor will show them their exact rate on the call.'
+      );
+    }
+  }
+
+  // === HARD RULE: alt_private segment bans (private/alternative playbook) ===
+  // Read segment from schema field (context.lead.segment), fallback to rawData if needed
+  const segment = context.lead.segment || (rawData as any)?.segment;
+  const isAltPrivate = segment === 'alt_private';
+
+  if (isAltPrivate && decision.message) {
+    const message = decision.message.toLowerCase();
+
+    // Banned phrases for alt_private segment
+    const altPrivateBannedPatterns = [
+      /\blow\s+rates?\b/i,                        // "low rates" / "low rate"
+      /\bultra[\s-]?low\b/i,                      // "ultra-low" / "ultra low"
+      /\breserved\s+rates?\b/i,                   // "reserved rates" / "reserved rate"
+      /\bno\s+penalties\b/i,                      // "no penalties"
+      /\bguaranteed\s+approval/i,                 // "guaranteed approval"
+      /\bcash\s+back\b/i,                         // "cash back"
+      /\bbest\s+rate/i,                           // "best rate"
+      /\bwhat\s+rate\s+(is|does)\s+your\s+bank/i, // "what rate is your bank at"
+      /\bpull\s+(your\s+)?credit/i,               // "pull your credit" / "pull credit"
+      /\bsee\s+if\s+you\s+qualify/i,              // "see if you qualify"
+      /\bcheck\s+if\s+you\s+qualify/i,            // "check if you qualify"
+      /\bshopping\s+for\s+rates?\b/i,             // "shopping for rates" (Harper Test issue #2)
+      /\byour\s+rate\s+is\s+on\s+(its|the)\s+way/i, // "your rate is on its way" (Harper Test issue #2)
+    ];
+
+    const violations = altPrivateBannedPatterns.filter(pattern => pattern.test(message));
+    if (violations.length > 0) {
+      errors.push(
+        'CRITICAL: alt_private segment violation. This lead is private/alternative (NOT bankable). ' +
+        'Message contains banned phrase(s) for alt_private: low rates, ultra-low, reserved rates, no penalties, ' +
+        'guaranteed approval, cash back, best rate, pull credit, see if you qualify, shopping for rates, or your rate is on its way. ' +
+        'Use the alt_private playbook: focus on understanding their situation, normalizing that banks have a box, ' +
+        'and getting them to a short call with the team.'
+      );
+    }
+  }
+
+  // === HARD RULE: Outcome-promise timing bans (all segments) ===
+  // Ban claims like "approved within days" or "approved within 48 hours" (Harper Test issue #3)
+  if (decision.message) {
+    const message = decision.message.toLowerCase();
+    
+    const outcomePromisePatterns = [
+      /\bapproved\s+within\s+(\d+\s*)?(hours?|days?)\b/i,     // "approved within [X] hours/days"
+      /\bapproved\s+in\s+(\d+\s*)?(hours?|days?)\b/i,         // "approved in [X] hours/days"
+      /\bget\s+approved\s+(within|in)\s+(\d+\s*)?(hours?|days?)\b/i, // "get approved within/in [X] hours/days"
+    ];
+
+    const violations = outcomePromisePatterns.filter(pattern => pattern.test(message));
+    if (violations.length > 0) {
+      errors.push(
+        'CRITICAL: Outcome-promise timing ban. Message contains an approval timing promise ' +
+        '(e.g., "approved within days", "approved within 48 hours"). Do not promise approval timelines - ' +
+        'these are outside Holly\'s control and create false expectations. Focus on booking the discovery call instead.'
       );
     }
   }
