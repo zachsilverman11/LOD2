@@ -834,6 +834,7 @@ export function selectBookingHook(conversationText: string): BookingHook {
  */
 export function buildHollyBriefing(params: {
   leadData: any;
+  leadEmail?: string | null;
   conversationContext: ConversationContext;
   appointments: any[];
   callOutcome?: any;
@@ -842,7 +843,8 @@ export function buildHollyBriefing(params: {
   youtubeSharedInConversation?: boolean;
   leadActivities?: any[];
 }): string {
-  const { leadData, conversationContext, appointments, callOutcome, applicationStatus, youtubeLink, youtubeSharedInConversation, leadActivities } = params;
+  const { leadData, leadEmail, conversationContext, appointments, callOutcome, applicationStatus, youtubeLink, youtubeSharedInConversation, leadActivities } = params;
+  const resolvedEmail = leadEmail ?? leadData?.email ?? null;
 
   // Check segment (alt_private vs prime)
   const segment = leadData.segment || 'prime_other';
@@ -968,6 +970,9 @@ ${ADVISOR_TEAM_PROFILE.howHollyShouldUseThis.map(h => `- ${h}`).join('\n')}
 **Name:** ${leadData.first_name || leadData.name?.split(' ')[0] || 'Unknown'} ${leadData.last_name || leadData.name?.split(' ')[1] || ''}
 **Type:** ${loanType} ${isPurchase ? '(BUYING)' : isRefinance ? '(REFI)' : isRenewal ? '(RENEWAL)' : ''}
 **Location:** ${leadData.city ? `${leadData.city}, ${leadData.province}` : leadData.province || 'Unknown'}
+${resolvedEmail
+  ? `**Email on file:** ${resolvedEmail} — use this for \`book_directly\`; do not ask for it again.`
+  : `**No email on file** — ask for email before attempting \`book_directly\`.`}
 `;
 
   // Add purchase-specific details

@@ -138,8 +138,20 @@ console.log('📋 Test 4: Pipedrive API Direct Test');
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
 async function testPipedriveDirect() {
-  const PIPEDRIVE_API_TOKEN = '2b211909afd7f9f3614f582af4a97a3e921a3efb';
-  const PIPEDRIVE_COMPANY = 'inspiredmortgage';
+  const PIPEDRIVE_API_TOKEN = process.env.PIPEDRIVE_API_TOKEN;
+  const PIPEDRIVE_COMPANY = process.env.PIPEDRIVE_COMPANY_DOMAIN;
+
+  if (!PIPEDRIVE_API_TOKEN) {
+    throw new Error(
+      'PIPEDRIVE_API_TOKEN is not set. It must contain the Pipedrive API token for the account under test.'
+    );
+  }
+
+  if (!PIPEDRIVE_COMPANY) {
+    throw new Error(
+      'PIPEDRIVE_COMPANY_DOMAIN is not set. It must contain the Pipedrive company subdomain (the "<company>" in <company>.pipedrive.com).'
+    );
+  }
 
   try {
     // Test 1: Get current user

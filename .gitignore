@@ -26,10 +26,13 @@ yarn-debug.log*
 yarn-error.log*
 
 # local env files
-.env*.local
-.env
-.env.production
-.env.vercel
+# Broad by design: any .env* is ignored unless explicitly allowed below.
+# .env.production and .env.vercel were previously tracked and leaked live
+# credentials; they are now untracked (still on disk) and covered here.
+# This subsumes main's enumerated .env*.local / .env / .env.production / .env.vercel.
+.env*
+!.env.example
+!.env.autonomous-agent.example
 
 # vercel
 .vercel
@@ -42,8 +45,6 @@ next-env.d.ts
 prisma/migrations
 
 /app/generated/prisma
-.env.vercel.*
-.env.production.local
 test-output/
 mailchimp-export.csv
 test-pdfs/

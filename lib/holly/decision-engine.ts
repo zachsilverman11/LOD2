@@ -328,6 +328,9 @@ export async function askHollyToDecide(
       // Map FinanceVine mortgage_type to loanType
       loanType: rawData?.loanType || rawData?.lead_type || rawData?.mortgage_type,
     },
+    // Pass the Lead row's email explicitly: the briefing gates `book_directly`
+    // on an email being on file, and rawData may not carry one.
+    leadEmail: lead.email,
     conversationContext: {
       touchNumber: outboundCount + 1,
       hasReplied: inboundCount > 0,

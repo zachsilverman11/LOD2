@@ -6,7 +6,12 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  // Pooled (pgbouncer) endpoint — used by the app at runtime.
+  url       = env("DATABASE_URL")
+  // Non-pooled endpoint — used by migrations only. DDL must not run through
+  // the connection pooler: pgbouncer in transaction mode breaks the session
+  // state and advisory locks that `prisma migrate` relies on.
+  directUrl = env("DIRECT_URL")
 }
 
 model Lead {
@@ -37,6 +42,16 @@ model Lead {
   hollyDisabled          Boolean               @default(false)
   cohort                 String?
   cohortStartDate        DateTime?
+  // Which kind of lending this lead needs. Drives conversation behaviour:
+  // which vertical prompt module, hooks, and guardrails apply.
+  // NULLABLE and NOT backfilled. NULL is read as conventional — every lead
+  // predating this column is known-conventional, so that default is safe.
+  // Deliberately a separate axis from `source` (which vendor sent the lead)
+  // and from `cohort` (batch/campaign identity): a vendor can send more than
+  // one vertical, and a vertical can come from more than one vendor.
+  // Typed String? to match the existing `cohort` convention rather than
+  // introducing an enum. Populated by lib/holly/verticals/classify.ts.
+  vertical               String?
   processingStartedAt    DateTime?
   lastSlackAlertAt       DateTime?
   lastSlackAlertType     String?
@@ -60,6 +75,7 @@ model Lead {
   @@index([managedByAutonomous])
   @@index([hollyDisabled])
   @@index([cohort])
+  @@index([vertical])
   @@index([lastContactedAt])
   @@index([processingStartedAt])
   @@index([managedByAutonomous, nextReviewAt, status, hollyDisabled], map: "idx_holly_agent_query")

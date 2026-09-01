@@ -1,7 +1,7 @@
 import { prisma } from "../lib/db";
 import { handleConversation } from "../lib/holly/conversation-handler";
 import { bookLeadAppointmentDirectly } from "../lib/direct-booking";
-import { getAvailableSlots, getAvailabilityWindow, cancelCalComBooking } from "../lib/calcom";
+import { getAvailableSlots, getAvailabilityWindow } from "../lib/calcom";
 
 async function main() {
   const { start, end } = getAvailabilityWindow();
@@ -106,24 +106,9 @@ async function main() {
     let bookingCancelled = false;
     let cancellationSkippedReason: string | null = null;
 
-    if (result.booking.id) {
-      await cancelCalComBooking(
-        result.booking.id,
-        "Automated direct booking verification test"
-      );
-      bookingCancelled = true;
-
-      await prisma.appointment.update({
-        where: { id: appointment.id },
-        data: {
-          status: "cancelled",
-          notes: "Automated direct booking verification test (cancelled after verification)",
-        },
-      });
-    } else {
-      cancellationSkippedReason =
-        "Cal.com returned no numeric booking id, so automatic cancellation was skipped";
-    }
+    // TODO: Implement cancellation via Cal.com v2 API to auto-clean test bookings
+    cancellationSkippedReason =
+      "Cal.com v1 cancel removed — manual cancellation required until v2 cancel is implemented";
 
     console.log(
       JSON.stringify(

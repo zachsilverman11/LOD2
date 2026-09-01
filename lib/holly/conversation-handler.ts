@@ -2054,6 +2054,7 @@ export async function executeDecision(
                 metadata: hollyOutboundSmsMetadata(decision, {
                   aiReasoning: decision.reasoning,
                   fallbackReason: "no_email",
+                  execPath: "holly-v1-handler:book_appointment_directly/no_email_fallback",
                 }),
               },
             });
@@ -2136,6 +2137,7 @@ export async function executeDecision(
                   aiReasoning: decision.reasoning,
                   directBookingFailed: true,
                   error: error instanceof Error ? error.message : String(error),
+                  execPath: "holly-v1-handler:book_appointment_directly/error_fallback",
                 }),
               },
             });
@@ -2237,6 +2239,7 @@ export async function executeDecision(
               intent: "booking_link_sent",
               metadata: hollyOutboundSmsMetadata(decision, {
                 aiReasoning: decision.reasoning,
+                execPath: "holly-v1-handler:send_booking_link",
               }),
             },
           });
