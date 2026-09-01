@@ -8,6 +8,28 @@ import { DealSignals } from '../deal-intelligence';
 import { getLocalTime } from '../timezone-utils';
 import { ConversationStage, getDiscoveryQuestionPatterns } from './stage';
 
+/**
+ * Did the lead's own words explicitly ask for a booking link (or to book online
+ * themselves)? This is the ONLY exception to the send_booking_link guardrails
+ * (live slots → offer times; empty slots → ask preference; first touch → never).
+ * One list, shared by both the send_booking_link rule and the cal.com-URL-in-
+ * send_sms rule, so the two can't drift apart.
+ */
+export const LINK_REQUEST_PATTERNS: RegExp[] = [
+  /just send (me )?the link/i,
+  /send me (the |a )?link/i,
+  /give me (the |a )?link/i,
+  // "can you get me the link", "can I get a link", "can you send me the link"
+  /can (you |i )?(get|send|text|shoot) (me |over )?(the |a )?link/i,
+  /\blink please\b/i,
+  /i'?ll book (it |myself|online)/i,
+];
+
+export function leadAskedForBookingLink(text: string | null | undefined): boolean {
+  if (!text) return false;
+  return LINK_REQUEST_PATTERNS.some((p) => p.test(text));
+}
+
 export interface ValidationResult {
   isValid: boolean;
   errors: string[];
@@ -181,18 +203,7 @@ export function validateDecision(
       ?.filter((c: any) => c.direction === 'INBOUND')
       .sort((a: any, b: any) => b.createdAt.getTime() - a.createdAt.getTime())[0];
     
-    const linkRequestPatterns = [
-      /just send (me )?the link/i,
-      /send me (the |a )?link/i,
-      /give me (the |a )?link/i,
-      /can (you |i )get (the |a )?link/i,
-      /\blink please\b/i,
-      /i'?ll book (it |myself|online)/i,
-    ];
-    
-    const leadAskedForLink = lastInbound && linkRequestPatterns.some(p => 
-      p.test(lastInbound.content)
-    );
+    const leadAskedForLink = !!lastInbound && leadAskedForBookingLink(lastInbound.content);
 
     // First touch: never send link
     if (decision._availabilityPrefetchSkipped) {
@@ -337,18 +348,7 @@ export function validateDecision(
         ?.filter((c: any) => c.direction === 'INBOUND')
         .sort((a: any, b: any) => b.createdAt.getTime() - a.createdAt.getTime())[0];
       
-      const linkRequestPatterns = [
-        /just send (me )?the link/i,
-        /send me (the |a )?link/i,
-        /give me (the |a )?link/i,
-        /can (you |i )get (the |a )?link/i,
-        /\blink please\b/i,
-        /i'?ll book (it |myself|online)/i,
-      ];
-      
-      const leadAskedForLink = lastInbound && linkRequestPatterns.some(p => 
-        p.test(lastInbound.content)
-      );
+      const leadAskedForLink = !!lastInbound && leadAskedForBookingLink(lastInbound.content);
       
       if (!leadAskedForLink) {
         errors.push(
