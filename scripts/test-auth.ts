@@ -10,7 +10,13 @@ async function testAuth() {
   console.log();
 
   const username = "admin";
-  const password = "InspiredMortgage2025!";
+  const password = process.env.AUTH_TEST_PASSWORD;
+
+  if (!password) {
+    throw new Error(
+      'AUTH_TEST_PASSWORD is not set. It must contain the plaintext app login password to check against AUTH_PASSWORD_HASH.'
+    );
+  }
 
   console.log(`Testing credentials: ${username} / ${password}`);
 

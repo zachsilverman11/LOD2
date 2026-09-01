@@ -1,6 +1,16 @@
+/**
+ * WARNING: runs DDL against the PRODUCTION database (recreates the LeadStatus enum).
+ */
 import { Pool } from '@neondatabase/serverless';
 
-const connectionString = 'postgresql://neondb_owner:npg_dEhcITmUYK49@ep-round-pine-adn431lh.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require';
+const connectionString = process.env.DATABASE_URL_UNPOOLED;
+
+if (!connectionString) {
+  throw new Error(
+    'DATABASE_URL_UNPOOLED is not set. It must contain the non-pooled ' +
+      '(no "-pooler" in the host) Neon connection string for the production database.'
+  );
+}
 const pool = new Pool({ connectionString });
 
 async function fixEnum() {

@@ -18,6 +18,14 @@ async function configureWebhook() {
     throw new Error("VAPI_ASSISTANT_ID is not set");
   }
 
+  const webhookSecret = process.env.VAPI_WEBHOOK_SECRET;
+
+  if (!webhookSecret) {
+    throw new Error(
+      "VAPI_WEBHOOK_SECRET is not set. It must contain the shared secret Vapi sends back on each webhook request (serverUrlSecret)."
+    );
+  }
+
   const webhookUrl = "https://lod2-a9incracj-zach-silvermans-projects.vercel.app/api/webhooks/vapi";
 
   console.log("Configuring webhook for assistant:", assistantId);
@@ -31,7 +39,7 @@ async function configureWebhook() {
     },
     body: JSON.stringify({
       serverUrl: webhookUrl,
-      serverUrlSecret: "vapi-webhook-secret-2025", // Simple secret for now
+      serverUrlSecret: webhookSecret,
     }),
   });
 
