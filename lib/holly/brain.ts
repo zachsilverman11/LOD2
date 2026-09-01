@@ -93,6 +93,7 @@ export interface SalesPsychology {
     touch3: { goal: string; approach: string; avoid: string[] };
     touch4PlusEngaged: { goal: string; approach: string; avoid: string[] };
     touch4PlusZeroEngagement: { goal: string; approach: string; avoid: string[] };
+    touch4PlusZeroEngagementAltPrivate: { goal: string; approach: string; avoid: string[] };
   };
 }
 
@@ -739,6 +740,17 @@ export const SALES_PSYCHOLOGY: SalesPsychology = {
         'Giving up without deploying all available hooks (cash back, report, rate vs. cost)',
       ],
     },
+    touch4PlusZeroEngagementAltPrivate: {
+      goal: 'Pattern interrupt without bankable hooks (alt_private lead who has NEVER replied)',
+      approach:
+        'The soft approach has not landed. Go shorter and more direct, with a single clear call to action. The only hook for this segment is the call itself: a short conversation to understand what the bank said no to and whether a path exists with lenders beyond the banks. Consider acknowledging the silence honestly. Do not keep asking diagnostic questions.',
+      avoid: [
+        'More diagnostic questions (they have not answered any)',
+        'Repeating the same angle from earlier touches',
+        'Mortgage Strategy Report, rate-vs-cost reframes, cash back, or any bankable program (off-playbook for alt_private)',
+        'Long messages with multiple points (keep it short and punchy)',
+      ],
+    },
   },
 };
 
@@ -1190,6 +1202,8 @@ When referencing the cancellation, you MUST say "${cancellationRelativeDate}", n
 - Acknowledge the trust hit: name that cancellations are frustrating
 - Offer specific available slots (don't send a link yet)
 - Keep tone: apologetic but forward-looking, brief
+- **Apologise ONCE per cancellation.** If the conversation history already contains your apology for this cancellation, do not apologise again; move straight to the light rebook offer or give space
+- Never announce cadence ("last one from me", "I'll stop now"); automation may message again
 
 ` : isNoShow ? `
 🚨 **NO-SHOW DETECTED:**
@@ -1556,7 +1570,11 @@ export function buildValueProp(framework: string, leadData: any): string | null 
  * @param touchNumber - Which outbound touch this is
  * @param hasLeadReplied - Whether the lead has ever replied (used for touch 4+ differentiation)
  */
-export function getConversationGuidance(touchNumber: number, hasLeadReplied: boolean = false): {
+export function getConversationGuidance(
+  touchNumber: number,
+  hasLeadReplied: boolean = false,
+  isAltPrivate: boolean = false
+): {
   goal: string;
   approach: string;
   avoid: string[];
@@ -1564,8 +1582,11 @@ export function getConversationGuidance(touchNumber: number, hasLeadReplied: boo
   if (touchNumber === 1) return SALES_PSYCHOLOGY.conversationFlow.touch1;
   if (touchNumber === 2) return SALES_PSYCHOLOGY.conversationFlow.touch2;
   if (touchNumber === 3) return SALES_PSYCHOLOGY.conversationFlow.touch3;
-  return hasLeadReplied
-    ? SALES_PSYCHOLOGY.conversationFlow.touch4PlusEngaged
+  if (hasLeadReplied) return SALES_PSYCHOLOGY.conversationFlow.touch4PlusEngaged;
+  // alt_private has no bankable hooks to "deploy"; the generic pattern-interrupt
+  // guidance names the Strategy Report, rate-vs-cost and cash back, all off-playbook.
+  return isAltPrivate
+    ? SALES_PSYCHOLOGY.conversationFlow.touch4PlusZeroEngagementAltPrivate
     : SALES_PSYCHOLOGY.conversationFlow.touch4PlusZeroEngagement;
 }
 

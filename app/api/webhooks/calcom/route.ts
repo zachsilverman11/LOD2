@@ -5,6 +5,7 @@ import { sendSlackNotification } from "@/lib/slack";
 import { handleConversation, executeDecision } from "@/lib/holly/conversation-handler";
 import { findLeadByPhone } from "@/lib/phone-matching";
 import { getTimezoneForProvince } from "@/lib/calcom";
+import { buildCancellationSlackDetails, POST_CANCELLATION_HOLD_HOURS } from "@/lib/holly/post-cancellation";
 
 /**
  * Handle Cal.com webhook events
@@ -451,16 +452,31 @@ async function handleBookingCancelled(payload: any) {
       channel: CommunicationChannel.SYSTEM,
       subject: "Call cancelled",
       content: `Discovery call was cancelled${cancellationReason ? `: ${cancellationReason}` : ""}${cancelledByAdvisor ? " (by advisor)" : cancelledByLead ? " (by lead)" : ""}`,
-      metadata: { cancelledBy, cancellationReason, payload },
+      metadata: {
+        cancelledBy,
+        cancellationReason,
+        cancelledByAdvisor,
+        cancelledByLead,
+        appointmentId: appointment.id,
+        payload,
+      },
     },
   });
 
-  // Send Slack notification about cancellation
+  // Notify the team. On an advisor cancellation the person who cancelled owns
+  // the apology; Holly sends one short apology, then holds (see
+  // lib/holly/post-cancellation.ts).
+  const slackAlert = buildCancellationSlackDetails({
+    cancelledByAdvisor,
+    advisorName: organizer?.name || appointment.advisorName,
+    cancellationReason,
+    hollyDisabled: lead.hollyDisabled,
+  });
   await sendSlackNotification({
-    type: "lead_rotting",
+    type: slackAlert.type,
     leadName: `${lead.firstName} ${lead.lastName}`,
     leadId: appointment.leadId,
-    details: `Appointment cancelled ${cancelledByAdvisor ? "by advisor" : "by lead"}${cancellationReason ? `\nReason: ${cancellationReason}` : ""}\nHolly will reach out to re-engage${lead.hollyDisabled ? " (when re-enabled)" : ""}.`,
+    details: slackAlert.details,
   });
 
   // Skip SMS if Holly is disabled, no SMS consent, or no phone
@@ -502,6 +518,8 @@ Your job is to:
 
 DO NOT say the lead cancelled. DO NOT blame them. This was an advisor-initiated cancellation.
 
+This is the ONE apology. Apologise once, plainly, then move to the rebook offer. Do NOT promise when you will follow up next, do NOT say this is your last message, and do NOT pile on reassurance. The advisor will also reach out personally.
+
 IMPORTANT: Use the advisor name above ONLY when it's a specific person (e.g. Greg, Jakub). If Advisor is "your advisor", do NOT guess a name - just say "we" or "the team".
 
 Keep it SHORT (under 160 chars), warm and helpful. Use the send_sms tool.`;
@@ -509,6 +527,19 @@ Keep it SHORT (under 160 chars), warm and helpful. Use the send_sms tool.`;
 
     const decision = await handleConversation(lead.id, undefined, cancellationContext);
     await executeDecision(lead.id, decision);
+
+    // Advisor cancellation: the apology is the only automated touch for the
+    // next POST_CANCELLATION_HOLD_HOURS. Without this the lead's stale
+    // nextReviewAt (set while the call was booked) is already due, so the
+    // 15-minute cron would re-review immediately (observed: 13 minutes after
+    // the apology on 2026-08-27, then hourly until the 4h guardrail let a
+    // second message through).
+    if (cancelledByAdvisor) {
+      await prisma.lead.update({
+        where: { id: appointment.leadId },
+        data: { nextReviewAt: new Date(Date.now() + POST_CANCELLATION_HOLD_HOURS * 60 * 60 * 1000) },
+      });
+    }
     console.log(
       `[Cal.com] Holly reaching out after ${cancelledByAdvisor ? "advisor" : "lead"} cancellation`
     );

@@ -15,6 +15,12 @@ import { sendSlackNotification } from '../slack';
 import { trackConversationOutcome } from '../conversation-outcome-tracker';
 import { getNext8AM, getLocalTimeString } from '../timezone-utils';
 import { ACTIVE_APPOINTMENT_STATUSES } from '../appointment-status';
+import { MIN_HOURS_BETWEEN_UNANSWERED_OUTBOUND } from './guardrails';
+import {
+  resolvePostCancellationPolicy,
+  buildPostCancellationFollowUpContext,
+} from './post-cancellation';
+import { resolveStageMove, defaultReviewHoursForStage } from './stage-move';
 
 // Environment variables for safe rollout
 const ENABLE_AUTONOMOUS_AGENT = process.env.ENABLE_AUTONOMOUS_AGENT === 'true';
@@ -237,6 +243,66 @@ export async function processLeadWithAutonomousAgent(
       }
     }
 
+    // === POST-CANCELLATION POLICY (advisor-initiated cancellations) ===
+    // A cancellation is the advisor's relationship moment, not an automation
+    // trigger: one apology (sent by the Cal.com webhook), a 48h hold, at most one
+    // follow-up, then long-term nurture. Decided before any Claude call.
+    // Reactive (sms_reply) runs are never held: a reply ends the policy anyway.
+    let postCancellationContext: string | undefined;
+    if (triggerSource === 'cron') {
+      const policy = resolvePostCancellationPolicy({
+        activities: lead.activities,
+        communications: lead.communications,
+        now,
+      });
+
+      if (policy.phase === 'hold' || policy.phase === 'nurture') {
+        console.log(
+          `[Holly Agent] 🤝 ${lead.firstName}: post-cancellation ${policy.phase.toUpperCase()} - ${policy.reason}`
+        );
+        if (!DRY_RUN_MODE) {
+          const canParkInNurturing =
+            policy.phase === 'nurture' &&
+            ['CONTACTED', 'ENGAGED', 'NURTURING'].includes(lead.status) &&
+            lead.status !== 'NURTURING';
+          await prisma.lead.update({
+            where: { id: lead.id },
+            data: {
+              nextReviewAt: policy.nextReviewAt,
+              ...(canParkInNurturing ? { status: 'NURTURING' as LeadStatus } : {}),
+            },
+          });
+          await prisma.leadActivity.create({
+            data: {
+              leadId: lead.id,
+              type: 'NOTE_ADDED',
+              channel: 'SYSTEM',
+              content:
+                policy.phase === 'hold'
+                  ? `🤝 Post-cancellation hold: apology sent, giving the lead space. No automated message until ${policy.nextReviewAt?.toISOString()}. The advisor owns the personal follow-up.`
+                  : `🤝 Post-cancellation nurture: apology and one follow-up went unanswered. Holly is quiet until ${policy.nextReviewAt?.toISOString()}; silence after a cancellation is "deciding", not lost.`,
+              metadata: {
+                automated: true,
+                autonomous: true,
+                postCancellation: policy.phase,
+                outboundSinceCancellation: policy.outboundSinceCancellation,
+              },
+            },
+          });
+        }
+        return { success: true, action: 'wait', reason: policy.reason, postCancellation: policy.phase };
+      }
+
+      if (policy.phase === 'follow_up_due' && policy.cancelledAt) {
+        postCancellationContext = buildPostCancellationFollowUpContext({
+          firstName: lead.firstName || (lead.rawData as any)?.first_name || 'the lead',
+          cancelledAt: policy.cancelledAt,
+          isAltPrivate: (lead.segment || (lead.rawData as any)?.segment) === 'alt_private',
+        });
+        console.log(`[Holly Agent] 🤝 ${lead.firstName}: post-cancellation single follow-up allowed`);
+      }
+    }
+
     console.log(`[Holly Agent] 🔍 Processing ${lead.firstName} ${lead.lastName}...`);
 
     // === ANALYZE DEAL HEALTH ===
@@ -257,7 +323,7 @@ export async function processLeadWithAutonomousAgent(
     console.log(`[Holly Agent] 🎭 ${lead.firstName}: Stage = ${conversationStage}`);
 
     // === ASK HOLLY TO DECIDE ===
-    const decision = await askHollyToDecide(lead, signals);
+    const decision = await askHollyToDecide(lead, signals, { extraContext: postCancellationContext });
 
     // === VALIDATE DECISION ===
     const validation = validateDecision(decision, {
@@ -467,8 +533,22 @@ export async function processLeadWithAutonomousAgent(
         console.log(
           `[Holly Agent] ⏰ ${lead.firstName}: Scheduled for next 8 AM (${getLocalTimeString(province)}) due to time restriction`
         );
+      } else if (validation.errors.some(error => error.startsWith('Too soon')) && lead.lastContactedAt) {
+        // ANTI-SPAM BLOCK: the earliest legal send is known exactly, so review then.
+        // Hourly retries here were a Claude call per hour with a guaranteed block
+        // (10 such blocks on one lead over 2026-08-27..31).
+        nextReviewAt = new Date(
+          lead.lastContactedAt.getTime() + MIN_HOURS_BETWEEN_UNANSWERED_OUTBOUND * 60 * 60 * 1000 + 60 * 1000
+        );
+        if (nextReviewAt.getTime() <= now.getTime()) {
+          nextReviewAt = new Date(now.getTime() + 60 * 60 * 1000);
+        }
+
+        console.log(
+          `[Holly Agent] ⏱️  ${lead.firstName}: Anti-spam block, next review at ${nextReviewAt.toISOString()}`
+        );
       } else {
-        // OTHER BLOCKS (anti-spam, opt-out, etc.): Retry in 1 hour
+        // OTHER BLOCKS (opt-out, finality promise, etc.): Retry in 1 hour
         nextReviewAt = new Date(now.getTime() + 60 * 60 * 1000);
 
         console.log(
@@ -608,20 +688,40 @@ export async function processLeadWithAutonomousAgent(
       }
 
       if (!DRY_RUN_MODE) {
-        // Validate transition is allowed
-        const validTransitions: Record<string, string[]> = {
-          CONTACTED: ['ENGAGED', 'NURTURING', 'LOST'],
-          ENGAGED: ['NURTURING', 'CALL_SCHEDULED', 'LOST'],
-          CALL_SCHEDULED: ['WAITING_FOR_APPLICATION', 'NURTURING', 'LOST'],
-          WAITING_FOR_APPLICATION: ['NURTURING', 'LOST'],
-          NURTURING: ['ENGAGED', 'CALL_SCHEDULED', 'LOST'],
-        };
+        // Validate transition is allowed. Both non-moves below MUST schedule a
+        // next review: returning without one left the lead due, and the cron
+        // re-ran Holly (a Claude call each time) every 15 minutes. Observed as a
+        // NURTURING → NURTURING loop, 10 consecutive cycles on 2026-09-01.
+        const stageMove = resolveStageMove(lead.status, decision.newStage);
 
-        const allowedMoves = validTransitions[lead.status] || [];
-        if (!allowedMoves.includes(decision.newStage)) {
-          console.error(
-            `[Holly Agent] ❌ Invalid transition: ${lead.status} → ${decision.newStage}. Allowed: ${allowedMoves.join(', ')}`
+        if (stageMove.kind === 'same_stage') {
+          // Holly "moved" the lead to where it already is: that is a wait, not a
+          // move. No farewell message (there is no transition to explain).
+          const nextReview = new Date(now.getTime() + stageMove.nextReviewHours * 60 * 60 * 1000);
+          console.log(
+            `[Holly Agent] ⏸️  ${lead.firstName}: already in ${lead.status}; treating move_stage as wait ${stageMove.nextReviewHours}h`
           );
+          await prisma.leadActivity.create({
+            data: {
+              leadId: lead.id,
+              type: 'NOTE_ADDED',
+              channel: 'SYSTEM',
+              content: `⏸️ Holly chose move_stage → ${decision.newStage} but the lead is already in ${lead.status}. Treated as WAIT ${stageMove.nextReviewHours}h.\n\nReasoning: ${decision.thinking}`,
+              metadata: { automated: true, autonomous: true, sameStageMove: true },
+            },
+          });
+          await prisma.lead.update({ where: { id: lead.id }, data: { nextReviewAt: nextReview } });
+          return { success: true, action: 'wait', waitHours: stageMove.nextReviewHours, sameStage: true };
+        }
+
+        if (stageMove.kind === 'invalid') {
+          console.error(
+            `[Holly Agent] ❌ Invalid transition: ${lead.status} → ${decision.newStage}. Allowed: ${stageMove.allowed.join(', ')}`
+          );
+          await prisma.lead.update({
+            where: { id: lead.id },
+            data: { nextReviewAt: new Date(now.getTime() + stageMove.nextReviewHours * 60 * 60 * 1000) },
+          });
           return { success: false, action: 'move_stage', error: 'Invalid transition' };
         }
 
@@ -668,14 +768,7 @@ export async function processLeadWithAutonomousAgent(
         });
 
         // Set next review time based on new stage
-        let nextReviewHours = 24; // Default
-        if (decision.newStage === 'LOST') {
-          nextReviewHours = 24 * 365; // 1 year (never)
-        } else if (decision.newStage === 'NURTURING') {
-          nextReviewHours = 24 * 14; // 14 days for nurturing
-        } else if (decision.newStage === 'WAITING_FOR_APPLICATION') {
-          nextReviewHours = 48; // Check in 2 days
-        }
+        const nextReviewHours = defaultReviewHoursForStage(decision.newStage);
 
         const nextReview = new Date(now.getTime() + nextReviewHours * 60 * 60 * 1000);
         await prisma.lead.update({
