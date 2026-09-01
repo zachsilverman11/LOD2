@@ -46,6 +46,7 @@ jest.mock('../lib/deal-intelligence', () => ({
     nextReviewHours: 24,
   })),
   resolveNextReviewHoursAfterOutbound: jest.fn(() => 24),
+  countUnansweredOutbound: jest.requireActual('../lib/deal-intelligence').countUnansweredOutbound,
 }));
 
 jest.mock('../lib/slack', () => ({

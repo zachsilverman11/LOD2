@@ -209,11 +209,48 @@ export function resolveNextReviewHoursAfterOutbound(params: {
   signals: DealSignals;
   inboundCount: number;
   outboundCountBeforeThisSend: number;
+  /**
+   * Holly outbounds sent since the lead's most recent inbound, before this send
+   * (see countUnansweredOutbound). When omitted, falls back to the old
+   * "has the lead ever replied?" heuristic.
+   */
+  unansweredOutboundBeforeThisSend?: number;
 }): number {
-  if (params.inboundCount > 0 || params.signals.temperature === 'hot') {
+  if (params.signals.temperature === 'hot') {
     return params.signals.nextReviewHours;
   }
-  return nextReviewHoursAfterZeroReplyOutbound(params.outboundCountBeforeThisSend + 1);
+  const unanswered =
+    params.unansweredOutboundBeforeThisSend ??
+    (params.inboundCount > 0 ? 0 : params.outboundCountBeforeThisSend);
+
+  // Replying to the lead's latest message: conversational cadence (temperature-based).
+  if (unanswered === 0 && params.inboundCount > 0) {
+    return params.signals.nextReviewHours;
+  }
+  // Silence — whether the lead never replied, or replied once and then went quiet
+  // (e.g. after a cancelled call): widen the gap with every unanswered touch.
+  // A lead who replied once used to be reviewed every 2-6h forever, with only
+  // the 4h SMS guardrail between reviews and sends; that produced 5 sends in
+  // 4 days after an advisor cancellation (notes/post-cancel-cadence-diagnosis.md).
+  return nextReviewHoursAfterZeroReplyOutbound(unanswered + 1);
+}
+
+/**
+ * Number of Holly outbound messages sent after the lead's most recent inbound.
+ * 0 means the lead's last message is newer than ours (they are waiting on us).
+ * Works on any slice of the conversation (agent.ts loads the last 20).
+ */
+export function countUnansweredOutbound(
+  communications: ReadonlyArray<{ direction: string; createdAt: Date }> | null | undefined
+): number {
+  if (!communications || communications.length === 0) return 0;
+  let lastInbound = 0;
+  for (const c of communications) {
+    if (c.direction === 'INBOUND') lastInbound = Math.max(lastInbound, c.createdAt.getTime());
+  }
+  return communications.filter(
+    (c) => c.direction === 'OUTBOUND' && c.createdAt.getTime() > lastInbound
+  ).length;
 }
 
 // === HELPER FUNCTIONS ===
