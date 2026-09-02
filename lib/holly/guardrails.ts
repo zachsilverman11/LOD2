@@ -98,14 +98,6 @@ interface DecisionContext {
   conversationStage?: ConversationStage;
   // Pass true when live Cal.com availability slots were provided to Holly
   availabilitySlotsProvided?: boolean;
-  /**
-   * Vertical this lead belongs to, when known. There is no `Lead.vertical`
-   * column yet (see notes/holly-alt-lending-vertical-audit.md §2), so this is
-   * optional and callers may also carry it on `lead.rawData.vertical`.
-   * Undefined — which is every caller today — means "conventional", and the
-   * alt-lending checks below do not run.
-   */
-  vertical?: string;
 }
 
 export function validateDecision(
@@ -465,9 +457,10 @@ export function validateDecision(
   }
 
   // === HARD RULE: alt_private segment bans (private/alternative playbook) ===
-  // Read segment from schema field (context.lead.segment), fallback to rawData if needed
-  const segment = context.lead.segment || (rawData as any)?.segment;
-  const isAltPrivate = segment === 'alt_private';
+  // Read segment from schema field (context.lead.segment), fallback to rawData if needed.
+  // Extracted to isAltPrivateSegment() so the numeric guardrail below resolves the
+  // segment the exact same way and the two cannot drift apart.
+  const isAltPrivate = isAltPrivateSegment(context);
 
   if (isAltPrivate && decision.message) {
     const message = decision.message.toLowerCase();
@@ -575,15 +568,24 @@ export function validateDecision(
     }
   }
 
-  // === HARD RULE (ALT-LENDING ONLY, FLAGGED OFF BY DEFAULT) ===
+  // === HARD RULE (alt_private SEGMENT ONLY, FLAGGED OFF BY DEFAULT) ===
   // Runtime half of alt-lending Hard Guardrail #8. Double-gated: the env flag
-  // must be explicitly enabled AND the lead must be in the alt-lending
-  // vertical. Neither is true for any conventional-cohort traffic today, so
-  // this block is inert until both are deliberately turned on.
+  // must be explicitly enabled AND the lead must be in the alt_private segment
+  // (`isAltPrivate` above — the same resolution the banned-phrase block uses).
+  //
+  // This used to gate on a `vertical` axis that nothing ever populated, so the
+  // check was unreachable no matter how the flag was set. `segment` is the
+  // authoritative classification: lib/lead-segmentation.ts writes it at ingest
+  // on every webhook path, which also means the guardrail correctly covers
+  // leads_on_demand leads who reported bank trouble, not just FinanceVine.
+  //
+  // Reasons stack into the same `errors` array as every other rule, so a
+  // message that also trips the banned-phrase block above produces one block
+  // event with both reasons listed — not two separate failures.
   if (
     decision.message &&
     isAltLendingNumericGuardrailEnabled() &&
-    isAltLendingVertical(context)
+    isAltPrivate
   ) {
     errors.push(...checkAltLendingNumericCompliance(decision.message));
   }
@@ -612,18 +614,23 @@ export function isAltLendingNumericGuardrailEnabled(): boolean {
 }
 
 /**
- * Second gate. Returns true only for leads explicitly marked alt-lending.
- * Conventional leads carry no vertical at all today, so this is false for
- * 100% of current production traffic even if the flag above were enabled.
+ * Second gate: is this lead in the alt_private segment?
+ *
+ * `segment` is written at ingest by lib/lead-segmentation.ts on all three
+ * webhook paths — FinanceVine leads are always alt_private; leads_on_demand
+ * leads are alt_private when bankability is not_approved/unsure. Reads the
+ * schema field first and falls back to rawData, which is exactly how the
+ * banned-phrase block resolves it, so the two gates cannot diverge.
+ *
+ * Exact string match on 'alt_private': prime_rate_shop, prime_other, an
+ * unclassified lead, and any typo are all false.
  */
-export function isAltLendingVertical(context: {
-  vertical?: string;
-  lead?: { rawData?: unknown };
+export function isAltPrivateSegment(context: {
+  lead?: { segment?: string | null; rawData?: unknown } | null;
 }): boolean {
-  const fromContext = context.vertical;
-  const fromRawData = (context.lead?.rawData as { vertical?: string } | null | undefined)?.vertical;
-  const vertical = (fromContext ?? fromRawData ?? '').toUpperCase();
-  return vertical === 'ALT_LENDING';
+  const fromColumn = context.lead?.segment;
+  const fromRawData = (context.lead?.rawData as { segment?: string } | null | undefined)?.segment;
+  return (fromColumn || fromRawData) === 'alt_private';
 }
 
 /**
@@ -632,7 +639,7 @@ export function isAltLendingVertical(context: {
  * percentages, so "80% LTV", "$50,000", and "you'll probably qualify" all pass
  * through it today).
  *
- * DELIBERATE CARVE-OUTS — this vertical is number-silent and promise-silent,
+ * DELIBERATE CARVE-OUTS — this segment is number-silent and promise-silent,
  * NOT rate-silent. The following must pass clean, and are covered by tests:
  *  - Generic equity-as-a-factor language ("how much equity you have in the
  *    property is one of the biggest things that opens up options").
@@ -663,7 +670,7 @@ export function checkAltLendingNumericCompliance(message: string): string[] {
   // --- Any percentage figure: covers interest rates, LTVs, and percentage fees ---
   if (/\b\d{1,3}(?:\.\d+)?\s*%/.test(scrubbed) || /\b\d{1,3}(?:\.\d+)?\s*percent\b/i.test(scrubbed)) {
     errors.push(
-      'ALT-LENDING GUARDRAIL #8: Message contains a specific percentage. In this vertical Holly cannot state any rate, LTV, or percentage fee — these are deal-specific and advisor-only. ' +
+      'ALT-LENDING GUARDRAIL #8: Message contains a specific percentage. In the alt_private segment Holly cannot state any rate, LTV, or percentage fee — these are deal-specific and advisor-only. ' +
       'Remove the number. General phrasing ("fair rates", "lenders beyond the big banks") is allowed; figures are not.'
     );
   }
