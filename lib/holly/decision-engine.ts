@@ -206,6 +206,24 @@ DEFAULT: offer specific times and book directly. Link is LAST RESORT.
 
 **Focus on conversion, not activity. Quality over quantity.**`;
 
+/**
+ * Value proposition for alt_private (private / alternative) leads.
+ *
+ * Deliberately separate from getValueProposition(), which is written for bankable
+ * leads. Every line here must survive the alt_private phrase bans in
+ * guardrails.ts (no rate talk, no approval promises, no "qualify" invitations) —
+ * tests/alt-private-value-prop.test.ts pins that against the real validator.
+ */
+export function getAltPrivateValueProposition(leadData: any): string {
+  const urgency = leadData?.motivation_level;
+
+  if (urgency === 'I have made an offer to purchase') {
+    return `Since you have an accepted offer, timing is tight. Our advisors can look at your full situation and tell you straight what's workable before your subject removal date. Takes 15 mins. When works - today or tomorrow?`;
+  }
+
+  return `Our advisors work with lenders outside the big banks, so situations the bank couldn't fit often still have a path. Takes 10-15 mins to walk through yours. Worth a quick call?`;
+}
+
 export async function askHollyToDecide(
   lead: Lead & {
     communications?: any[];
@@ -400,7 +418,13 @@ export async function askHollyToDecide(
 
   // === LAYER 1: LEAD JOURNEY CONTEXT ===
   const journeyContext = getLeadJourneyIntro(leadType, rawData?.motivation_level);
-  const valueProp = getValueProposition(rawData);
+  // alt_private leads get their own value proposition. The generic one is written
+  // for bankable leads and leans on language the alt_private guardrail rejects
+  // ("see what you qualify for", "Guaranteed Approvals Certificate"), so injecting
+  // it here was steering Holly straight into a block.
+  const valueProp = isAltPrivate
+    ? getAltPrivateValueProposition(rawData)
+    : getValueProposition(rawData);
 
   // === BOOKING HOOK SELECTION ===
   const selectedHook = selectBookingHook(recentMessages);
