@@ -21,6 +21,7 @@ jest.mock('../lib/db', () => ({
     },
     leadActivity: {
       create: jest.fn(),
+      findMany: jest.fn(),
     },
   },
 }));
@@ -62,6 +63,7 @@ describe('Holly Agent Timing Rules', () => {
     mockPrisma.lead.updateMany.mockResolvedValue({ count: 1 });
     mockPrisma.lead.update.mockResolvedValue({} as any);
     mockPrisma.leadActivity.create.mockResolvedValue({} as any);
+    mockPrisma.leadActivity.findMany.mockResolvedValue([]);
   });
 
   describe('FinanceVine Timing', () => {

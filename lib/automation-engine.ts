@@ -10,6 +10,8 @@ import { validateDecision, HollyDecision } from "@/lib/holly/guardrails";
 import { detectConversationStage } from "@/lib/holly/stage";
 import { sendSlackNotification, sendErrorAlert, sendSlackAlertWithDedup, hasUpcomingAppointment } from "@/lib/slack";
 import { ACTIVE_APPOINTMENT_STATUSES } from "@/lib/appointment-status";
+import { GUARDRAIL_ESCALATION_THRESHOLD, buildGuardrailRetryContext, contentErrors } from "@/lib/holly/guardrail-retry";
+import { loadGuardrailLoopState, escalateGuardrailLoop } from "@/lib/holly/guardrail-escalation";
 
 /**
  * Automation rule trigger types
@@ -91,11 +93,30 @@ async function getHollyDecision(leadId: string): Promise<{
     };
   }
 
+  // 2b. Guardrail loop state (shared with the autonomous agent). A lead that
+  // has been escalated to a human, or has already hit the block threshold, is
+  // not asked again from the same inputs: no Claude call, do_nothing. The
+  // callers own their own cadence (24h/48h windows), so nothing is rescheduled
+  // here; the agent path holds the safety-net review.
+  const guardrailState = await loadGuardrailLoopState(lead);
+  if (guardrailState.awaitingHuman) {
+    console.log(`[getHollyDecision] Lead ${leadId} awaiting human after guardrail escalation, returning do_nothing`);
+    return { action: "do_nothing", reasoning: "Awaiting human after guardrail escalation" };
+  }
+  if (guardrailState.consecutiveBlocks >= GUARDRAIL_ESCALATION_THRESHOLD) {
+    console.log(`[getHollyDecision] Lead ${leadId} at guardrail block threshold, escalating without a new attempt`);
+    await escalateGuardrailLoop({ lead, state: guardrailState, now: new Date(), source: "automation" });
+    return { action: "do_nothing", reasoning: "Guardrail block threshold reached - escalated to a human" };
+  }
+  const extraContext = guardrailState.lastBlock
+    ? buildGuardrailRetryContext({ lastBlock: guardrailState.lastBlock, attempt: guardrailState.consecutiveBlocks + 1 })
+    : undefined;
+
   // 3. Analyze deal health for signals
   const signals = analyzeDealHealth(lead);
 
-  // 4. Ask Holly (Claude) to decide
-  const hollyDecision = await askHollyToDecide(lead, signals);
+  // 4. Ask Holly (Claude) to decide, told what was rejected last time (if anything)
+  const hollyDecision = await askHollyToDecide(lead, signals, { extraContext });
 
   const conversationStage = detectConversationStage({
     lead: {
@@ -131,9 +152,29 @@ async function getHollyDecision(leadId: string): Promise<{
           guardrailBlock: true,
           blockedAction: hollyDecision.action,
           errors: validation.errors,
+          blockedMessage: hollyDecision.message ?? null,
         },
       },
     });
+
+    // Same strike rule as the agent: content errors count, scheduling errors do
+    // not. At the threshold, hand the lead to a human (shared escalation).
+    const strikeErrors = contentErrors(validation.errors);
+    const blocksNow = strikeErrors.length > 0 ? guardrailState.consecutiveBlocks + 1 : guardrailState.consecutiveBlocks;
+    if (strikeErrors.length > 0 && blocksNow >= GUARDRAIL_ESCALATION_THRESHOLD) {
+      const now = new Date();
+      await escalateGuardrailLoop({
+        lead,
+        now,
+        source: "automation",
+        state: {
+          ...guardrailState,
+          consecutiveBlocks: blocksNow,
+          lastBlock: { createdAt: now, errors: strikeErrors, blockedAction: hollyDecision.action, blockedMessage: hollyDecision.message },
+        },
+      });
+      return { action: "do_nothing", reasoning: `Blocked by guardrails ${blocksNow} times in a row - escalated to a human` };
+    }
 
     return {
       action: "do_nothing",
