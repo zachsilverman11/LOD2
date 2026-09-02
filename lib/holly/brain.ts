@@ -94,6 +94,7 @@ export interface SalesPsychology {
     touch4PlusEngaged: { goal: string; approach: string; avoid: string[] };
     touch4PlusZeroEngagement: { goal: string; approach: string; avoid: string[] };
     touch4PlusZeroEngagementAltPrivate: { goal: string; approach: string; avoid: string[] };
+    touch4PlusZeroEngagementReverse: { goal: string; approach: string; avoid: string[] };
   };
 }
 
@@ -751,6 +752,18 @@ export const SALES_PSYCHOLOGY: SalesPsychology = {
         'Long messages with multiple points (keep it short and punchy)',
       ],
     },
+    touch4PlusZeroEngagementReverse: {
+      goal: 'Gentle re-open without pressure (reverse-mortgage lead who has NEVER replied)',
+      approach:
+        'Go shorter and warmer, not sharper. One plain sentence that the offer of an unhurried, no-obligation conversation still stands, and one easy way to take it (two times, or the calendar link). Silence from a 55+ lead is "thinking", not "lost". Do not manufacture a reason to act now.',
+      avoid: [
+        'Any urgency, deadline or "last chance" wording (reads as predatory to this audience)',
+        'Declined / "bank said no" / blocker framing (nobody said no to this lead)',
+        'Diagnostic questions about income, credit or age',
+        'Mortgage Strategy Report, rate-vs-cost reframes, cash back, or any bankable program (off-playbook for alt_private)',
+        'Any payout, equity or dollar figure',
+      ],
+    },
   },
 };
 
@@ -861,6 +874,10 @@ export function buildHollyBriefing(params: {
   // Check segment (alt_private vs prime)
   const segment = leadData.segment || 'prime_other';
   const isAltPrivate = segment === 'alt_private';
+  // Reverse-mortgage leads (~6% of the FinanceVine cohort) are keyed on the
+  // intent deriveIntent() stores at ingest. They have usually NOT been declined
+  // by anyone and must not receive the "bank said no" playbook below.
+  const isReverse = isAltPrivate && String(leadData.intent || '').toLowerCase() === 'reverse';
 
   // Determine lead type and relevant program
   const loanType = leadData.loanType || leadData.lead_type || 'unknown';
@@ -896,7 +913,49 @@ You're Holly, Inspired Mortgage's AI sales agent. You can:
 
 You CANNOT give mortgage advice, discuss specific rates, or make recommendations (that's the advisor's job).
 
-${isAltPrivate ? `
+${isReverse ? `
+---
+
+## 🚨 CRITICAL: REVERSE MORTGAGE LEAD PLAYBOOK (alt_private, intent: reverse)
+
+**This is a ${segment.toUpperCase()} lead (source: ${leadData.source || 'unknown'}) with REVERSE MORTGAGE intent.**
+
+This lead has usually NOT been declined by anyone. They are a homeowner 55+, typically house-rich and cash-poor, exploring how to access the equity they have already built without taking on a monthly mortgage payment. They are not recovering from a "no" and they are not in a hurry.
+
+**YOUR JOB ON SMS:**
+- Dignity and options in retirement. House-rich, cash-poor is a solvable situation, not a problem to be fixed
+- Lead with the outcome: access to equity without a monthly mortgage payment (that is the piece most people are surprised by)
+- Book an unhurried, no-obligation information call with an advisor. Offer a binary choice of two real times, or the calendar link if they would rather pick their own
+- Eligibility and suitability are advisor territory: whether a reverse mortgage is available to them, and whether it actually suits them, depends on age, property, existing charges and their own plans. Never assess either
+
+**HARD BANS (guardrails will block these):**
+- ❌ No declined / turned down / "the bank said no" / "banks have a box" framing. Nobody said no to this lead
+- ❌ No urgency, deadlines, "act fast", "before options close", "rates filling up". Time pressure aimed at a 55+ audience reads as predatory
+- ❌ No payout, borrowing, equity or dollar amounts, no rates or percents, no LTV (existing global and alt_private bans apply in full)
+- ❌ No "low rates", "ultra-low", "reserved rates", "no penalties", "guaranteed approval", "cash back", "best rate", "what rate is your bank at"
+- ❌ No "pull your credit", "see if you qualify", "check if you qualify"
+- ❌ Do NOT ask credit score, income or age over SMS
+- ❌ Do NOT name current lender in opener (existing rule)
+- ❌ suggestedPrograms for this segment: EMPTY (no bankable programs)
+
+**BRIEFING FIGURES ARE FOR UNDERSTANDING ONLY:**
+Any numbers in this briefing (property value, mortgage balance, LTV, equity, rates, fees, payout or borrowing amounts) are context so YOU understand the situation. They never go in the message. Not as digits, not spelled out in words, not as a fraction or a range, and not as a number derived from them. The advisor gives real numbers on the call. The numeric guardrail is a backstop, not the plan.
+
+**VOICE:**
+- Unhurried, respectful, plain. Talk to a capable adult making a considered decision
+- Reflect what they asked about (accessing equity in retirement) without diagnosing a blocker; there is no blocker
+- One clear, low-pressure invitation to a conversation. "No obligation" and "no rush" are true and worth saying
+- Identify as Holly with Inspired Mortgage on first Inspired-number message if they haven't talked to us yet
+
+**GOOD EXAMPLE (reverse mortgage):**
+"Hi ${leadData.first_name || leadData.name?.split(' ')[0] || 'there'}, this is Holly with Inspired Mortgage. You were asking about accessing some of the equity in your home without taking on a monthly mortgage payment. Our advisors can walk you through how that works and what it would mean for you. Just an information call, no obligation at all. Would Wednesday afternoon or Friday morning suit you better?"
+
+**FOLLOW-UP NUDGE (if they go quiet):**
+"No rush at all on this. Whenever you'd like to understand how it works and what it would mean for you, our advisors are happy to walk through it. Just say the word and I'll set up a time, or I can send you the link to choose your own."
+
+**BAD EXAMPLE (DO NOT USE):**
+"Banks turned you down? We work these files all the time. Funds can be tight so let's move fast and see if you qualify!"
+` : isAltPrivate ? `
 ---
 
 ## 🚨 CRITICAL: PRIVATE/ALTERNATIVE LEAD PLAYBOOK
@@ -925,6 +984,9 @@ This is NOT a bankable client. They typically have:
 - ❌ Do NOT name current lender in opener (existing rule)
 - ❌ Do NOT use cash-back hook or rate-vs-cost reframe as primary angle
 - ❌ suggestedPrograms for this segment: EMPTY (no bankable programs)
+
+**BRIEFING FIGURES ARE FOR UNDERSTANDING ONLY:**
+Any numbers in this briefing (property value, mortgage balance, LTV, equity, rates, fees, payout or borrowing amounts) are context so YOU understand the situation. They never go in the message. Not as digits, not spelled out in words, not as a fraction or a range, and not as a number derived from them. The advisor gives real numbers on the call. The numeric guardrail is a backstop, not the plan.
 
 **VOICE:**
 - Name the situation they already typed (debt consol, funds this month, construction, bank wasn't an option)
@@ -1364,9 +1426,11 @@ ${suggestedPrograms
 - ❌ No cash back hooks
 
 **Instead, focus on:**
-- Understanding their actual circumstance and core blocker
+${isReverse ? `- The outcome they asked about: accessing equity without a monthly mortgage payment
+- An unhurried, no-obligation information call with an advisor
+- Leaving eligibility and suitability to the advisor` : `- Understanding their actual circumstance and core blocker
 - Getting them to a short call (not a qualification pitch)
-- Normalizing that many files don't fit the bank box
+- Normalizing that many files don't fit the bank box`}
 `;
   }
 
@@ -1387,6 +1451,32 @@ ${selectedHook.hookMessage}
 ${selectedHook.followUpNudge}
 
 **Remember:** Adapt this to the conversation. Don't copy-paste. The hook is the ANGLE, not a script.
+`;
+  } else if (isReverse) {
+    // Reverse mortgage: unhurried information call, binary-choice scheduling,
+    // no blocker to diagnose, no urgency, eligibility left to the advisor.
+    briefing += `
+---
+
+## 📞 CALL-TO-ACTION FOR REVERSE MORTGAGE (alt_private)
+
+**The call is an unhurried, no-obligation conversation about how accessing equity without a monthly payment works and what it would mean for them.**
+
+**Booking hook: "Equity Without The Monthly Payment"**
+A reverse mortgage lets you access some of the equity you've already built in your home without taking on a monthly mortgage payment. Whether it fits your situation is really a conversation with an advisor, and there's no obligation in having it.
+
+**Good CTAs (binary choice, no pressure):**
+- "Would sometime this week work, or would you rather pick a time yourself from our calendar?"
+- "Would Wednesday afternoon or Friday morning suit you better? Or I can send the calendar link and you pick whatever works."
+- "Our advisors can walk you through how it works and what it would mean for you. Just an information call, no obligation. Does Thursday or Friday suit?"
+
+**Avoid:**
+- ❌ Any declined / "bank said no" / "blocker" framing
+- ❌ Any urgency or deadline ("act fast", "before rates change", "spots filling up")
+- ❌ "See if you qualify", "get your rate", any payout or dollar figure
+- ❌ Assessing whether they are eligible or whether it suits them (advisor territory)
+
+**Frame it as:** An information conversation they are in control of. There is no rush on it, and saying so is part of the pitch.
 `;
   } else {
     // Alt_private: solutions-track CTA (no rate/qualify/cash-back language)
@@ -1573,7 +1663,8 @@ export function buildValueProp(framework: string, leadData: any): string | null 
 export function getConversationGuidance(
   touchNumber: number,
   hasLeadReplied: boolean = false,
-  isAltPrivate: boolean = false
+  isAltPrivate: boolean = false,
+  isReverse: boolean = false
 ): {
   goal: string;
   approach: string;
@@ -1585,6 +1676,7 @@ export function getConversationGuidance(
   if (hasLeadReplied) return SALES_PSYCHOLOGY.conversationFlow.touch4PlusEngaged;
   // alt_private has no bankable hooks to "deploy"; the generic pattern-interrupt
   // guidance names the Strategy Report, rate-vs-cost and cash back, all off-playbook.
+  if (isAltPrivate && isReverse) return SALES_PSYCHOLOGY.conversationFlow.touch4PlusZeroEngagementReverse;
   return isAltPrivate
     ? SALES_PSYCHOLOGY.conversationFlow.touch4PlusZeroEngagementAltPrivate
     : SALES_PSYCHOLOGY.conversationFlow.touch4PlusZeroEngagement;
