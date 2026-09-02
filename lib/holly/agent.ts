@@ -21,6 +21,14 @@ import {
   buildPostCancellationFollowUpContext,
 } from './post-cancellation';
 import { resolveStageMove, defaultReviewHoursForStage } from './stage-move';
+import {
+  GUARDRAIL_ESCALATION_THRESHOLD,
+  GUARDRAIL_RETRY_HOURS,
+  buildGuardrailRetryContext,
+  contentErrors,
+  type GuardrailLoopState,
+} from './guardrail-retry';
+import { loadGuardrailLoopState, escalateGuardrailLoop } from './guardrail-escalation';
 
 // Environment variables for safe rollout
 const ENABLE_AUTONOMOUS_AGENT = process.env.ENABLE_AUTONOMOUS_AGENT === 'true';
@@ -243,6 +251,47 @@ export async function processLeadWithAutonomousAgent(
       }
     }
 
+    // === GUARDRAIL LOOP STATE (informed, bounded retries) ===
+    // Derived from LeadActivity rows; resets on any communication in either
+    // direction. See lib/holly/guardrail-retry.ts.
+    const guardrailState: GuardrailLoopState = await loadGuardrailLoopState(lead);
+
+    if (triggerSource === 'cron' && guardrailState.awaitingHuman) {
+      // Escalated and nobody has messaged the lead since. No Claude call: the
+      // inputs have not changed, so the outcome would not either. Re-park with a
+      // reminder so the lead is neither looped nor forgotten.
+      console.log(
+        `[Holly Agent] 🚨 ${lead.firstName}: awaiting human since guardrail escalation at ${guardrailState.escalatedAt?.toISOString()} - re-parking`
+      );
+      if (!DRY_RUN_MODE) {
+        await escalateGuardrailLoop({ lead, state: guardrailState, now, reminder: true, source: 'agent' });
+      }
+      return { success: false, reason: 'Awaiting human after guardrail escalation', escalated: true };
+    }
+
+    if (guardrailState.consecutiveBlocks >= GUARDRAIL_ESCALATION_THRESHOLD) {
+      // Threshold already reached (blocks can also accrue on the cron nudge
+      // path). Hand off now rather than spend another attempt.
+      console.log(
+        `[Holly Agent] 🚨 ${lead.firstName}: ${guardrailState.consecutiveBlocks} consecutive guardrail blocks on file - escalating without a new attempt`
+      );
+      if (!DRY_RUN_MODE) {
+        await escalateGuardrailLoop({ lead, state: guardrailState, now, source: 'agent' });
+      }
+      return { success: false, reason: 'Guardrail block threshold reached', escalated: true };
+    }
+
+    let guardrailRetryContext: string | undefined;
+    if (guardrailState.lastBlock) {
+      guardrailRetryContext = buildGuardrailRetryContext({
+        lastBlock: guardrailState.lastBlock,
+        attempt: guardrailState.consecutiveBlocks + 1,
+      });
+      console.log(
+        `[Holly Agent] 🔁 ${lead.firstName}: retry attempt ${guardrailState.consecutiveBlocks + 1} of ${GUARDRAIL_ESCALATION_THRESHOLD} after guardrail block - feeding back ${guardrailState.lastBlock.errors.length} reason(s)`
+      );
+    }
+
     // === POST-CANCELLATION POLICY (advisor-initiated cancellations) ===
     // A cancellation is the advisor's relationship moment, not an automation
     // trigger: one apology (sent by the Cal.com webhook), a 48h hold, at most one
@@ -323,7 +372,8 @@ export async function processLeadWithAutonomousAgent(
     console.log(`[Holly Agent] 🎭 ${lead.firstName}: Stage = ${conversationStage}`);
 
     // === ASK HOLLY TO DECIDE ===
-    const decision = await askHollyToDecide(lead, signals, { extraContext: postCancellationContext });
+    const extraContext = [postCancellationContext, guardrailRetryContext].filter(Boolean).join('\n\n') || undefined;
+    const decision = await askHollyToDecide(lead, signals, { extraContext });
 
     // === VALIDATE DECISION ===
     const validation = validateDecision(decision, {
@@ -513,9 +563,43 @@ export async function processLeadWithAutonomousAgent(
               guardrailBlock: true,
               blockedAction: decision.action,
               errors: validation.errors,
+              blockedMessage: decision.message ?? null,
+              consecutiveBlocks: contentErrors(validation.errors).length > 0
+                ? guardrailState.consecutiveBlocks + 1
+                : guardrailState.consecutiveBlocks,
             },
           },
         });
+      }
+
+      // === BOUNDED RETRIES: count content blocks, escalate at the threshold ===
+      // Scheduling errors (SMS hours, anti-spam) are not strikes: the same
+      // message passes once the clock allows. Everything else is one strike;
+      // at GUARDRAIL_ESCALATION_THRESHOLD in a row the lead gets a human.
+      const strikeErrors = contentErrors(validation.errors);
+      const blocksNow = strikeErrors.length > 0 ? guardrailState.consecutiveBlocks + 1 : guardrailState.consecutiveBlocks;
+      if (strikeErrors.length > 0 && blocksNow >= GUARDRAIL_ESCALATION_THRESHOLD) {
+        console.log(
+          `[Holly Agent] 🚨 ${lead.firstName}: ${blocksNow} consecutive guardrail blocks - escalating to a human, no further retries`
+        );
+        if (!DRY_RUN_MODE) {
+          await escalateGuardrailLoop({
+            lead,
+            now,
+            source: 'agent',
+            state: {
+              ...guardrailState,
+              consecutiveBlocks: blocksNow,
+              lastBlock: {
+                createdAt: now,
+                errors: strikeErrors,
+                blockedAction: decision.action,
+                blockedMessage: decision.message,
+              },
+            },
+          });
+        }
+        return { success: false, reason: validation.errors.join(', '), escalated: true, guardrailBlocks: blocksNow };
       }
 
       // Smart retry scheduling based on block reason
@@ -548,11 +632,12 @@ export async function processLeadWithAutonomousAgent(
           `[Holly Agent] ⏱️  ${lead.firstName}: Anti-spam block, next review at ${nextReviewAt.toISOString()}`
         );
       } else {
-        // OTHER BLOCKS (opt-out, finality promise, etc.): Retry in 1 hour
-        nextReviewAt = new Date(now.getTime() + 60 * 60 * 1000);
+        // OTHER BLOCKS (opt-out, finality promise, etc.): retry in 1 hour, and
+        // the retry is told what was rejected (see guardrailRetryContext above).
+        nextReviewAt = new Date(now.getTime() + GUARDRAIL_RETRY_HOURS * 60 * 60 * 1000);
 
         console.log(
-          `[Holly Agent] ⏱️  ${lead.firstName}: Retry in 1 hour due to: ${validation.errors[0]}`
+          `[Holly Agent] ⏱️  ${lead.firstName}: Retry in ${GUARDRAIL_RETRY_HOURS}h (block ${blocksNow} of ${GUARDRAIL_ESCALATION_THRESHOLD}) due to: ${validation.errors[0]}`
         );
       }
 
@@ -561,7 +646,7 @@ export async function processLeadWithAutonomousAgent(
         data: { nextReviewAt },
       });
 
-      return { success: false, reason: validation.errors.join(', ') };
+      return { success: false, reason: validation.errors.join(', '), guardrailBlocks: blocksNow };
     }
 
     // === CHECK FOR REPETITION (if sending message) ===

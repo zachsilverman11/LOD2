@@ -19,7 +19,7 @@ import { MIN_HOURS_BETWEEN_UNANSWERED_OUTBOUND } from '../lib/holly/guardrails';
 jest.mock('../lib/db', () => ({
   prisma: {
     lead: { updateMany: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
-    leadActivity: { create: jest.fn() },
+    leadActivity: { create: jest.fn(), findMany: jest.fn() },
   },
 }));
 jest.mock('../lib/holly/decision-engine', () => ({ askHollyToDecide: jest.fn() }));
@@ -114,6 +114,7 @@ beforeEach(() => {
   mockPrisma.lead.updateMany.mockResolvedValue({ count: 1 });
   mockPrisma.lead.update.mockResolvedValue({} as any);
   mockPrisma.leadActivity.create.mockResolvedValue({} as any);
+  mockPrisma.leadActivity.findMany.mockResolvedValue([]);
 });
 
 describe('advisor cancellation: hold', () => {
