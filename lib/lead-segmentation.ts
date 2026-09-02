@@ -70,12 +70,31 @@ export function deriveLeadSegment(params: {
 }
 
 /**
+ * Product strings that mean "reverse mortgage" without saying "reverse".
+ * Lowercased input expected.
+ */
+const REVERSE_MORTGAGE_ALIASES =
+  /reverse|home\s*equity\s*conversion|\bhecm\b|equity\s*release|\bchip\b|retirement\s*income\s*mortgage|senior[s]?\s*(equity|lending)|\b55\s*\+?\s*equity/;
+
+/**
  * Derive intent from form data
  */
 function deriveIntent(rawData: any): LeadIntent {
   const loanType = (rawData?.loanType || rawData?.loan_type || rawData?.mortgage_type || '').toLowerCase();
   const primaryGoal = (rawData?.primary_goal || rawData?.goal || '').toLowerCase();
   const motivation = (rawData?.motivation_level || '').toLowerCase();
+
+  // Check for reverse mortgage (55+) FIRST. Vendor product names for this
+  // ("Home Equity Conversion Mortgage", "Equity Release", "55+ Equity Access")
+  // contain "equity" and not "reverse", so the equity branch below used to
+  // catch them. A reverse lead must never inherit the equity/declined playbook.
+  if (
+    REVERSE_MORTGAGE_ALIASES.test(loanType) ||
+    REVERSE_MORTGAGE_ALIASES.test(primaryGoal) ||
+    rawData?.age_55_plus === true
+  ) {
+    return 'reverse';
+  }
 
   // Check for equity take-out
   if (
@@ -113,15 +132,6 @@ function deriveIntent(rawData: any): LeadIntent {
     primaryGoal.includes('purchase')
   ) {
     return 'purchase';
-  }
-
-  // Check for reverse mortgage (55+)
-  if (
-    loanType.includes('reverse') ||
-    primaryGoal.includes('reverse') ||
-    rawData?.age_55_plus === true
-  ) {
-    return 'reverse';
   }
 
   // Check for rate shopping

@@ -13,9 +13,18 @@
 export function buildReportPreSellSection(params: {
   isAltPrivate: boolean;
   hasUpcomingAppointment: boolean;
+  /** alt_private lead with reverse-mortgage intent: no blocker, no "bank said no". */
+  isReverse?: boolean;
 }): string {
   if (params.hasUpcomingAppointment) {
     return 'This lead already has a booked call. The report pre-sell is not required. Focus on preparation and excitement.';
+  }
+  if (params.isAltPrivate && params.isReverse) {
+    return `**🚨 THIS LEAD HAS NOT BOOKED A CALL YET (alt_private, reverse mortgage).**
+
+Do NOT mention the Mortgage Strategy Report, rate comparisons, rate-vs-cost, penalties, cash back, or any bankable program. Those are the conventional playbook and they are off-playbook for this segment.
+
+The reason to book is an unhurried, no-obligation information call: how accessing equity without a monthly mortgage payment works, and what it would mean for them. Nobody has said no to this lead and there is no blocker to diagnose. No urgency, no deadlines, and eligibility or suitability is the advisor's call, not yours.`;
   }
   if (params.isAltPrivate) {
     return `**🚨 THIS LEAD HAS NOT BOOKED A CALL YET (alt_private).**
@@ -79,7 +88,11 @@ export function buildBookingHookLines(params: {
   isAltPrivate: boolean;
   hookName: string;
   hookAngle: string;
+  isReverse?: boolean;
 }): string {
+  if (params.isAltPrivate && params.isReverse) {
+    return `**Booking hook for this lead:** "Equity Without The Monthly Payment" (reverse mortgage). Dignity and options in retirement: access to equity they already own, without a monthly mortgage payment. Unhurried, no obligation, zero urgency, no declined framing. Whether it is available or suitable is the advisor's call.`;
+  }
   if (params.isAltPrivate) {
     return `**Booking hook for this lead:** none (alt_private). The call is the value: understanding the blocker and whether a path exists. No report, no rate angle, no cash back.`;
   }

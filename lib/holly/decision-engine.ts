@@ -220,6 +220,8 @@ export async function askHollyToDecide(
   // Segment gate, same predicate as buildHollyBriefing (brain.ts): alt_private
   // leads get no bankable hooks anywhere in this prompt, not just in the briefing.
   const isAltPrivate = (lead.segment || rawData?.segment) === 'alt_private';
+  // Reverse-mortgage intent (stored by deriveIntent at ingest): same segment, different framing.
+  const isReverse = isAltPrivate && String(lead.intent || rawData?.intent || '').toLowerCase() === 'reverse';
   const firstName = lead.firstName || rawData?.first_name || rawData?.name?.split(' ')[0] || 'there';
 
   // Get current date/time context
@@ -408,7 +410,7 @@ export async function askHollyToDecide(
   const urgentBooking = isImmediateBooking(rawData);
 
   // === LAYER 3: SALES PSYCHOLOGY ===
-  const conversationGuidance = getConversationGuidance(outboundCount + 1, inboundCount > 0, isAltPrivate);
+  const conversationGuidance = getConversationGuidance(outboundCount + 1, inboundCount > 0, isAltPrivate, isReverse);
 
   // === LAYER 4: TRAINING EXAMPLES ===
   // Calculate appointment context for better example selection
@@ -807,7 +809,7 @@ ${psychologySection}
 
 ## 🎯 YOUR DECISION TASK FOR THIS LEAD
 
-${buildReportPreSellSection({ isAltPrivate, hasUpcomingAppointment: !!hasUpcomingAppointment })}
+${buildReportPreSellSection({ isAltPrivate, isReverse, hasUpcomingAppointment: !!hasUpcomingAppointment })}
 ${options.extraContext ?? ''}
 
 ---
@@ -823,7 +825,7 @@ ${signals.reasoningContext}
 **Relevant value proposition for this lead:**
 ${valueProp}
 
-${buildBookingHookLines({ isAltPrivate, hookName: selectedHook.name, hookAngle: selectedHook.angle })}
+${buildBookingHookLines({ isAltPrivate, isReverse, hookName: selectedHook.name, hookAngle: selectedHook.angle })}
 
 ---
 
