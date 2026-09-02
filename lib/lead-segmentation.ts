@@ -77,6 +77,13 @@ const REVERSE_MORTGAGE_ALIASES =
   /reverse|home\s*equity\s*conversion|\bhecm\b|equity\s*release|\bchip\b|retirement\s*income\s*mortgage|senior[s]?\s*(equity|lending)|\b55\s*\+?\s*equity/;
 
 /**
+ * Goal strings that mean "take equity out of the home".
+ * Lowercased input expected. "consolidat" is a stem on purpose: it covers
+ * "consolidate debt", "debt consolidation" and "consolidating debts".
+ */
+const EQUITY_TAKEOUT_ALIASES = /equity|cash|consolidat/;
+
+/**
  * Derive intent from form data
  */
 function deriveIntent(rawData: any): LeadIntent {
@@ -96,11 +103,15 @@ function deriveIntent(rawData: any): LeadIntent {
     return 'reverse';
   }
 
-  // Check for equity take-out
+  // Check for equity take-out BEFORE refinance. A stated goal is more specific
+  // than a product/loan type: debt-consolidation leads almost always arrive as
+  // mortgage_type "refinance" with primary_goal "consolidate debt", and the
+  // refinance branch below would otherwise swallow them. Same ordering fix as
+  // the reverse branch above — most specific signal wins.
+  // Matched on the "consolidat" stem so "consolidate", "consolidation" and
+  // "consolidating" all land here; ".includes('consolidate')" missed the noun.
   if (
-    primaryGoal.includes('equity') ||
-    primaryGoal.includes('cash') ||
-    primaryGoal.includes('consolidate') ||
+    EQUITY_TAKEOUT_ALIASES.test(primaryGoal) ||
     (rawData?.withdraw_amount && parseInt(rawData.withdraw_amount) > 0)
   ) {
     return 'equity';
@@ -154,11 +165,10 @@ function deriveBankability(rawData: any): LeadBankability {
   const bankStatus = (rawData?.bank_status || '').toLowerCase();
   const approved = rawData?.bank_approved;
 
-  // Check explicit fields
-  if (borrowerProfile.includes('approved at bank') || bankStatus === 'approved' || approved === true) {
-    return 'bank_approved';
-  }
-
+  // Check the NEGATIVE first: "not approved at bank" contains the substring
+  // "approved at bank", so testing the positive first mis-classified every
+  // declined borrower as bank_approved — the exact opposite of the truth, and
+  // it would route them into the prime playbook.
   if (
     borrowerProfile.includes('not approved') ||
     borrowerProfile.includes('bank said no') ||
@@ -166,6 +176,10 @@ function deriveBankability(rawData: any): LeadBankability {
     approved === false
   ) {
     return 'not_approved';
+  }
+
+  if (borrowerProfile.includes('approved at bank') || bankStatus === 'approved' || approved === true) {
+    return 'bank_approved';
   }
 
   if (borrowerProfile.includes('unsure') || bankStatus === 'unsure') {
