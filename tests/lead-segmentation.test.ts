@@ -86,6 +86,37 @@ describe('Lead Segmentation', () => {
       expect(result.intent).toBe('equity');
     });
 
+    // The consolidation stem is matched on "consolidat" so the noun, verb and
+    // gerund all land on equity. Each of these pairs a consolidation goal with a
+    // "refinance" loan type and contains NO "equity"/"cash", so they discriminate
+    // the stem fix: on the old .includes('consolidate') they returned 'refinance'.
+    const consolidationGoals = [
+      'debt consolidation',
+      'consolidate debt',
+      'consolidating my debts',
+      'Debt Consolidation',
+    ];
+
+    consolidationGoals.forEach((goal) => {
+      it(`classifies "${goal}" as equity, not refinance`, () => {
+        const result = deriveLeadSegment({
+          source: 'financevine',
+          rawData: { mortgage_type: 'refinance', primary_goal: goal },
+        });
+
+        expect(result.intent).toBe('equity');
+      });
+    });
+
+    it('still classifies a genuine refinance as refinance', () => {
+      const result = deriveLeadSegment({
+        source: 'financevine',
+        rawData: { mortgage_type: 'refinance', primary_goal: 'lower payment' },
+      });
+
+      expect(result.intent).toBe('refinance');
+    });
+
     it('detects refinance intent from loan type', () => {
       const result = deriveLeadSegment({
         source: 'leads_on_demand',

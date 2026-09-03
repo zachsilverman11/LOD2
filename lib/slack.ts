@@ -81,6 +81,13 @@ export async function sendSlackNotification(notification: SlackNotification) {
       message = `*${leadName}* converted! 🎉\n${details || ""}`;
       break;
 
+    case "lead_updated":
+      emoji = "🔁";
+      color = "#625FFF";
+      title = "Lead Re-Submitted";
+      message = `*${leadName}* filled out the form again.\n${details || ""}`;
+      break;
+
     case "lead_escalated":
       emoji = "🚨";
       color = "#FF0000";

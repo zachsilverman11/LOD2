@@ -5,6 +5,84 @@ import { correctNames } from "@/lib/name-correction";
 import { deriveLeadSegment, formatPhoneE164 } from "@/lib/lead-segmentation";
 
 /**
+ * Statuses the autonomous Holly cron will NOT act on. Mirrors the eligibility
+ * filter in lib/holly/agent.ts (:1016) — pulling `nextReviewAt` forward for a
+ * lead in any of these states is a no-op, so we notify a human instead.
+ */
+const HOLLY_CRON_INELIGIBLE_STATUSES = [
+  "LOST",
+  "CONVERTED",
+  "DEALS_WON",
+  "APPLICATION_STARTED",
+  "CALL_SCHEDULED",
+];
+
+/**
+ * FinanceVine timing: 5-min opt-out window on their number + ~30-min handoff
+ * delay before the first Inspired SMS.
+ */
+const FINANCEVINE_HANDOFF_DELAY_MINUTES = 30;
+
+/**
+ * Would the autonomous cron pick this lead up at all?
+ */
+export function isHollyContactable(lead: {
+  status: string;
+  consentSms: boolean;
+  managedByAutonomous: boolean;
+  hollyDisabled: boolean;
+}): boolean {
+  return (
+    lead.consentSms &&
+    lead.managedByAutonomous &&
+    !lead.hollyDisabled &&
+    !HOLLY_CRON_INELIGIBLE_STATUSES.includes(lead.status)
+  );
+}
+
+/**
+ * A re-submission is a strong buying signal, so it should never sit behind a
+ * cadence set by an older conversation. Pull `nextReviewAt` forward to the
+ * handoff delay when the lead is contactable and its current review is further
+ * out (or unset) — but NEVER push it later, which would delay a lead already
+ * due for contact.
+ */
+export function resolveResubmissionReview(
+  lead: {
+    status: string;
+    consentSms: boolean;
+    managedByAutonomous: boolean;
+    hollyDisabled: boolean;
+    nextReviewAt: Date | null;
+  },
+  handoffAt: Date
+): { shouldSchedule: boolean; reason: string } {
+  if (!isHollyContactable(lead)) {
+    return {
+      shouldSchedule: false,
+      reason: `lead is not in the autonomous cron's scope (status ${lead.status}${
+        lead.hollyDisabled ? ", Holly disabled" : ""
+      })`,
+    };
+  }
+
+  if (lead.nextReviewAt !== null && lead.nextReviewAt <= handoffAt) {
+    return {
+      shouldSchedule: false,
+      reason: `already due sooner (${lead.nextReviewAt.toISOString()})`,
+    };
+  }
+
+  return {
+    shouldSchedule: true,
+    reason:
+      lead.nextReviewAt === null
+        ? "no review was scheduled"
+        : `review was ${lead.nextReviewAt.toISOString()}`,
+  };
+}
+
+/**
  * Webhook endpoint for FinanceVine leads via Zapier
  * 
  * These are typically private/alternative leads:
@@ -114,6 +192,7 @@ export async function POST(req: NextRequest) {
     });
 
     let lead;
+    let resubmissionScheduled = false;
 
     if (existingLead) {
       // Update existing lead with new data
@@ -149,6 +228,66 @@ export async function POST(req: NextRequest) {
       });
 
       console.log(`[FinanceVine] Updated existing lead: ${lead.id}, source: financevine`);
+
+      // === RE-SUBMISSION HANDLING ===
+      // A returning lead re-filling the form is a fresh buying signal. Previously
+      // the update path did neither of the two things below: no Slack fired and
+      // nextReviewAt was left on whatever cadence an older conversation had set,
+      // so a re-submission was a silent row mutation.
+      const handoffAt = new Date(
+        Date.now() + FINANCEVINE_HANDOFF_DELAY_MINUTES * 60 * 1000
+      );
+      const review = resolveResubmissionReview(lead, handoffAt);
+
+      if (review.shouldSchedule) {
+        try {
+          await prisma.lead.update({
+            where: { id: lead.id },
+            data: { nextReviewAt: handoffAt },
+          });
+          resubmissionScheduled = true;
+
+          await prisma.leadActivity.create({
+            data: {
+              leadId: lead.id,
+              type: "NOTE_ADDED",
+              content: `🔁 Re-submitted the FinanceVine form. Next review pulled forward to ${handoffAt.toISOString()} (${review.reason}).`,
+            },
+          });
+
+          console.log(
+            `[FinanceVine] Re-submission: pulled nextReviewAt forward to ${handoffAt.toISOString()} for ${lead.id}`
+          );
+        } catch (error) {
+          console.error("[FinanceVine] Failed to pull review forward:", error);
+          await sendErrorAlert({
+            error: error instanceof Error ? error : new Error(String(error)),
+            context: {
+              location: "webhooks/financevine - re-submission scheduling",
+              leadId: lead.id,
+            },
+          });
+        }
+      } else {
+        console.log(
+          `[FinanceVine] Re-submission: left nextReviewAt alone for ${lead.id} — ${review.reason}`
+        );
+      }
+
+      // Always notify, contactable or not. When we cannot schedule (lead is LOST,
+      // converted, has a call booked, or Holly is off), the Slack message IS the
+      // handoff to a human.
+      const resubGoal = primaryGoal || mortgageType || "mortgage inquiry";
+      const resubScheduleNote = resubmissionScheduled
+        ? `Holly review pulled forward to ${handoffAt.toISOString()}.`
+        : `Holly review NOT rescheduled — ${review.reason}.`;
+
+      await sendSlackNotification({
+        type: "lead_updated",
+        leadName: `${correctedFirstName} ${correctedLastName}`,
+        leadId: lead.id,
+        details: `Re-submitted the FinanceVine form: ${resubGoal}\n\nStatus ${lead.status} · segment ${segmentation.segment} · intent ${segmentation.intent} · bankability ${segmentation.bankability}\n${resubScheduleNote}`,
+      });
     } else {
       // Get current cohort config
       const cohortConfig = await prisma.cohortConfig.findFirst({
@@ -247,7 +386,6 @@ export async function POST(req: NextRequest) {
       console.log(`[Autonomous Holly] Scheduling FinanceVine lead for first contact in ~30 minutes: ${lead.id}`);
 
       try {
-        const FINANCEVINE_HANDOFF_DELAY_MINUTES = 30;
         const nextReviewAt = new Date(Date.now() + FINANCEVINE_HANDOFF_DELAY_MINUTES * 60 * 1000);
 
         await prisma.lead.update({
@@ -285,7 +423,9 @@ export async function POST(req: NextRequest) {
       leadId: lead.id,
       status: existingLead ? "updated" : "created",
       segment: segmentation.segment,
-      aiContactScheduled: !existingLead && lead.consentSms,
+      aiContactScheduled: existingLead
+        ? resubmissionScheduled
+        : lead.consentSms,
     });
   } catch (error) {
     console.error("[FinanceVine] Webhook error:", error);
