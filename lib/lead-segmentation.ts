@@ -158,6 +158,28 @@ function deriveIntent(rawData: any): LeadIntent {
 }
 
 /**
+ * Phrasings that mean "the bank turned me down".
+ * Lowercased input expected.
+ *
+ * Substring matching is not enough here: FinanceVine's own form value is
+ * "I'm not able to get approved at the bank", which contains neither the
+ * literal "not approved" nor "bank said no", but DOES contain "approved at
+ * the bank". Matching the positive first — or matching only the two literals
+ * — tags a declined borrower as bankable and routes them to the prime
+ * playbook, the exact opposite of the truth.
+ */
+const NOT_BANKABLE_ALIASES =
+  /not\s+able\s+to\s+(?:get\s+)?approved|\bunable\b|\bcan'?t\b|\bcannot\b|\bdeclined?\b|\bdenied\b|\bsaid\s+no\b|\bturned\s+down\b|\bnot\s+approved\b/;
+
+/**
+ * Explicit approval language. Deliberately narrow — it must name the bank
+ * approving, not merely contain the word "approved", because every negative
+ * phrasing above contains "approved" too.
+ */
+const BANK_APPROVED_ALIASES =
+  /\bpre[\s-]?approved\b|\bapproved\s+(?:at|by|with)\s+(?:the\s+)?bank\b|\bbank\s+approved\b/;
+
+/**
  * Derive bankability from form data
  */
 function deriveBankability(rawData: any): LeadBankability {
@@ -165,20 +187,23 @@ function deriveBankability(rawData: any): LeadBankability {
   const bankStatus = (rawData?.bank_status || '').toLowerCase();
   const approved = rawData?.bank_approved;
 
-  // Check the NEGATIVE first: "not approved at bank" contains the substring
-  // "approved at bank", so testing the positive first mis-classified every
-  // declined borrower as bank_approved — the exact opposite of the truth, and
-  // it would route them into the prime playbook.
-  if (
-    borrowerProfile.includes('not approved') ||
-    borrowerProfile.includes('bank said no') ||
-    bankStatus === 'not_approved' ||
-    approved === false
-  ) {
+  // Check the NEGATIVE first. Every declined phrasing contains the word
+  // "approved", so a positive-first check reads them backwards.
+  const isNotBankable = NOT_BANKABLE_ALIASES.test(borrowerProfile);
+
+  if (isNotBankable || bankStatus === 'not_approved' || approved === false) {
     return 'not_approved';
   }
 
-  if (borrowerProfile.includes('approved at bank') || bankStatus === 'approved' || approved === true) {
+  // Positive requires explicit approval language AND no negation anywhere in
+  // the profile. The negation guard is redundant given the early return above,
+  // and deliberately so: it keeps this branch correct on its own if the order
+  // is ever changed.
+  if (
+    (!isNotBankable && BANK_APPROVED_ALIASES.test(borrowerProfile)) ||
+    bankStatus === 'approved' ||
+    approved === true
+  ) {
     return 'bank_approved';
   }
 
