@@ -162,6 +162,77 @@ describe('Lead Segmentation', () => {
     });
   });
 
+  describe('Bankability Derivation', () => {
+    const bankability = (borrower_profile: string) =>
+      deriveLeadSegment({ source: 'financevine', rawData: { borrower_profile } }).bankability;
+
+    // The four phrasings probed against production during PR #26 verification,
+    // plus FinanceVine's literal form value. Two of these were wrong before:
+    // "Not able to get approved at the bank" returned 'unknown', and without
+    // the "the" it returned 'bank_approved' — a declined borrower tagged
+    // bankable, which routes them into the prime playbook.
+    const declined = [
+      'Not able to get approved at the bank',
+      'Not able to get approved at bank',
+      'not approved at bank',
+      'Bank said no',
+      "I'm not able to get approved at the bank",
+    ];
+
+    declined.forEach((profile) => {
+      it(`treats "${profile}" as not_approved`, () => {
+        expect(bankability(profile)).toBe('not_approved');
+      });
+    });
+
+    // Each alias in the set, in a natural sentence.
+    const aliasPhrasings = [
+      'Unable to get approved at the bank',
+      "Can't get approved at my bank",
+      'Cannot get approved at the bank',
+      'The bank declined me',
+      'I was denied by the bank',
+      'Bank turned down my application',
+    ];
+
+    aliasPhrasings.forEach((profile) => {
+      it(`treats "${profile}" as not_approved`, () => {
+        expect(bankability(profile)).toBe('not_approved');
+      });
+    });
+
+    it('still recognises explicit approval', () => {
+      expect(bankability('approved at bank')).toBe('bank_approved');
+      expect(bankability('Approved at the bank')).toBe('bank_approved');
+      expect(bankability('Pre-approved')).toBe('bank_approved');
+    });
+
+    it('does not read approval out of a declined phrasing', () => {
+      // Contains "approved at the bank" as a substring, but is a decline.
+      expect(bankability('Unable to get approved at the bank')).not.toBe('bank_approved');
+    });
+
+    it('preserves unsure', () => {
+      expect(bankability('unsure')).toBe('unsure');
+      expect(bankability('Unsure if I qualify')).toBe('unsure');
+    });
+
+    it('preserves unknown for an unrecognised profile', () => {
+      expect(bankability('Self-employed, good credit')).toBe('unknown');
+    });
+
+    it('honours the structured fields', () => {
+      const viaFlag = (rawData: any) =>
+        deriveLeadSegment({ source: 'financevine', rawData }).bankability;
+
+      expect(viaFlag({ bank_approved: true })).toBe('bank_approved');
+      expect(viaFlag({ bank_approved: false })).toBe('not_approved');
+      expect(viaFlag({ bank_status: 'approved' })).toBe('bank_approved');
+      expect(viaFlag({ bank_status: 'not_approved' })).toBe('not_approved');
+      expect(viaFlag({ bank_status: 'unsure' })).toBe('unsure');
+    });
+  });
+
   describe('formatPhoneE164', () => {
     it('formats 10-digit phone to E.164', () => {
       expect(formatPhoneE164('6045551234')).toBe('+16045551234');
