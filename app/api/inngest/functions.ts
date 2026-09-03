@@ -44,9 +44,17 @@ export const processLeadReply = inngest.createFunction(
   },
   { event: "lead/reply" },
   async ({ event, step }) => {
-    const { leadId, message, phone } = event.data;
+    const { leadId, message, phone, delaySeconds } = event.data;
 
     console.log(`[Inngest Worker] Processing lead reply: ${leadId}`);
+
+    // Step 0 (FinanceVine relay only): a reply that beat the vendor webhook was
+    // attributed to a provisional lead. Give the webhook a head start so Holly
+    // opens with the lead's name and profile rather than placeholders.
+    if (typeof delaySeconds === "number" && delaySeconds > 0) {
+      console.log(`[Inngest Worker] ⏳ Waiting ${delaySeconds}s for the vendor webhook before processing ${leadId}`);
+      await step.sleep("wait-for-vendor-webhook", `${Math.ceil(delaySeconds)}s`);
+    }
 
     // Step 1: Process with Autonomous Holly Agent
     const result = await step.run("process-with-autonomous-holly", async () => {

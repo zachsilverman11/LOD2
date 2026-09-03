@@ -21,6 +21,7 @@ import {
   buildPostCancellationFollowUpContext,
 } from './post-cancellation';
 import { resolveStageMove, defaultReviewHoursForStage } from './stage-move';
+import { isOptOutMessage, buildRelayHandoffContext } from '../financevine-relay';
 import {
   GUARDRAIL_ESCALATION_THRESHOLD,
   GUARDRAIL_RETRY_HOURS,
@@ -193,17 +194,10 @@ export async function processLeadWithAutonomousAgent(
             .filter((c: any) => c.direction === 'INBOUND')
             .sort((a: any, b: any) => a.createdAt.getTime() - b.createdAt.getTime())[0];
 
-          const optOutPatterns = [
-            /\bstop\b/i,
-            /\bunsubscribe\b/i,
-            /\bdon'?t\s+(bother|contact|text|call)/i,
-            /\bno\s+longer\s+interested\b/i,
-            /\bremove\s+me\b/i,
-          ];
-
-          const isOptOut = optOutPatterns.some((pattern) =>
-            pattern.test(firstInbound.content)
-          );
+          // Same classifier as the relay path (lib/financevine-relay.ts), so a
+          // relayed opt-out that the vendor webhook later re-consented is still
+          // caught here from the stored inbound text. A bare "no" does not match.
+          const isOptOut = isOptOutMessage(firstInbound.content);
 
           if (isOptOut) {
             console.log(
@@ -372,7 +366,10 @@ export async function processLeadWithAutonomousAgent(
     console.log(`[Holly Agent] 🎭 ${lead.firstName}: Stage = ${conversationStage}`);
 
     // === ASK HOLLY TO DECIDE ===
-    const extraContext = [postCancellationContext, guardrailRetryContext].filter(Boolean).join('\n\n') || undefined;
+    // Relay handoff: the latest inbound came through FinanceVine's number, so
+    // Holly's reply is the first thing the lead sees from ours.
+    const relayHandoffContext = buildRelayHandoffContext(lead);
+    const extraContext = [postCancellationContext, guardrailRetryContext, relayHandoffContext].filter(Boolean).join('\n\n') || undefined;
     const decision = await askHollyToDecide(lead, signals, { extraContext });
 
     // === VALIDATE DECISION ===
