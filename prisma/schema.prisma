@@ -50,7 +50,11 @@ model Lead {
   // and from `cohort` (batch/campaign identity): a vendor can send more than
   // one vertical, and a vertical can come from more than one vendor.
   // Typed String? to match the existing `cohort` convention rather than
-  // introducing an enum. Populated by lib/holly/verticals/classify.ts.
+  // introducing an enum.
+  // NO LONGER POPULATED. The classifier that wrote it
+  // (lib/holly/verticals/classify.ts) was deleted 2026-09-03; alt-lending
+  // ships on the `segment` axis instead, derived at ingest by
+  // lib/lead-segmentation.ts. Column retained for existing rows.
   vertical               String?
   processingStartedAt    DateTime?
   lastSlackAlertAt       DateTime?

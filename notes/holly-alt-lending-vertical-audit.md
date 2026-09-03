@@ -1,5 +1,23 @@
 # Holly: Alt-Lending / Private Mortgage Vertical — Audit & Architecture Recommendation
 
+> **Superseded — read as history, not as current state.** (Annotated 2026-09-03.)
+>
+> This document's central premise — that no alt-lending support exists in the
+> product — predates PR #3 and is no longer true. Alt-lending is live on `main`:
+> segmentation (`lib/lead-segmentation.ts`) derives `segment` / `intent` /
+> `bankability` at ingest; the `alt_private` playbook, its banned-phrase block,
+> the numeric guardrail and the reverse-mortgage framing all ship in
+> `lib/holly/brain.ts` and `lib/holly/guardrails.ts`.
+>
+> The design proposed below was implemented on a different axis than it
+> recommends: the shipped work keys off the `segment` field, not the `vertical`
+> column this document designs around. The two draft modules it refers to,
+> `lib/holly/verticals/classify.ts` and `lib/holly/verticals/alt-lending.draft.ts`,
+> were deleted on 2026-09-03 — all surviving content had been ported. The
+> `Lead.vertical` column still exists but is no longer populated.
+>
+> Kept for the reasoning and the audit findings, which are still sound.
+
 Status: **Research + design only. No production files were modified.** See "Verification" at the end.
 
 ---

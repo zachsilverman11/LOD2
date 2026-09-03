@@ -1,5 +1,22 @@
 # Legacy Path Investigation — is `lib/autonomous-agent.ts` live?
 
+> **Partially superseded — read the alt-lending framing as history.** (Annotated 2026-09-03.)
+>
+> The dead-island findings below (`lib/autonomous-agent.ts`,
+> `lib/safety-guardrails.ts`, `lib/ai-conversation-enhanced.ts`) still hold and
+> are still worth acting on.
+>
+> What has changed is the premise around them: this note was written when no
+> alt-lending support existed in the product. That predates PR #3 and is no
+> longer true. Alt-lending is live on `main` — segmentation at ingest
+> (`lib/lead-segmentation.ts`) plus the `alt_private` playbook, banned-phrase
+> block, numeric guardrail and reverse-mortgage framing in `lib/holly/brain.ts`
+> and `lib/holly/guardrails.ts`. `HOLLY_ALT_LENDING_GUARDRAILS` has since been
+> set in production.
+>
+> The draft modules referenced here, `lib/holly/verticals/classify.ts` and
+> `lib/holly/verticals/alt-lending.draft.ts`, were deleted on 2026-09-03.
+
 **Date:** 2026-09-01 · **Type:** read-only investigation, no files changed
 **Question:** can any live traffic reach `lib/autonomous-agent.ts`, `lib/safety-guardrails.ts`,
 or `lib/ai-conversation-enhanced.ts`? This must be settled before
