@@ -28,37 +28,37 @@ const LEAD_10 = '6478553592';
 // handler sees what the first one wrote.
 const leads: any[] = [];
 
-const mockLeadCreate = jest.fn(async ({ data }: any) => {
+const mockLeadCreate: jest.Mock = jest.fn(async ({ data }: any) => {
   const row = { id: `lead-${leads.length + 1}`, nextReviewAt: null, status: 'NEW', managedByAutonomous: true, hollyDisabled: false, ...data };
   leads.push(row);
   return row;
 });
-const mockLeadUpdate = jest.fn(async ({ where, data }: any) => {
+const mockLeadUpdate: jest.Mock = jest.fn(async ({ where, data }: any) => {
   const row = leads.find((l) => l.id === where.id);
   Object.assign(row, data);
   return row;
 });
-const mockLeadFindFirst = jest.fn(async ({ where }: any) => {
+const mockLeadFindFirst: jest.Mock = jest.fn(async ({ where }: any) => {
   const ors: any[] = where.OR ?? [where];
   return leads.find((l) => ors.some((cond) => (cond.email && l.email === cond.email) || (cond.phone && l.phone === cond.phone))) ?? null;
 });
-const mockFindLeadByPhone = jest.fn(async (phone: string) => leads.find((l) => l.phone === phone) ?? null);
-const mockCommunicationCreate = jest.fn(async ({ data }: any) => ({ id: 'comm', ...data }));
-const mockInngestSend = jest.fn(async () => ({}));
+const mockFindLeadByPhone: jest.Mock = jest.fn(async (phone: string) => leads.find((l) => l.phone === phone) ?? null);
+const mockCommunicationCreate: jest.Mock = jest.fn(async ({ data }: any) => ({ id: 'comm', ...data }));
+const mockInngestSend: jest.Mock = jest.fn(async () => ({}));
 
 jest.mock('../lib/phone-matching', () => ({
-  findLeadByPhone: (...a: any[]) => mockFindLeadByPhone(...(a as [string])),
+  findLeadByPhone: (...a: any[]) => mockFindLeadByPhone(...a),
 }));
 
 jest.mock('../lib/db', () => ({
   prisma: {
     lead: {
-      create: (...a: any[]) => mockLeadCreate(...(a as [any])),
-      update: (...a: any[]) => mockLeadUpdate(...(a as [any])),
-      findFirst: (...a: any[]) => mockLeadFindFirst(...(a as [any])),
+      create: (...a: any[]) => mockLeadCreate(...a),
+      update: (...a: any[]) => mockLeadUpdate(...a),
+      findFirst: (...a: any[]) => mockLeadFindFirst(...a),
     },
     communication: {
-      create: (...a: any[]) => mockCommunicationCreate(...(a as [any])),
+      create: (...a: any[]) => mockCommunicationCreate(...a),
       findUnique: jest.fn(async () => null),
     },
     leadActivity: { create: jest.fn(async () => ({})) },
@@ -68,7 +68,7 @@ jest.mock('../lib/db', () => ({
 }));
 
 jest.mock('../lib/inngest', () => ({
-  inngest: { send: (...a: any[]) => mockInngestSend(...(a as [any])) },
+  inngest: { send: (...a: any[]) => mockInngestSend(...a) },
 }));
 
 jest.mock('../lib/slack', () => ({
