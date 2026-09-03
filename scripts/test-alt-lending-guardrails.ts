@@ -27,9 +27,9 @@ import {
  * Fixtures are inline literals, deliberately.
  *
  * They used to be scraped out of lib/holly/verticals/alt-lending.draft.ts with
- * readFileSync + a regex. That module is slated for removal, and a test that
- * silently loses its corpus when a file disappears is worse than one that
- * pins the copy it cares about. These are the 16 message/hook/nudge literals
+ * readFileSync + a regex. That module was deleted on 2026-09-03, and a test
+ * that silently loses its corpus when a file disappears is worse than one that
+ * pins the copy it cares about — which is why these were inlined first. These are the 16 message/hook/nudge literals
  * as of bc42cfe — they are the realistic alt-lending copy this guardrail must
  * never false-positive on.
  */
