@@ -42,6 +42,15 @@ model Lead {
   hollyDisabled          Boolean               @default(false)
   cohort                 String?
   cohortStartDate        DateTime?
+  // The lead vendor's OWN unique id for this lead (FinanceVine sends it as
+  // `id`). Primary dedupe key at ingest, ahead of phone/email: a returning
+  // lead who changes the email they submit with must still match their
+  // existing row rather than create a second one.
+  // NULLABLE and NOT backfilled — every lead predating this column, and every
+  // source that sends no id, simply has NULL and dedupes on phone/email as
+  // before. Deliberately NOT @unique: two sources could in principle collide
+  // on an id string, and a unique violation at ingest would drop a real lead.
+  vendorLeadId           String?
   // Which kind of lending this lead needs. Drives conversation behaviour:
   // which vertical prompt module, hooks, and guardrails apply.
   // NULLABLE and NOT backfilled. NULL is read as conventional — every lead
@@ -79,6 +88,7 @@ model Lead {
   @@index([managedByAutonomous])
   @@index([hollyDisabled])
   @@index([cohort])
+  @@index([vendorLeadId])
   @@index([vertical])
   @@index([lastContactedAt])
   @@index([processingStartedAt])

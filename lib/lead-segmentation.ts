@@ -84,6 +84,30 @@ const REVERSE_MORTGAGE_ALIASES =
 const EQUITY_TAKEOUT_ALIASES = /equity|cash|consolidat/;
 
 /**
+ * Is the "55+" reverse-mortgage age flag set?
+ *
+ * FinanceVine's form only asks this on reverse-mortgage inquiries, so a "Yes"
+ * is a reverse signal in its own right — it must catch a reverse lead even
+ * when the product string is one we have never seen. Their key is the literal
+ * "55"; the older ingest shape sends the boolean `age_55_plus` and Zapier has
+ * been seen sending "55+". All three are read here, as booleans or as the
+ * vendor's "Yes"/"No"/"N/A" strings.
+ */
+function isAge55Flag(rawData: any): boolean {
+  const candidates = [rawData?.age_55_plus, rawData?.['55'], rawData?.['55+']];
+
+  for (const candidate of candidates) {
+    if (candidate === true) return true;
+    if (typeof candidate === 'string') {
+      const value = candidate.trim().toLowerCase();
+      if (value === 'yes' || value === 'y' || value === 'true') return true;
+    }
+  }
+
+  return false;
+}
+
+/**
  * Derive intent from form data
  */
 function deriveIntent(rawData: any): LeadIntent {
@@ -98,7 +122,7 @@ function deriveIntent(rawData: any): LeadIntent {
   if (
     REVERSE_MORTGAGE_ALIASES.test(loanType) ||
     REVERSE_MORTGAGE_ALIASES.test(primaryGoal) ||
-    rawData?.age_55_plus === true
+    isAge55Flag(rawData)
   ) {
     return 'reverse';
   }
