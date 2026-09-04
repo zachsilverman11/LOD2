@@ -310,16 +310,17 @@ describe('money parsing', () => {
 });
 
 describe('LTV parsing', () => {
-  // Which of these three the vendor sends is NOT confirmed. All three must
-  // land on the same percentage.
+  // The vendor has since CONFIRMED in writing that LTV is always a ratio:
+  // "0.80" means 80%. These cases were written while that was still unknown;
+  // the bare-percentage readings ("80" -> 80, "61" -> 61) encoded the wrong
+  // guess and are corrected here. Full coverage of the confirmed convention
+  // lives in financevine-ltv-and-equity.test.ts.
   const cases: Array<[string, number]> = [
-    ['80', 80],
     ['80%', 80],
     ['0.80', 80],
     ['0.8', 80],
-    ['61', 61],
-    ['61.5', 61.5],
     ['0.615', 61.5],
+    ['1.10', 110],
     [' 75 % ', 75],
   ];
 
@@ -335,6 +336,13 @@ describe('LTV parsing', () => {
 
   it('refuses an implausible percentage rather than recording it', () => {
     expect(parseLtv('8000')).toEqual({ raw: '8000', parsed: null });
+  });
+
+  it('flags a bare percentage as unparseable now that ratios are confirmed', () => {
+    // "80" ratio-expands to 8000, lands outside 0-200 and is reported with
+    // the raw string preserved — the signal we want if the vendor's format
+    // ever changes back.
+    expect(parseLtv('80')).toEqual({ raw: '80', parsed: null });
   });
 
   it('treats an explicit percent above 1 as a percent, not a ratio', () => {
@@ -504,7 +512,9 @@ describe('rawData overlay', () => {
   it('stores every figure raw, and parsed where parseable', () => {
     expect(overlay.mortgage_balance).toBe(520000);
     expect(overlay.mortgage_balance_raw).toBe('520000');
-    expect(overlay.ltv_percent).toBe(61);
+    // VENDOR_PAYLOAD carries LTV "61", which under the confirmed ratio
+    // convention is out of range and so stores raw-only.
+    expect(overlay.ltv_percent).toBeUndefined();
     expect(overlay.ltv_percent_raw).toBe('61');
   });
 

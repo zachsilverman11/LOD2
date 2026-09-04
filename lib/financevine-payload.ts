@@ -142,13 +142,29 @@ export function parseMoney(value: unknown): ParsedFigure | null {
 /**
  * LTV, always normalized to a percentage.
  *
- * Which form the vendor sends is NOT confirmed — a sample payload has been
- * requested. All three plausible forms are handled:
- *   "80"  → 80    (already a percentage)
- *   "80%" → 80    (explicit percentage)
- *   "0.8" → 80    (a ratio; anything <= 1 without a "%" is read as a ratio)
- * A result outside 0–200% is treated as unparseable — the raw string is kept
- * and the format is logged rather than a nonsense number reaching the record.
+ * The vendor has now CONFIRMED the convention in writing: LTV is always a
+ * ratio. "0.80" means 80%; the first real lead's "1.10" means 110%.
+ *
+ *   "0.80" → 80
+ *   "1.10" → 110    (an underwater property — the case that matters most here)
+ *   "0.5"  → 50
+ *   0.8    → 80     (a JSON number, not a string)
+ *
+ * There is deliberately NO "<= 1.0" gate any more. The previous version only
+ * multiplied values at or below 1.0, so "0.85" became 85 while "1.10" stayed
+ * 1.1 — a 100x error landing precisely on over-100% LTV, which is the
+ * underwater case an alt/private book sees most often. See
+ * notes/financevine-first-lead-audit.md §2.
+ *
+ * Two guards remain, and both are about catching a FUTURE format change
+ * loudly rather than storing a wrong number quietly:
+ *   - An explicit "%" is honoured as a percentage. A value that literally
+ *     says "80%" is self-describing, and reading it as a ratio (8000%) would
+ *     be perverse.
+ *   - A result outside 0-200% is treated as unparseable. If the vendor ever
+ *     switches back to sending percentages, "80" would ratio-expand to 8000,
+ *     land outside the range, and be reported as UNPARSED with the raw string
+ *     preserved — which is exactly the signal we would want.
  */
 export function parseLtv(value: unknown): ParsedFigure | null {
   const raw = presentString(value);
@@ -159,7 +175,8 @@ export function parseLtv(value: unknown): ParsedFigure | null {
   if (!/^-?\d+(\.\d+)?$/.test(cleaned)) return { raw, parsed: null };
 
   let parsed = Number(cleaned);
-  if (!isExplicitPercent && parsed > 0 && parsed <= 1) parsed *= 100;
+  // Every bare LTV is a ratio, per the vendor. No magnitude gate.
+  if (!isExplicitPercent) parsed *= 100;
 
   if (!Number.isFinite(parsed) || parsed < 0 || parsed > 200) {
     return { raw, parsed: null };

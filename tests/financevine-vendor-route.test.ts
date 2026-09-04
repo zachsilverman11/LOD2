@@ -148,7 +148,9 @@ describe('vendor payload end to end', () => {
     expect(rawData.province).toBe('Ontario');
     expect(rawData.mortgage_balance).toBe(520000);
     expect(rawData.mortgage_balance_raw).toBe('520000');
-    expect(rawData.ltv_percent).toBe(61);
+    // "61" is out of range as a ratio; raw is preserved, parsed is omitted.
+    expect(rawData.ltv_percent).toBeUndefined();
+    expect(rawData.ltv_percent_raw).toBe('61');
     expect(rawData.age_55_plus).toBe(false);
     expect(rawData.open_to_sell).toBe(true);
     expect(rawData.phone).toBe('+16478553592');
