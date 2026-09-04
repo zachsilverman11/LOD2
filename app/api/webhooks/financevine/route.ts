@@ -2,7 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { sendSlackNotification, sendErrorAlert } from "@/lib/slack";
 import { correctNames } from "@/lib/name-correction";
-import { deriveLeadSegment, formatPhoneE164 } from "@/lib/lead-segmentation";
+import { deriveLeadSegment } from "@/lib/lead-segmentation";
+import {
+  describeFigureFormats,
+  normalizeFinanceVinePayload,
+  payloadKeys,
+  toRawDataOverlay,
+  toSegmentationInput,
+} from "@/lib/financevine-payload";
 
 /**
  * Statuses the autonomous Holly cron will NOT act on. Mirrors the eligibility
@@ -62,7 +69,7 @@ export function resolveResubmissionReview(
       shouldSchedule: false,
       reason: `lead is not in the autonomous cron's scope (status ${lead.status}${
         lead.hollyDisabled ? ", Holly disabled" : ""
-      })`,
+      }${lead.consentSms ? "" : ", SMS consent withdrawn"})`,
     };
   }
 
@@ -80,6 +87,33 @@ export function resolveResubmissionReview(
         ? "no review was scheduled"
         : `review was ${lead.nextReviewAt.toISOString()}`,
   };
+}
+
+/**
+ * Which communication channels this lead has WITHDRAWN consent for.
+ *
+ * `consentSms: false` is the opt-out marker across the codebase — Twilio sets
+ * it on a STOP reply (app/api/webhooks/twilio/route.ts:99) and on a carrier
+ * unsubscribe, and CASL withdrawal sets any of the three
+ * (lib/compliance.ts:145).
+ *
+ * It exists because re-submitting the FinanceVine form must NOT be read as
+ * fresh consent. The vendor SMS-verifies leads, so the create path grants all
+ * three channels — but on the update path a lead who opted out would have had
+ * `consentSms: true` written straight back over their opt-out, putting them
+ * back in Holly's reach on the next cron pass. A withdrawal is never undone by
+ * a form re-fill; only the lead can restore it.
+ */
+export function withdrawnConsentChannels(lead: {
+  consentSms: boolean;
+  consentEmail: boolean;
+  consentCall: boolean;
+}): string[] {
+  const withdrawn: string[] = [];
+  if (!lead.consentSms) withdrawn.push("SMS");
+  if (!lead.consentEmail) withdrawn.push("email");
+  if (!lead.consentCall) withdrawn.push("call");
+  return withdrawn;
 }
 
 /**
@@ -123,7 +157,48 @@ export async function POST(req: NextRequest) {
 
     console.log("[FinanceVine] Received lead - processing");
 
-    // Log the webhook
+    // === PAYLOAD ADAPTER ===
+    // FinanceVine posts two different shapes (their documented schema with
+    // capitalized/spaced keys and Python `None`s, and the flat snake_case
+    // shape this route has always taken). Both are normalized to one internal
+    // input here, at the edge; NOTHING below this line reads the payload for
+    // lead fields. See lib/financevine-payload.ts.
+    const normalized = normalizeFinanceVinePayload(payload);
+
+    if (!normalized.ok) {
+      // Keys only, never values — this is what makes a schema drift
+      // diagnosable from Vercel logs without exposing a lead's data.
+      console.warn(
+        `[FinanceVine] Rejected payload: ${normalized.error}. Received keys: ${JSON.stringify(
+          normalized.keys
+        )}`
+      );
+
+      // Record the drift, keys only. A rejected body is never stored: we do
+      // not know what is in it, we are not creating a lead from it, and the
+      // key set is the whole diagnostic. This write happens AFTER validation
+      // on purpose — a malformed POST must not be able to put an arbitrary
+      // body into the audit table.
+      await prisma.webhookEvent.create({
+        data: {
+          source: "financevine",
+          eventType: "rejected_payload",
+          payload: { receivedKeys: normalized.keys, problems: normalized.problems },
+          processed: true,
+        },
+      });
+
+      return NextResponse.json(
+        {
+          error: normalized.error,
+          problems: normalized.problems,
+          receivedKeys: normalized.keys,
+        },
+        { status: 400 }
+      );
+    }
+
+    // Log the webhook. Only a payload we could actually read gets stored.
     await prisma.webhookEvent.create({
       data: {
         source: "financevine",
@@ -133,63 +208,90 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Normalize Zapier payload shapes (flat, nested data, or query-ish keys)
-    const data = payload.data || payload;
+    const input = normalized.lead;
+    const {
+      vendorLeadId,
+      email,
+      phone,
+      mortgageType,
+      primaryGoal,
+      borrowerProfile,
+    } = input;
 
-    // Extract fields (map what we can, rest goes in rawData)
-    const firstName = data.first_name || data.firstName || data["First Name"] || "Unknown";
-    const lastName = data.last_name || data.lastName || data["Last Name"] || "";
-    const email = data.email || data.Email;
-    const rawPhone = data.phone || data.Phone || data.phone_number;
-    const mortgageType = data.mortgage_type || data["Mortgage Type"] || data.loan_type;
-    const primaryGoal = data.primary_goal || data["Primary Goal"] || data.goal;
-    const borrowerProfile = data.borrower_profile || data["Borrower Profile"];
-    const timeline = data.timeline || data.Timeline;
-    const age55Plus = data.age_55_plus || data["55+"] || false;
-    const openToSelling = data.open_to_selling || data["Open to Selling"];
-    const propertyValue = data.property_value || data["Property Value"];
-    const mortgageBalance = data.mortgage_balance || data["Mortgage Balance"];
-    const equityTakeOut = data.equity_take_out || data["Equity Take-Out"];
-    const ltvPercent = data.ltv_percent || data["LTV%"];
-    const province = data.province || data.Province;
-    const zoning = data.zoning || data.Zoning;
-    const propertyConditions = data.property_conditions || data["Property Conditions"];
-    const trustedFormCert = data.trusted_form_cert || data.xxTrustedFormCertUrl;
-    const leadId = data.lead_id || data.Lead_ID || data.unique_id;
-
-    // Validate required fields
-    if (!email || !rawPhone) {
-      return NextResponse.json(
-        { error: "Missing required fields: email, phone" },
-        { status: 400 }
-      );
-    }
-
-    // Normalize phone to E.164
-    const phone = formatPhoneE164(rawPhone);
+    // Whether LTV arrives as "80", "80%" or "0.80", and whether money carries
+    // "$" and commas, is not yet confirmed by the vendor. Log the SHAPE of
+    // every figure (digits masked) so the real formats can be read off the
+    // logs and this parser tightened, without a figure ever being printed.
+    console.log(
+      `[FinanceVine] Payload keys: ${JSON.stringify(
+        payloadKeys(payload)
+      )} | figure formats: ${describeFigureFormats(input)}`
+    );
 
     // Parse and correct names
-    const nameCorrectionResult = correctNames(firstName, lastName);
+    const nameCorrectionResult = correctNames(input.firstName, input.lastName);
     const correctedFirstName = nameCorrectionResult.firstName;
     const correctedLastName = nameCorrectionResult.lastName;
 
-    // Derive segment, intent, bankability
+    // Derive segment, intent, bankability from the normalized strings. The
+    // vendor's value set is NOT enumerated, so the strings are passed straight
+    // through to the natural-language aliases rather than matched to an enum.
     const segmentation = deriveLeadSegment({
       source: "financevine",
-      rawData: {
-        mortgage_type: mortgageType,
-        primary_goal: primaryGoal,
-        borrower_profile: borrowerProfile,
-        age_55_plus: age55Plus,
-      },
+      rawData: toSegmentationInput(input),
     });
 
-    // Check if lead already exists
-    const existingLead = await prisma.lead.findFirst({
-      where: {
-        OR: [{ email }, { phone }],
-      },
-    });
+    // rawData: the payload EXACTLY as received, plus a canonical snake_case
+    // overlay for the consumers that read loose keys off rawData (province for
+    // timezone/SMS-hours, goal for prompts) and the parsed financials. The
+    // untouched payload is also kept verbatim under `financevineRaw` so the
+    // overlay can never be mistaken for what the vendor actually sent.
+    const rawDataForLead = {
+      ...(payload as Record<string, unknown>),
+      ...toRawDataOverlay(input),
+      financevineRaw: payload,
+      ingestTimestamp: new Date().toISOString(), // For timing logic
+    };
+
+    // === DEDUPE ===
+    // The vendor's own lead id comes first: the same vendor lead must never
+    // create twice, even when they change the email they submit with.
+    // Phone/email remain the fallback, so the snake_case shape (which carries
+    // no vendor id) dedupes exactly as it always has.
+    let existingLead = vendorLeadId
+      ? await prisma.lead.findFirst({ where: { vendorLeadId } })
+      : null;
+
+    const dedupeKey = existingLead ? "vendorLeadId" : "phone/email";
+
+    if (!existingLead) {
+      existingLead = await prisma.lead.findFirst({
+        where: {
+          OR: [{ email }, { phone }],
+        },
+      });
+    }
+
+    if (existingLead) {
+      console.log(
+        `[FinanceVine] Matched existing lead ${existingLead.id} on ${dedupeKey}`
+      );
+    }
+
+    // `email` is unique on Lead. When we matched on the vendor id and the lead
+    // arrives with a NEW email, that email may already belong to a different
+    // row — writing it would fail the whole webhook on a unique violation.
+    // Keep the existing address in that case and say so.
+    let emailForUpdate = email;
+    if (existingLead && existingLead.email !== email) {
+      const emailOwner = await prisma.lead.findFirst({ where: { email } });
+      if (emailOwner && emailOwner.id !== existingLead.id) {
+        console.warn(
+          `[FinanceVine] Lead ${existingLead.id} submitted an email already held by ${emailOwner.id} - keeping the existing address`
+        );
+        emailForUpdate = existingLead.email;
+      }
+    }
 
     let lead;
     let resubmissionScheduled = false;
@@ -202,18 +304,17 @@ export async function POST(req: NextRequest) {
           firstName: correctedFirstName,
           lastName: correctedLastName,
           phone,
-          email,
+          email: emailForUpdate,
           source: "financevine",
+          vendorLeadId: vendorLeadId ?? existingLead.vendorLeadId,
           segment: segmentation.segment,
           intent: segmentation.intent,
           bankability: segmentation.bankability,
-          rawData: {
-            ...payload,
-            ingestTimestamp: new Date().toISOString(), // For timing logic
-          },
-          consentSms: true, // FinanceVine leads are SMS-verified
-          consentEmail: true,
-          consentCall: true,
+          rawData: rawDataForLead,
+          // NO consent fields here, deliberately. See withdrawnConsentChannels:
+          // an opt-out or a CASL withdrawal must survive a re-submission, and
+          // a channel that is already consented needs no rewrite. The create
+          // path below is the only place consent is granted.
           updatedAt: new Date(),
         },
       });
@@ -282,11 +383,19 @@ export async function POST(req: NextRequest) {
         ? `Holly review pulled forward to ${handoffAt.toISOString()}.`
         : `Holly review NOT rescheduled — ${review.reason}.`;
 
+      // Surface a withdrawal explicitly. Re-submitting the form does not undo
+      // it, so a human needs to know why nothing automated will happen.
+      const withdrawn = withdrawnConsentChannels(lead);
+      const consentNote =
+        withdrawn.length > 0
+          ? `\n⚠️ Consent previously withdrawn for: ${withdrawn.join(", ")} — NOT re-granted by this re-submission.`
+          : "";
+
       await sendSlackNotification({
         type: "lead_updated",
         leadName: `${correctedFirstName} ${correctedLastName}`,
         leadId: lead.id,
-        details: `Re-submitted the FinanceVine form: ${resubGoal}\n\nStatus ${lead.status} · segment ${segmentation.segment} · intent ${segmentation.intent} · bankability ${segmentation.bankability}\n${resubScheduleNote}`,
+        details: `Re-submitted the FinanceVine form: ${resubGoal}\n\nStatus ${lead.status} · segment ${segmentation.segment} · intent ${segmentation.intent} · bankability ${segmentation.bankability}\n${resubScheduleNote}${consentNote}`,
       });
     } else {
       // Get current cohort config
@@ -303,13 +412,11 @@ export async function POST(req: NextRequest) {
           phone,
           status: "NEW",
           source: "financevine",
+          vendorLeadId,
           segment: segmentation.segment,
           intent: segmentation.intent,
           bankability: segmentation.bankability,
-          rawData: {
-            ...payload,
-            ingestTimestamp: new Date().toISOString(), // For timing logic
-          },
+          rawData: rawDataForLead,
           consentSms: true, // FinanceVine leads are SMS-verified
           consentEmail: true,
           consentCall: true,
