@@ -6,6 +6,11 @@ import { inngest } from "@/lib/inngest";
 import { sendErrorAlert } from "@/lib/slack";
 import { validateTwilioSignature } from "@/lib/twilio-signature";
 import { findLeadByPhone } from "@/lib/phone-matching";
+import {
+  isPinnedRelaySender,
+  looksLikeRelayFormat,
+  processFinanceVineRelay,
+} from "@/lib/financevine-relay";
 
 /**
  * Handle incoming SMS messages from Twilio
@@ -80,6 +85,34 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
+      );
+    }
+
+    // 🔁 FINANCEVINE RELAY
+    // Replies to FinanceVine's intro SMS (sent from THEIR number) are forwarded
+    // to us as "NEW MESSAGE FROM: <lead> BODY: <text>". The sender is the
+    // vendor, not the lead: nothing in this branch ever replies to `from`. The
+    // lead's real number is extracted, the message attributed to the right lead
+    // (or a provisional one), and Holly opens a fresh direct thread from our
+    // number. See lib/financevine-relay.ts and notes/financevine-relay.md.
+    if (looksLikeRelayFormat(body) || isPinnedRelaySender(from)) {
+      const outcome = await processFinanceVineRelay({ from, body, messageSid });
+
+      await prisma.webhookEvent.create({
+        data: {
+          source: "twilio",
+          eventType: "sms.relay",
+          payload: { from, body, messageSid, outcome: outcome.kind },
+          processed: outcome.kind !== "malformed" && outcome.kind !== "unexpected_sender",
+        },
+      });
+
+      // Empty TwiML, always: a <Message> here would go to the 778.
+      return new Response(
+        '<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
+        {
+          headers: { "Content-Type": "text/xml" },
+        }
       );
     }
 
