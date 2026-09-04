@@ -854,6 +854,238 @@ export function selectBookingHook(conversationText: string): BookingHook {
   return BOOKING_HOOKS.find(h => h.id === 'hidden-cost')!;
 }
 
+// ---------------------------------------------------------------------------
+// FinanceVine financials in the alt_private briefing
+// ---------------------------------------------------------------------------
+
+/**
+ * A figure as the FinanceVine adapter leaves it on `rawData`.
+ *
+ * lib/financevine-payload.ts (`toRawDataOverlay`) writes every financial twice:
+ * `<key>` is the parsed number when the vendor's string could be read as one,
+ * and `<key>_raw` is that string verbatim either way. A field the vendor did
+ * not send is OMITTED from the overlay — never written as null — so a missing
+ * key is the only absence signal there is, and it is the one read here.
+ *
+ * These numbers exist so Holly can reason about the lead's equity position.
+ * They are never for the message. The block built below is rendered directly
+ * above the figures-are-for-understanding-only rule in both the alt_private and
+ * the reverse playbook so the numbers and the instruction travel together, and
+ * HOLLY_ALT_LENDING_GUARDRAILS blocks any figure that leaks into an SMS anyway.
+ */
+interface BriefingFigure {
+  value: number | null;
+  raw: string | null;
+}
+
+function readBriefingFigure(leadData: any, key: string): BriefingFigure {
+  const rawValue = leadData?.[`${key}_raw`];
+  const raw =
+    typeof rawValue === 'string' && rawValue.trim() !== '' ? rawValue.trim() : null;
+
+  const stored = leadData?.[key];
+  let value: number | null = null;
+  if (typeof stored === 'number' && Number.isFinite(stored)) {
+    value = stored;
+  } else if (typeof stored === 'string' && /^-?\d+(\.\d+)?$/.test(stored.trim())) {
+    // rawData is JSON that has round-tripped through Postgres; tolerate a
+    // numeric string rather than silently dropping a figure we hold.
+    value = Number(stored.trim());
+  }
+
+  return { value, raw };
+}
+
+function hasBriefingFigure(figure: BriefingFigure): boolean {
+  return figure.value !== null || figure.raw !== null;
+}
+
+/**
+ * "$750,000" / "$1,234.56". Deliberately not Intl.NumberFormat: this string is
+ * pinned by tests and must be byte-identical wherever it runs, including on a
+ * Node build without full ICU.
+ */
+function formatBriefingMoney(n: number): string {
+  const [whole, frac] = Math.abs(n).toFixed(2).split('.');
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return `${n < 0 ? '-$' : '$'}${frac === '00' ? grouped : `${grouped}.${frac}`}`;
+}
+
+/** LTV is already a percentage by the time it reaches rawData (see parseLtv). */
+function formatBriefingPercent(n: number): string {
+  const rounded = Math.round(n * 100) / 100;
+  return `${Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2).replace(/0$/, '')}%`;
+}
+
+function briefingMoneyLine(label: string, figure: BriefingFigure): string | null {
+  if (figure.value !== null) return `- ${label}: ${formatBriefingMoney(figure.value)}`;
+  if (figure.raw !== null) {
+    return `- ${label}: "${figure.raw}" (exactly as the vendor sent it - we could not read it as a number)`;
+  }
+  return null;
+}
+
+function briefingFlagLine(label: string, value: unknown): string | null {
+  if (value === true) return `- ${label}: yes`;
+  if (value === false) return `- ${label}: no`;
+  return null;
+}
+
+function briefingTextLine(label: string, value: unknown): string | null {
+  const text = typeof value === 'string' ? value.trim() : null;
+  return text ? `- ${label}: ${text}` : null;
+}
+
+/**
+ * What the figures MEAN, in words Holly can reason from.
+ *
+ * Every sentence here is deliberately unquotable: no percentage, no dollar
+ * amount, and none of the spelled-out fractions ("half the value of your home")
+ * that checkAltLendingNumericCompliance also bans. The point is that Holly
+ * understands the equity position well enough to pick an angle, not that she
+ * has a new sentence to paste into a text.
+ */
+function describeLeverage(leveragePercent: number, reverse: boolean): string {
+  if (reverse) {
+    if (leveragePercent >= 100) {
+      return 'There is little or nothing left of the home\'s value once the existing mortgage is counted. Whether a reverse mortgage is available at all turns on that, and on things only an advisor can weigh. Nothing here changes the unhurried, no-pressure framing.';
+    }
+    if (leveragePercent >= 80) {
+      return 'Much of the home\'s value is already borrowed against. How much room that leaves is advisor territory, and not something to hint at either way.';
+    }
+    if (leveragePercent >= 65) {
+      return 'There is real equity built up in the home, alongside an existing mortgage that is still a meaningful size.';
+    }
+    return 'They have built up substantial equity in the home. That is the whole basis of an unhurried conversation about options - a factor you understand, never a figure you quote.';
+  }
+
+  if (leveragePercent >= 100) {
+    return 'The balance owing is at or above what the property is worth. There is no equity left to draw on, and that is very likely the real constraint on this file - more than credit or income. An honest look at the whole picture is the only thing worth offering.';
+  }
+  if (leveragePercent >= 90) {
+    return 'Nearly the whole value of the property is already borrowed against. There is very little room, and what is possible is the advisor\'s call after seeing the full picture.';
+  }
+  if (leveragePercent >= 80) {
+    return 'The property is leveraged past the point where most bank lenders stop. This is exactly the kind of file the alternative and private side exists for - say that as reassurance, not as a promise.';
+  }
+  if (leveragePercent >= 65) {
+    return 'There is real equity in the property, though not a lot of slack. How much equity someone has is one of the biggest things that opens up options here.';
+  }
+  return 'There is substantial equity in the property. That is the strongest thing this file has going for it - treat it as a factor, never as a figure.';
+}
+
+/**
+ * The financials block for an alt_private lead's briefing.
+ *
+ * Returns '' when the record carries none of them, so a lead without vendor
+ * financials (every leads_on_demand alt_private lead, for instance) gets the
+ * briefing it got before, unchanged.
+ */
+export function buildFinancialContext(
+  leadData: any,
+  options: { reverse: boolean }
+): string {
+  const propertyValue = readBriefingFigure(leadData, 'property_value');
+  const mortgageBalance = readBriefingFigure(leadData, 'mortgage_balance');
+  const ltv = readBriefingFigure(leadData, 'ltv_percent');
+  const equityTakeOut = readBriefingFigure(leadData, 'equity_take_out');
+  const downPayment = readBriefingFigure(leadData, 'down_payment');
+  const income = readBriefingFigure(leadData, 'income');
+
+  const figures = [propertyValue, mortgageBalance, ltv, equityTakeOut, downPayment, income];
+  const flags = [leadData?.age_55_plus, leadData?.has_realtor, leadData?.open_to_sell];
+
+  // Gate on a financial or a flag, not on the situational fields below: a
+  // `timeline` alone is not a financial picture and must not conjure a block.
+  const hasAnything =
+    figures.some(hasBriefingFigure) || flags.some((f) => typeof f === 'boolean');
+  if (!hasAnything) return '';
+
+  const lines = [
+    briefingMoneyLine('Property value', propertyValue),
+    briefingMoneyLine('Mortgage balance', mortgageBalance),
+    ltv.value !== null
+      ? `- Loan-to-value: ${formatBriefingPercent(ltv.value)}`
+      : ltv.raw !== null
+        ? `- Loan-to-value: "${ltv.raw}" (exactly as the vendor sent it - we could not read it as a number)`
+        : null,
+    briefingMoneyLine('Equity take-out requested', equityTakeOut),
+    briefingMoneyLine('Down payment goal', downPayment),
+    briefingMoneyLine('Stated income', income),
+    briefingFlagLine('55 or older', leadData?.age_55_plus),
+    briefingFlagLine('Working with a realtor', leadData?.has_realtor),
+    briefingFlagLine('Open to selling', leadData?.open_to_sell),
+    briefingTextLine('Timeline they gave', leadData?.timeline),
+    briefingTextLine('Zoning', leadData?.zoning),
+    briefingTextLine('Property conditions', leadData?.property_conditions),
+  ].filter((line): line is string => line !== null);
+
+  // --- What it means -------------------------------------------------------
+  const reading: string[] = [];
+  const pv = propertyValue.value;
+  const mb = mortgageBalance.value;
+  const equity = pv !== null && mb !== null ? pv - mb : null;
+  // Prefer the LTV the vendor sent (parseLtv normalizes it to a percentage)
+  // and fall back to the one the other two figures imply.
+  const leveragePercent =
+    ltv.value !== null ? ltv.value : pv !== null && pv > 0 && mb !== null ? (mb / pv) * 100 : null;
+
+  if (leveragePercent !== null) {
+    reading.push(`- ${describeLeverage(leveragePercent, options.reverse)}`);
+  }
+
+  const ask = equityTakeOut.value;
+  if (ask !== null && equity !== null) {
+    if (options.reverse) {
+      reading.push(
+        '- They named an amount they would like to access. Never repeat it back and never confirm it is available - what is possible is the advisor\'s to say.'
+      );
+    } else if (equity <= 0) {
+      reading.push(
+        '- They have asked to take equity out of a property that has none left in it. Do not say that to them. It means the call is about what is actually possible, not about how much.'
+      );
+    } else if (ask > equity) {
+      reading.push(
+        '- What they asked to take out is more than the equity currently in the property. Do not say that to them and do not promise the amount. Steer the call toward what is actually possible.'
+      );
+    } else {
+      reading.push(
+        '- What they asked to take out sits inside the equity currently in the property. That does not make it approvable - approval is the advisor\'s judgment, not yours - but it is not obviously out of reach.'
+      );
+    }
+  }
+
+  if (hasBriefingFigure(income)) {
+    reading.push(
+      '- Their income is already on file. Do not ask for it over SMS; the advisor covers it on the call.'
+    );
+  }
+
+  if (leadData?.open_to_sell === true) {
+    reading.push(
+      '- They said they are open to selling. That widens what the advisor can walk through. Leave room for it, do not push it.'
+    );
+  }
+
+  const propertyConditions =
+    typeof leadData?.property_conditions === 'string' && leadData.property_conditions.trim() !== '';
+  if (propertyConditions && !options.reverse) {
+    reading.push(
+      '- The property conditions above are a real part of this file. Naming the situation they already described is what makes the message land.'
+    );
+  }
+
+  const readingBlock =
+    reading.length > 0
+      ? `\n**WHAT THOSE FIGURES MEAN FOR THIS CONVERSATION (understand it, never say it):**\n${reading.join('\n')}\n`
+      : '';
+
+  return `**THIS LEAD'S FINANCIALS, AS THEY CAME IN (CONTEXT FOR YOUR JUDGMENT, NEVER FOR A MESSAGE):**
+${lines.join('\n')}
+${readingBlock}
+`;
+}
+
 /**
  * Build complete context briefing for Holly
  */
@@ -878,6 +1110,23 @@ export function buildHollyBriefing(params: {
   // intent deriveIntent() stores at ingest. They have usually NOT been declined
   // by anyone and must not receive the "bank said no" playbook below.
   const isReverse = isAltPrivate && String(leadData.intent || '').toLowerCase() === 'reverse';
+
+  // The FinanceVine financials this lead's record already holds, rendered for
+  // alt_private only and always immediately above the figures-are-for-
+  // understanding-only rule. '' when the record carries none of them.
+  const financialContext = isAltPrivate
+    ? buildFinancialContext(leadData, { reverse: isReverse })
+    : '';
+  const fvPropertyValue = readBriefingFigure(leadData, 'property_value');
+  const fvMortgageBalance = readBriefingFigure(leadData, 'mortgage_balance');
+  const fvDownPayment = readBriefingFigure(leadData, 'down_payment');
+  // The LEAD DETAILS blocks below print a literal "unknown" for a figure they
+  // cannot find under the leads_on_demand key names. That is what told Holly
+  // "property value and balance are unknown" on the first FinanceVine lead
+  // while both sat on the record. Fall back to the vendor keys; a lead without
+  // them (every prime lead) still renders exactly as before.
+  const detailFigure = (figure: BriefingFigure): string | null =>
+    figure.value !== null ? formatBriefingMoney(figure.value).replace('$', '') : figure.raw;
 
   // Determine lead type and relevant program
   const loanType = leadData.loanType || leadData.lead_type || 'unknown';
@@ -938,7 +1187,7 @@ This lead has usually NOT been declined by anyone. They are a homeowner 55+, typ
 - ❌ Do NOT name current lender in opener (existing rule)
 - ❌ suggestedPrograms for this segment: EMPTY (no bankable programs)
 
-**BRIEFING FIGURES ARE FOR UNDERSTANDING ONLY:**
+${financialContext}**BRIEFING FIGURES ARE FOR UNDERSTANDING ONLY:**
 Any numbers in this briefing (property value, mortgage balance, LTV, equity, rates, fees, payout or borrowing amounts) are context so YOU understand the situation. They never go in the message. Not as digits, not spelled out in words, not as a fraction or a range, and not as a number derived from them. The advisor gives real numbers on the call. The numeric guardrail is a backstop, not the plan.
 
 **VOICE:**
@@ -985,7 +1234,7 @@ This is NOT a bankable client. They typically have:
 - ❌ Do NOT use cash-back hook or rate-vs-cost reframe as primary angle
 - ❌ suggestedPrograms for this segment: EMPTY (no bankable programs)
 
-**BRIEFING FIGURES ARE FOR UNDERSTANDING ONLY:**
+${financialContext}**BRIEFING FIGURES ARE FOR UNDERSTANDING ONLY:**
 Any numbers in this briefing (property value, mortgage balance, LTV, equity, rates, fees, payout or borrowing amounts) are context so YOU understand the situation. They never go in the message. Not as digits, not spelled out in words, not as a fraction or a range, and not as a number derived from them. The advisor gives real numbers on the call. The numeric guardrail is a backstop, not the plan.
 
 **VOICE:**
@@ -1053,8 +1302,8 @@ ${resolvedEmail
   if (isPurchase) {
     briefing += `
 **Purchase Details:**
-- Price: $${leadData.purchasePrice || leadData.home_value || 'unknown'}
-- Down Payment: $${leadData.downPayment || leadData.down_payment || 'unknown'}
+- Price: $${leadData.purchasePrice || leadData.home_value || detailFigure(fvPropertyValue) || 'unknown'}
+- Down Payment: $${leadData.downPayment || leadData.down_payment || detailFigure(fvDownPayment) || 'unknown'}
 - Urgency: ${leadData.motivation_level || 'unknown'}
 ${leadData.motivation_level === 'I have made an offer to purchase' ? '  ⚠️ **URGENT** - They have an accepted offer!' : ''}
 - Credit Score: ${leadData.creditScore || 'unknown'}
@@ -1065,8 +1314,8 @@ ${leadData.motivation_level === 'I have made an offer to purchase' ? '  ⚠️ *
   if (isRefinance) {
     briefing += `
 **Refinance Details:**
-- Property Value: $${leadData.purchasePrice || leadData.home_value || 'unknown'}
-- Current Balance: $${leadData.balance || 'unknown'}
+- Property Value: $${leadData.purchasePrice || leadData.home_value || detailFigure(fvPropertyValue) || 'unknown'}
+- Current Balance: $${leadData.balance || detailFigure(fvMortgageBalance) || 'unknown'}
 ${leadData.withdraw_amount && parseInt(leadData.withdraw_amount) > 0 ? `- Cash Out: $${leadData.withdraw_amount}` : ''}
 ${leadData.lender ? `- Current Lender: ${leadData.lender} (DO NOT mention this lender by name in your opening message)` : ''}
 - Credit Score: ${leadData.creditScore || 'unknown'}
