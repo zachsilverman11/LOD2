@@ -84,6 +84,39 @@ const REVERSE_MORTGAGE_ALIASES =
 const EQUITY_TAKEOUT_ALIASES = /equity|cash|consolidat/;
 
 /**
+ * Goal strings that mean "raise a down payment". Lowercased input expected.
+ *
+ * This is a SEPARATE, GATED alias rather than another branch of
+ * EQUITY_TAKEOUT_ALIASES, because "down payment" is the one equity phrase
+ * whose meaning flips with the product:
+ *   - mortgage_type "Refinance my property" + goal "Down payment for
+ *     purchase" = a homeowner pulling equity OUT to fund a second property.
+ *     That is an equity take-out, and the vendor's own materials file "use
+ *     home equity to buy a second property" under equity.
+ *   - mortgage_type "Purchase a property" + the same goal = the money the
+ *     buyer is putting IN. That is a purchase, not a take-out.
+ * A bare regex in EQUITY_TAKEOUT_ALIASES could not tell those apart and would
+ * have mislabelled every genuine purchase lead.
+ */
+const DOWN_PAYMENT_GOAL_ALIASES = /down\s*payment|down\s*pay\b/;
+
+/** Product strings that mean the lead is buying, not refinancing. */
+const PURCHASE_PRODUCT_ALIASES = /purchase|\bbuy/;
+
+/**
+ * Is this a "refinance to fund a down payment" lead — i.e. an equity
+ * take-out wearing a down-payment label?
+ *
+ * Gated on mortgage_type ONLY. The goal saying "for purchase" is not the
+ * deciding signal — a refinance lead's goal names what the cash is FOR, and
+ * that is precisely the case we want to catch.
+ */
+function isDownPaymentTakeout(loanType: string, primaryGoal: string): boolean {
+  if (!DOWN_PAYMENT_GOAL_ALIASES.test(primaryGoal)) return false;
+  return !PURCHASE_PRODUCT_ALIASES.test(loanType);
+}
+
+/**
  * Is the "55+" reverse-mortgage age flag set?
  *
  * FinanceVine's form only asks this on reverse-mortgage inquiries, so a "Yes"
@@ -136,6 +169,7 @@ function deriveIntent(rawData: any): LeadIntent {
   // "consolidating" all land here; ".includes('consolidate')" missed the noun.
   if (
     EQUITY_TAKEOUT_ALIASES.test(primaryGoal) ||
+    isDownPaymentTakeout(loanType, primaryGoal) ||
     (rawData?.withdraw_amount && parseInt(rawData.withdraw_amount) > 0)
   ) {
     return 'equity';
